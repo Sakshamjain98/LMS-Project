@@ -1,0 +1,16 @@
+import express from "express";
+import cors from "cors";
+import authRoutes from "./routes/auth.routes.js";
+import testRoutes from "./routes/test.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import otpRoutes from "./routes/otp.routes.js";
+import { errorHandler } from "./middlewares/error.middleware.js";
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/test", testRoutes);
+app.use("/api/v1/auth/otp", otpRoutes);
+app.use(errorHandler);
+export default app;
