@@ -1,8 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
-import { ApiError } from "../utils/ApiError.js";
+import { ApiError } from "../shared/error/ApiError.js";
 import { STATUS_CODES } from "../constants/statusCode.js";
 import { MESSAGES } from "../constants/message.js";
+import { markUserActive } from "../infrastucture/redis/activeUsers.redis.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -13,7 +14,6 @@ export const authMiddleware = async (req, res, next) => {
         MESSAGES.TOKEN_MISSING
       );
     }
-
     const token = authHeader.split(" ")[1];
     let decoded;
     try {
@@ -24,7 +24,6 @@ export const authMiddleware = async (req, res, next) => {
         MESSAGES.TOKEN_INVALID
       );
     }
-
     const user = await User.findById(decoded.userId).select("-password");
 
     if (!user) {
@@ -34,7 +33,7 @@ export const authMiddleware = async (req, res, next) => {
       );
     }
     req.user = user;
-
+    await markUserActive(user._id);
     next();
   } catch (error) {
     next(error);

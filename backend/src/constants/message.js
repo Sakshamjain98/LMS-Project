@@ -24,5 +24,14 @@ OTP_EXPIRED: "OTP expired",
 OTP_RATE_LIMIT_EXCEEDED: "Too many OTP requests. Try again later.",
 OTP_VERIFY_LIMIT_EXCEEDED: "Too many incorrect OTP attempts",
 
+
+PROFILE_UPDATED: "Profile updated successfully",
+UNAUTHORIZED: "Unauthorized",
+FORBIDDEN: "Access denied",
+
+PAYMENT_INITIATED: "Payment initiated",
+PAYMENT_SUCCESS: "Payment verified successfully",
+INVALID_PAYMENT: "Invalid payment",
+SUBSCRIPTION_REQUIRED: "Active subscription required",
 });
 

@@ -1,0 +1,23 @@
+import express from "express";
+import * as controller from "./admin.controller.js";
+import { authorize } from "../../middlewares/authorize.middleware.js";
+import { authMiddleware } from "../../middlewares/auth.middleware.js";
+
+const router = express.Router();
+router.use(authMiddleware);
+router.use(authorize("admin"));
+router.post("/create", controller.createAdmin);
+router.get("/dashboard", controller.dashboard);
+router.get("/users", controller.users);
+router.put("/users/:id/role", controller.updateRole);
+router.delete("/users/:id", controller.removeUser);
+router.get("/content/pending", controller.pendingContent);
+router.put("/content/course/:id/approve", controller.approveCourse);
+router.delete("/content/course/:id/reject", controller.rejectCourse);
+router.get("/payments", controller.payments);
+router.put("/payments/:id/refund", controller.refund);
+router.post("/cms/blog", controller.createBlog);
+router.delete("/cms/blog/:id", controller.deleteBlog);
+router.get("/teachers/pending", controller.pendingTeachers);
+router.put("/teachers/:id/approve", controller.approveTeacher);
+export default router;

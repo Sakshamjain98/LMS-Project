@@ -1,23 +1,19 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const otpRateLimitSchema = new mongoose.Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      lowercase: true,
-      index: true,
-    },
-    attempts: {
-      type: Number,
-      default: 1,
-    },
-    lastAttemptAt: {
-      type: Date,
-      default: Date.now,
-    },
+const otpRateLimitSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
   },
-  { timestamps: true }
-);
+  attempts: {
+    type: Number,
+    default: 1,
+  },
+  lastAttemptAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, { timestamps: true });
 
-export default mongoose.model("OtpRateLimit", otpRateLimitSchema);
+export default mongoose.model('OtpRateLimit', otpRateLimitSchema);
