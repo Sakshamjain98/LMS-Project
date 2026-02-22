@@ -12,30 +12,18 @@ const router = express.Router();
 
 router.use(authMiddleware);
 router.use(authorize("student"));
-
-// Start a test
 router.post("/start/:testId", controller.startTest);
-
-// Save individual answer (auto-save)
 router.post(
   "/:attemptId/answer",
   validate(submitAnswerSchema),
   controller.submitAnswer
 );
-// Submit entire test
 router.post(
   "/:attemptId/submit",
   validate(submitTestSchema),
   controller.submitTest
 );
-
-// Get result
 router.get("/:attemptId/result", controller.getResult);
-
-// Get all my attempts
 router.get("/my-attempts", controller.getMyAttempts);
-
-// Get leaderboard (public for students)
 router.get("/leaderboard/:testId", controller.getLeaderboard);
-
 export default router;

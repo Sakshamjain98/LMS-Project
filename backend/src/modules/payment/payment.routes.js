@@ -13,4 +13,5 @@ router.get("/plans", controller.getPlans);
 router.post("/create-order", authMiddleware, validate(createOrderSchema), controller.createOrder);
 router.post("/verify", authMiddleware, validate(verifyPaymentSchema), controller.verifyPayment);
 
+
 export default router;

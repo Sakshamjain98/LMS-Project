@@ -45,7 +45,7 @@ app.use("/api/student", studentRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/teacher", teacherRoutes);
 app.use("/api/questions", questionRoutes);
-app.use("/api/test-attempts", testAttemptRoutes);
+app.use("/api/test", testAttemptRoutes);
 app.use("/api/admin", adminRoutes);
 
 import swaggerUi from "swagger-ui-express";

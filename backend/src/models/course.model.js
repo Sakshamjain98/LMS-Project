@@ -3,27 +3,20 @@ import mongoose from "mongoose";
 const fileSchema = new mongoose.Schema({
   url: String,
   publicId: String,
-  fileType: String, // "image" | "pdf"
+  fileType: String, // image | pdf | video
 });
 
-const itemSchema = new mongoose.Schema({
-  type: { type: String, enum: ["video", "pdf"], required: true },
-  title: { type: String, required: true },
-  description: String,
-  // For video
-  videoUrl: String,
-  // For pdf (reusing fileSchema fields)
-  fileUrl: String,
-  filePublicId: String,
-  order: { type: Number, default: 0 },
-}, { _id: true });
+const videoLinkSchema = new mongoose.Schema({
+  url: String,      // YouTube URL
+  title: String,
+});
 
 const sectionSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: String,
-  items: [itemSchema],
-  order: { type: Number, default: 0 },
-}, { _id: true });
+  videos: [videoLinkSchema],
+  notes: [fileSchema],
+});
 
 const courseSchema = new mongoose.Schema(
   {
@@ -32,10 +25,10 @@ const courseSchema = new mongoose.Schema(
     isPaid: { type: Boolean, default: false },
     tags: [String],
     educator: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    thumbnail: fileSchema, // course image
+    thumbnail: fileSchema,
     price: { type: Number, default: 0 },
     published: { type: Boolean, default: false },
-    sections: [sectionSchema], // new
+    sections: [sectionSchema],
   },
   { timestamps: true }
 );
