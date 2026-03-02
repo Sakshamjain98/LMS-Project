@@ -1,14 +1,6 @@
 import { Worker } from "bullmq";
 import redis from "../../config/redis.js";
 import logger from "../logger/logger.js";
-
-/**
- * Activity Logs Worker
- * --------------------
- * Ye worker background me Redis queue se jobs uthata hai
- * aur unko logger ke through store karta hai.
- */
-
 const activityWorker = new Worker(
   "activity-logs",
   async (job) => {
@@ -20,7 +12,7 @@ const activityWorker = new Worker(
         jobId: job.id,
         data: job.data,
       });
-      throw error; // BullMQ ko batata hai ki job fail hui
+      throw error;
     }
   },
   {
@@ -28,11 +20,8 @@ const activityWorker = new Worker(
   }
 );
 
-/**
- * Worker lifecycle logs
- */
 activityWorker.on("ready", () => {
-  console.log("🟢 Activity worker is ready and listening for jobs...");
+  console.log("Activity worker is ready and listening for jobs...");
 });
 
 activityWorker.on("failed", (job, err) => {

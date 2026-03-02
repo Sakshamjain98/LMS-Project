@@ -1,29 +1,43 @@
 import rateLimit from "express-rate-limit";
 
-export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+const createLimiter = ({
+  windowMs,
+  max,
+  message,
+  keyGenerator,
+  standardHeaders = true,
+  legacyHeaders = false,
+}) =>
+  rateLimit({
+    windowMs,
+    max,
+    message: { message },
+    keyGenerator,
+    standardHeaders,
+    legacyHeaders,
+  });
+
+export const apiLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
   max: 100,
-  message: {
-    message: "Too many requests, please try again later.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
+  message: "Too many requests, please try again later.",
 });
 
-export const authLimiter = rateLimit({
+export const authLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: {
-    message: "Too many authentication attempts, please try again later.",
-  },
+  message: "Too many authentication attempts, please try again later.",
 });
 
-export const otpLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+export const otpLimiter = createLimiter({
+  windowMs: 60 * 1000,
   max: 3,
-  message: {
-    message: "Too many OTP requests, please wait before trying again.",
-  },
+  message: "Too many OTP requests, please wait before trying again.",
 });
 
-
+export const forgotPasswordLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  keyGenerator: (req) => req.body?.email || req.ip,
+  message: "Too many password reset attempts, please try again later.",
+});

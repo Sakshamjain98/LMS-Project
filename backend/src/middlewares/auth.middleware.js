@@ -25,6 +25,12 @@ export const authMiddleware = async (req, res, next) => {
       );
     }
     const user = await User.findById(decoded.userId).select("-password");
+if (user.passwordChangedAt) {
+  const changedTimestamp = parseInt(user.passwordChangedAt.getTime() / 1000, 10);
+  if (decoded.iat < changedTimestamp) {
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, 'Token expired after password change');
+  }
+}
 
     if (!user) {
       throw new ApiError(

@@ -1,52 +1,26 @@
-export const SUBSCRIPTION_PLANS = Object.freeze({
+export const SUBSCRIPTION_PLANS = {
   FREE: {
     id: "FREE",
     name: "Free",
     price: 0,
     duration: null, // unlimited
-    features: [
-      "Access to free courses",
-      "Access to free notes",
-      "Read blogs",
-    ],
+    features: ["free_courses", "free_notes"],
   },
   MONTHLY: {
     id: "MONTHLY",
-    name: "Monthly Premium",
-    price: 299,
+    name: "Monthly",
+    price: 499, // example price
     duration: 30, // days
-    features: [
-      "Access to all courses",
-      "Access to all notes & PDFs",
-      "All tests & mock exams",
-      "Priority support",
-      "Download materials",
-    ],
-  },
-  QUARTERLY: {
-    id: "QUARTERLY",
-    name: "Quarterly Premium",
-    price: 799,
-    duration: 90, // days
-    discount: 11, // percentage saved vs monthly
-    features: [
-      "All Monthly features",
-      "Save 11% compared to monthly",
-    ],
+    features: ["all_courses", "all_notes", "premium_support"],
   },
   YEARLY: {
     id: "YEARLY",
-    name: "Yearly Premium",
-    price: 2499,
-    duration: 365, // days
-    discount: 30, // percentage saved vs monthly
-    features: [
-      "All Monthly features",
-      "Save 30% compared to monthly",
-      "Early access to new content",
-    ],
+    name: "Yearly",
+    price: 3999, // example
+    duration: 365,
+    features: ["all_courses", "all_notes", "premium_support", "discount"],
   },
-});
+};
 
 export const SUBSCRIPTION_STATUS = Object.freeze({
   ACTIVE: "ACTIVE",

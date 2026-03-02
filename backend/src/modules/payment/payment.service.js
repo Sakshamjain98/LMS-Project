@@ -11,7 +11,7 @@ export const getPlans = () => {
 
 export const createOrder = async (userId, planId) => {
   const plan = SUBSCRIPTION_PLANS[planId];
-  
+
   if (!plan || plan.id === "FREE") {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid plan selected");
   }
@@ -25,8 +25,8 @@ export const createOrder = async (userId, planId) => {
     plan: plan.id,
   });
 
-  return { 
-    orderId, 
+  return {
+    orderId,
     amount: plan.price,
     plan: plan.id,
     planName: plan.name,
@@ -45,7 +45,6 @@ export const verifyPayment = async ({
     throw new ApiError(STATUS_CODES.BAD_REQUEST, MESSAGES.INVALID_PAYMENT);
   }
 
-  // IDEMPOTENCY
   if (payment.status === "SUCCESS") {
     return { alreadyProcessed: true };
   }
@@ -54,12 +53,21 @@ export const verifyPayment = async ({
   payment.status = "SUCCESS";
   await payment.save();
 
-  // Queue subscription grant
+  // Calculate subscription period
+  const plan = SUBSCRIPTION_PLANS[payment.plan];
+  const startDate = new Date();
+  const endDate = plan.duration
+    ? new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000)
+    : null;
+
+  // Queue subscription grant with dates
   await paymentQueue.add("grant-subscription", {
     userId,
     paymentId,
     plan: payment.plan,
     amount: payment.amount,
+    startDate,
+    endDate,
   });
 
   return { success: true };

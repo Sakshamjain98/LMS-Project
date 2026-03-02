@@ -5,15 +5,15 @@ import { MESSAGES } from "../../constants/message.js";
 import { hashPassword, comparePassword } from "../../shared/utils/bcrypt.js";
 import { generateToken } from "../../shared/utils/token.js";
 import { OAuth2Client } from "google-auth-library";
-
+import crypto from 'crypto';
+import { sendResetPasswordEmail} from "../../shared/utils/email.util.js"
 export const registerUserService = async ({ name, email, password, role }) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new ApiError(STATUS_CODES.CONFLICT, MESSAGES.USER_ALREADY_EXISTS);
   }
-
   const hashedPassword = await hashPassword(password);
-  const isApproved = role === 'student'; // teachers need approval
+  const isApproved = role === 'student';
   const user = await User.create({
     name,
     email,
@@ -29,17 +29,13 @@ export const loginUserService = async ({ email, password }) => {
   if (!user) {
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, MESSAGES.INVALID_CREDENTIALS);
   }
-
-  // Teachers must be approved
   if (user.role === 'teacher' && !user.isApproved) {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "Your teacher account is pending admin approval.");
   }
-
   const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, MESSAGES.INVALID_CREDENTIALS);
   }
-
   const token = generateToken({ userId: user._id });
   return { token, user };
 };
@@ -64,15 +60,15 @@ export const googleLoginService = async ({ token, role }) => {
   let user = await User.findOne({ email });
 
   if (user) {
-    // Existing user: link Google account if not already linked
+
     if (!user.googleId) {
       user.googleId = googleId;
       user.avatar = user.avatar || picture;
       await user.save();
     }
-    // Do NOT change role – existing role takes precedence
+
   } else {
-    // New user: create with provided role and set approval status
+
     const isApproved = role === 'student';
     user = await User.create({
       name,
@@ -86,4 +82,62 @@ export const googleLoginService = async ({ token, role }) => {
 
   const jwtToken = generateToken({ userId: user._id });
   return { token: jwtToken, user };
+};
+
+
+
+
+
+
+
+export const forgotPasswordService = async ({ email }) => {
+  const user = await User.findOne({ email });
+  if (!user) {
+
+    return { message: MESSAGES.FORGOT_PASSWORD_EMAIL_SENT };
+  }
+
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+
+  const expires = Date.now() + 3600000; 
+
+  user.passwordResetToken = tokenHash;
+  user.passwordResetExpires = expires;
+  await user.save();
+
+
+  sendResetPasswordEmail(user.email, user.name, resetToken).catch(console.error);
+
+  return { message: MESSAGES.FORGOT_PASSWORD_EMAIL_SENT };
+};
+
+
+export const resetPasswordService = async ({ token, password }) => {
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await User.findOne({
+    passwordResetToken: tokenHash,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'Invalid or expired token');
+  }
+
+
+  const hashedPassword = await hashPassword(password);
+
+
+  user.password = hashedPassword;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  user.passwordChangedAt = Date.now(); 
+  await user.save();
+
+  return { message: MESSAGES.PASSWORD_RESET_SUCCESS };
 };

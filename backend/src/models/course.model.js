@@ -3,11 +3,11 @@ import mongoose from "mongoose";
 const fileSchema = new mongoose.Schema({
   url: String,
   publicId: String,
-  fileType: String, // image | pdf | video
+  fileType: String, 
 });
 
 const videoLinkSchema = new mongoose.Schema({
-  url: String,      // YouTube URL
+  url: String,   
   title: String,
 });
 
@@ -29,6 +29,7 @@ const courseSchema = new mongoose.Schema(
     price: { type: Number, default: 0 },
     published: { type: Boolean, default: false },
     sections: [sectionSchema],
+status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
   },
   { timestamps: true }
 );

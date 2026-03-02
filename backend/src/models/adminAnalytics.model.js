@@ -7,7 +7,7 @@ const questionAnalyticsSchema = new mongoose.Schema({
   correctAttempts: { type: Number, default: 0 },
   incorrectAttempts: { type: Number, default: 0 },
   skipped: { type: Number, default: 0 },
-  avgTimeSpent: { type: Number, default: 0 }, // seconds
+  avgTimeSpent: { type: Number, default: 0 }, 
 }, { timestamps: true });
 
 export default mongoose.model("QuestionAnalytics", questionAnalyticsSchema);

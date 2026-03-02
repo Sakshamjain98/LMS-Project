@@ -1,12 +1,20 @@
 {
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.67.2",
+    "crypto": "^1.0.1",
+    "express-rate-limit": "^8.2.1",
     "express-session": "^1.19.0",
     "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.9.2",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^8.0.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "@express-rate-limit/tsconfig": "^1.0.2"
   }
 }

@@ -42,6 +42,9 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
     },
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+    passwordChangedAt: Date,
   },
   { timestamps: true }
 );

@@ -1,11 +1,8 @@
-// scripts/createAdmin.js
 import mongoose from 'mongoose';
 import userModel from '../src/models/user.model.js';
 import { hashPassword } from '../src/shared/utils/bcrypt.js';
 import dotenv from 'dotenv';
-
 dotenv.config();
-
 const createAdmin = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);

@@ -1,31 +1,38 @@
 openapi: 3.0.0
 info:
-  title: Edu-Platform Pro API
-  description: Complete backend API documentation covering all modules: Auth, OTP, Student, Teacher, Admin, Questions, Test Attempts, Payments, and CMS.
+  title: Pharmacist Shubham API
+  description: API for educational platform with courses, tests, notes, payments, and user roles.
   version: 1.0.0
+  contact:
+    name: Support
+    email: support@pharmacistshubham.com
 servers:
-  - url: http://localhost:5000
+  - url: http://localhost:5000/api
     description: Local development server
-  - url: https://api.edu-platform.com/v1
+  - url: https://api.pharmacistshubham.com/api
     description: Production server
 
 tags:
   - name: Auth
-    description: Authentication endpoints (register, login, Google OAuth)
+    description: Authentication endpoints
   - name: OTP
-    description: One-Time Password (OTP) verification
-  - name: User
-    description: User profile and role management
+    description: OTP verification endpoints
   - name: Student
-    description: Student dashboard, profile, free content, blogs, schedule, payments
+    description: Student dashboard and content access
   - name: Teacher
-    description: Teacher dashboard, course management, test creation, analytics
-  - name: Questions
-    description: Question CRUD (single and bulk) for tests
+    description: Teacher content management
+  - name: Payment
+    description: Subscription and payment processing
+  - name: Question
+    description: Question management for tests
   - name: Test Attempt
-    description: Test taking, answer submission, results, leaderboard
+    description: Test taking and results
   - name: Admin
-    description: Admin dashboard, user management, content moderation, payments, CMS
+    description: Administrative operations
+  - name: User
+    description: User profile management
+  - name: System
+    description: Health check
 
 components:
   securitySchemes:
@@ -35,59 +42,33 @@ components:
       bearerFormat: JWT
 
   schemas:
-    # ------------------------------
-    # Base / Common
-    # ------------------------------
-    ApiResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        message:
-          type: string
-          example: "Operation successful"
-    ErrorResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-        message:
-          type: string
-          example: "Error description"
-        stack:
-          type: string
-          description: Stack trace (only in development)
-
-    # ------------------------------
-    # User
-    # ------------------------------
+    # ---------- User ----------
     User:
       type: object
       properties:
         _id:
           type: string
-          example: "60d5ecb54f421b2d"
+          example: "60d21b4667d0d8992e610c85"
         name:
           type: string
-          example: "Jatin"
+          example: "John Doe"
         email:
           type: string
-          example: "jatin@example.com"
+          format: email
+          example: "john@example.com"
         role:
           type: string
           enum: [student, teacher, admin]
           example: "student"
-        isProfileComplete:
+        isApproved:
           type: boolean
-          example: false
+          example: true
         avatar:
           type: string
-          nullable: true
+          example: "https://res.cloudinary.com/..."
         phone:
           type: string
-          nullable: true
+          example: "+1234567890"
         createdAt:
           type: string
           format: date-time
@@ -95,352 +76,7 @@ components:
           type: string
           format: date-time
 
-    UserResponse:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-        - type: object
-          properties:
-            user:
-              $ref: '#/components/schemas/User'
-
-    # ------------------------------
-    # OTP
-    # ------------------------------
-    OtpSendRequest:
-      type: object
-      required: [email]
-      properties:
-        email:
-          type: string
-          format: email
-          example: "user@example.com"
-    OtpVerifyRequest:
-      type: object
-      required: [email, otp]
-      properties:
-        email:
-          type: string
-          format: email
-        otp:
-          type: string
-          example: "123456"
-
-    # ------------------------------
-    # Question
-    # ------------------------------
-    Option:
-      type: object
-      required: [text]
-      properties:
-        text:
-          type: string
-          example: "Paris"
-        isCorrect:
-          type: boolean
-          default: false
-
-    Question:
-      type: object
-      required: [questionText, options, correctOptionIndex]
-      properties:
-        _id:
-          type: string
-        questionText:
-          type: string
-          example: "What is the capital of France?"
-        questionType:
-          type: string
-          enum: [MCQ, TRUE_FALSE, MULTIPLE_SELECT]
-          default: "MCQ"
-        options:
-          type: array
-          items:
-            $ref: '#/components/schemas/Option'
-          minItems: 2
-          maxItems: 4
-        correctOptionIndex:
-          type: integer
-          minimum: 0
-          example: 0
-        marks:
-          type: number
-          default: 1
-        negativeMarks:
-          type: number
-          default: 0
-        explanation:
-          type: string
-        difficulty:
-          type: string
-          enum: [easy, medium, hard]
-          default: "medium"
-        tags:
-          type: array
-          items:
-            type: string
-        createdBy:
-          type: string
-        testId:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    QuestionCreate:
-      type: object
-      required: [questionText, options, correctOptionIndex]
-      properties:
-        questionText:
-          type: string
-        questionType:
-          type: string
-          enum: [MCQ, TRUE_FALSE, MULTIPLE_SELECT]
-          default: "MCQ"
-        options:
-          type: array
-          items:
-            $ref: '#/components/schemas/Option'
-          minItems: 2
-          maxItems: 4
-        correctOptionIndex:
-          type: integer
-        marks:
-          type: number
-        negativeMarks:
-          type: number
-        explanation:
-          type: string
-        difficulty:
-          type: string
-          enum: [easy, medium, hard]
-        tags:
-          type: array
-          items:
-            type: string
-
-    BulkQuestionRequest:
-      type: object
-      required: [questions]
-      properties:
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/QuestionCreate'
-
-    # ------------------------------
-    # Test
-    # ------------------------------
-    Test:
-      type: object
-      properties:
-        _id:
-          type: string
-        title:
-          type: string
-        description:
-          type: string
-        teacherId:
-          type: string
-        questions:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-          enum: [draft, scheduled, published, closed]
-        startTime:
-          type: string
-          format: date-time
-        endTime:
-          type: string
-          format: date-time
-        duration:
-          type: integer
-          description: In minutes
-        totalMarks:
-          type: number
-        passingMarks:
-          type: number
-        instructions:
-          type: string
-        questionCount:
-          type: integer
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    TestCreateRequest:
-      type: object
-      required: [title]
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        duration:
-          type: integer
-        instructions:
-          type: string
-        passingMarks:
-          type: number
-
-    TestPublishRequest:
-      type: object
-      properties:
-        startTime:
-          type: string
-          format: date-time
-        endTime:
-          type: string
-          format: date-time
-
-    # ------------------------------
-    # Test Config
-    # ------------------------------
-    TestConfig:
-      type: object
-      properties:
-        testId:
-          type: string
-        sections:
-          type: array
-          items:
-            type: object
-            properties:
-              name:
-                type: string
-              questionIds:
-                type: array
-                items:
-                  type: string
-              marksPerQuestion:
-                type: number
-        duration:
-          type: integer
-        negativeMarking:
-          type: object
-          properties:
-            enabled:
-              type: boolean
-            value:
-              type: number
-
-    # ------------------------------
-    # Test Attempt
-    # ------------------------------
-    AnswerSubmission:
-      type: object
-      required: [questionId]
-      properties:
-        questionId:
-          type: string
-        selectedOptionIndex:
-          type: integer
-          nullable: true
-        timeTaken:
-          type: integer
-          description: Time in seconds spent on this question
-
-    TestAttempt:
-      type: object
-      properties:
-        _id:
-          type: string
-        testId:
-          type: string
-        studentId:
-          type: string
-        answers:
-          type: array
-          items:
-            $ref: '#/components/schemas/AnswerSubmission'
-        status:
-          type: string
-          enum: [in_progress, submitted, evaluated, expired]
-        startedAt:
-          type: string
-          format: date-time
-        submittedAt:
-          type: string
-          format: date-time
-        totalQuestions:
-          type: integer
-        attemptedQuestions:
-          type: integer
-        correctAnswers:
-          type: integer
-        wrongAnswers:
-          type: integer
-        skippedQuestions:
-          type: integer
-        totalMarks:
-          type: number
-        marksObtained:
-          type: number
-        percentage:
-          type: number
-        timeTaken:
-          type: integer
-
-    TestResult:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponse'
-        - type: object
-          properties:
-            result:
-              type: object
-              properties:
-                totalQuestions:
-                  type: integer
-                attemptedQuestions:
-                  type: integer
-                correctAnswers:
-                  type: integer
-                wrongAnswers:
-                  type: integer
-                skippedQuestions:
-                  type: integer
-                totalMarks:
-                  type: number
-                marksObtained:
-                  type: number
-                percentage:
-                  type: number
-
-    LeaderboardEntry:
-      type: object
-      properties:
-        studentId:
-          type: string
-        studentName:
-          type: string
-        marksObtained:
-          type: number
-        percentage:
-          type: number
-        timeTaken:
-          type: integer
-
-    # ------------------------------
-    # Course
-    # ------------------------------
-    FileInfo:
-      type: object
-      properties:
-        url:
-          type: string
-        publicId:
-          type: string
-        fileType:
-          type: string
-          enum: [image, pdf, video]
-
+    # ---------- Course ----------
     Course:
       type: object
       properties:
@@ -457,17 +93,17 @@ components:
           items:
             type: string
         educator:
-          type: string
+          $ref: '#/components/schemas/User'
         thumbnail:
-          $ref: '#/components/schemas/FileInfo'
-        notes:
-          type: array
-          items:
-            $ref: '#/components/schemas/FileInfo'
+          $ref: '#/components/schemas/File'
         price:
           type: number
         published:
           type: boolean
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Section'
         createdAt:
           type: string
           format: date-time
@@ -475,33 +111,224 @@ components:
           type: string
           format: date-time
 
-    CourseCreateRequest:
+    Section:
       type: object
       properties:
         title:
           type: string
         description:
           type: string
-        isPaid:
-          type: string
-          enum: ["true", "false"]
-        tags:
-          type: string
-          description: Comma-separated tags
-        price:
-          type: string
-        thumbnail:
-          type: string
-          format: binary
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoLink'
         notes:
           type: array
           items:
-            type: string
-            format: binary
+            $ref: '#/components/schemas/File'
 
-    # ------------------------------
-    # Payment & Subscription
-    # ------------------------------
+    VideoLink:
+      type: object
+      properties:
+        url:
+          type: string
+          example: "https://youtube.com/..."
+        title:
+          type: string
+
+    File:
+      type: object
+      properties:
+        url:
+          type: string
+        publicId:
+          type: string
+        fileType:
+          type: string
+          enum: [image, pdf, other]
+
+    # ---------- Note ----------
+    Note:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        file:
+          $ref: '#/components/schemas/File'
+        teacherId:
+          $ref: '#/components/schemas/User'
+        isFree:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        downloadCount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- Test ----------
+    Test:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        teacherId:
+          $ref: '#/components/schemas/User'
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+        status:
+          type: string
+          enum: [draft, scheduled, published, closed]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        duration:
+          type: number
+          description: Duration in minutes
+        totalMarks:
+          type: number
+        passingMarks:
+          type: number
+        instructions:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Question:
+      type: object
+      properties:
+        _id:
+          type: string
+        testId:
+          type: string
+        questionText:
+          type: string
+        questionType:
+          type: string
+          enum: [MCQ, TRUE_FALSE, MULTIPLE_SELECT]
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/Option'
+        correctOptionIndex:
+          type: number
+        marks:
+          type: number
+        negativeMarks:
+          type: number
+        explanation:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        tags:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Option:
+      type: object
+      properties:
+        text:
+          type: string
+        isCorrect:
+          type: boolean
+
+    # ---------- Test Attempt ----------
+    TestAttempt:
+      type: object
+      properties:
+        _id:
+          type: string
+        testId:
+          type: string
+        studentId:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Answer'
+        status:
+          type: string
+          enum: [in_progress, submitted, evaluated, expired]
+        startedAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        totalQuestions:
+          type: number
+        attemptedQuestions:
+          type: number
+        correctAnswers:
+          type: number
+        wrongAnswers:
+          type: number
+        skippedQuestions:
+          type: number
+        totalMarks:
+          type: number
+        marksObtained:
+          type: number
+        percentage:
+          type: number
+        timeTaken:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Answer:
+      type: object
+      properties:
+        questionId:
+          type: string
+        selectedOptionIndex:
+          type: number
+          nullable: true
+        isCorrect:
+          type: boolean
+        marksObtained:
+          type: number
+        timeTaken:
+          type: number
+
+    # ---------- Payment & Subscription ----------
     Payment:
       type: object
       properties:
@@ -523,12 +350,17 @@ components:
         status:
           type: string
           enum: [CREATED, SUCCESS, FAILED, REFUNDED]
+        gateway:
+          type: string
         refundedAt:
           type: string
           format: date-time
         refundReason:
           type: string
         createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -560,9 +392,137 @@ components:
           format: date-time
         autoRenew:
           type: boolean
-        isActive:
+        cancelledAt:
+          type: string
+          format: date-time
+        renewalReminder:
           type: boolean
+        paymentHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              paymentId:
+                type: string
+              amount:
+                type: number
+              paidAt:
+                type: string
+                format: date-time
+              plan:
+                type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
+    # ---------- OTP ----------
+    Otp:
+      type: object
+      properties:
+        email:
+          type: string
+        otp:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        attempts:
+          type: number
+
+    # ---------- Blog ----------
+    Blog:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        published:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- News ----------
+    News:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        author:
+          $ref: '#/components/schemas/User'
+        published:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- Comment ----------
+    Comment:
+      type: object
+      properties:
+        _id:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        blog:
+          $ref: '#/components/schemas/Blog'
+        comment:
+          type: string
+        approved:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- Subscription Plan ----------
+    SubscriptionPlan:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        duration:
+          type: number
+          description: Duration in days
+        features:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- Invoice ----------
     Invoice:
       type: object
       properties:
@@ -576,6 +536,7 @@ components:
           type: string
         plan:
           type: string
+          enum: [MONTHLY, QUARTERLY, YEARLY]
         amount:
           type: number
         gst:
@@ -597,31 +558,386 @@ components:
         createdAt:
           type: string
           format: date-time
-
-    # ------------------------------
-    # Blog
-    # ------------------------------
-    Blog:
-      type: object
-      properties:
-        _id:
-          type: string
-        title:
-          type: string
-        content:
-          type: string
-        published:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
         updatedAt:
           type: string
           format: date-time
 
-    BlogCreateRequest:
+    # ---------- Question Analytics ----------
+    QuestionAnalytics:
       type: object
-      required: [title, content]
+      properties:
+        testId:
+          type: string
+        questionId:
+          type: string
+        totalAttempts:
+          type: number
+        correctAttempts:
+          type: number
+        incorrectAttempts:
+          type: number
+        skipped:
+          type: number
+        avgTimeSpent:
+          type: number
+
+    # ---------- Common Responses ----------
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        stack:
+          type: string
+          description: Only in development
+
+    # ---------- Request Bodies ----------
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        role:
+          type: string
+          enum: [student, teacher]
+          default: student
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    GoogleLoginRequest:
+      type: object
+      required:
+        - token
+        - role
+      properties:
+        token:
+          type: string
+          description: Google ID token
+        role:
+          type: string
+          enum: [student, teacher]
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          format: password
+
+    OtpSendRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    OtpVerifyRequest:
+      type: object
+      required:
+        - email
+        - otp
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+        role:
+          type: string
+          enum: [student, teacher]
+
+    CreateCourseRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isPaid:
+          type: boolean
+        tags:
+          type: string
+          description: Comma-separated tags
+        price:
+          type: number
+        thumbnail:
+          type: string
+          format: binary
+          description: Image file
+
+    CreateSectionRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+
+    AddVideoLinkRequest:
+      type: object
+      required:
+        - url
+        - title
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+
+    CreateTestRequest:
+      type: object
+      required:
+        - title
+        - duration
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        duration:
+          type: number
+          description: Duration in minutes
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        instructions:
+          type: string
+        passingMarks:
+          type: number
+
+    CreateQuestionRequest:
+      type: object
+      required:
+        - questionText
+        - options
+        - correctOptionIndex
+      properties:
+        questionText:
+          type: string
+        questionType:
+          type: string
+          enum: [MCQ, TRUE_FALSE, MULTIPLE_SELECT]
+          default: MCQ
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              isCorrect:
+                type: boolean
+        correctOptionIndex:
+          type: number
+        marks:
+          type: number
+          default: 1
+        negativeMarks:
+          type: number
+          default: 0
+        explanation:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+          default: medium
+        tags:
+          type: array
+          items:
+            type: string
+
+    BulkCreateQuestionsRequest:
+      type: object
+      required:
+        - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateQuestionRequest'
+
+    TestConfigRequest:
+      type: object
+      required:
+        - duration
+      properties:
+        sections:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              questionIds:
+                type: array
+                items:
+                  type: string
+              marksPerQuestion:
+                type: number
+        duration:
+          type: number
+        negativeMarking:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            value:
+              type: number
+
+    PublishTestRequest:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+
+    SubmitAnswerRequest:
+      type: object
+      required:
+        - questionId
+        - selectedOptionIndex
+        - timeTaken
+      properties:
+        questionId:
+          type: string
+        selectedOptionIndex:
+          type: number
+          nullable: true
+        timeTaken:
+          type: number
+
+    SubmitTestRequest:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmitAnswerRequest'
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - planId
+      properties:
+        planId:
+          type: string
+          enum: [MONTHLY, QUARTERLY, YEARLY]
+
+    VerifyPaymentRequest:
+      type: object
+      required:
+        - razorpay_payment_id
+        - razorpay_order_id
+        - razorpay_signature
+      properties:
+        razorpay_payment_id:
+          type: string
+        razorpay_order_id:
+          type: string
+        razorpay_signature:
+          type: string
+
+    UpdateRoleRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum: [student, teacher, admin]
+
+    CreateBlogRequest:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        published:
+          type: boolean
+          default: true
+
+    # ---------- New Admin Request Bodies ----------
+    CreateNewsRequest:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        published:
+          type: boolean
+          default: true
+
+    UpdateNewsRequest:
+      type: object
       properties:
         title:
           type: string
@@ -630,46 +946,126 @@ components:
         published:
           type: boolean
 
-    # ------------------------------
-    # Admin Dashboard
-    # ------------------------------
-    AdminDashboard:
+    CreatePlanRequest:
       type: object
+      required:
+        - name
+        - price
+        - duration
       properties:
-        totalUsers:
-          type: integer
-        totalStudents:
-          type: integer
-        totalTeachers:
-          type: integer
-        totalRevenue:
-          type: number
-        totalCourses:
-          type: integer
-        totalTests:
-          type: integer
-        activeSubscriptions:
-          type: integer
-
-    # ------------------------------
-    # Select Role
-    # ------------------------------
-    SelectRoleRequest:
-      type: object
-      required: [role]
-      properties:
-        role:
+        name:
           type: string
-          enum: [student, teacher]
+        price:
+          type: number
+        duration:
+          type: number
+          description: Duration in days
+        features:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+          default: true
 
-security:
-  - bearerAuth: []
+    UpdatePlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        duration:
+          type: number
+        features:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+
+  parameters:
+    courseId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Course ID
+    sectionId:
+      name: sectionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Section ID
+    testId:
+      name: testId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Test ID
+    questionId:
+      name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Question ID
+    attemptId:
+      name: attemptId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Test attempt ID
+    userId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: User ID
+    blogId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Blog ID
+    videoIndex:
+      name: videoIndex
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Index of video in section's videos array
+    newsId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: News ID
+    commentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Comment ID
+    planId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Subscription plan ID
 
 paths:
-  # ================================
-  # AUTH
-  # ================================
-  /api/v1/auth/register:
+  # ---------- Auth ----------
+  /auth/register:
     post:
       tags: [Auth]
       summary: Register a new user
@@ -678,37 +1074,33 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [name, email, password]
-              properties:
-                name:
-                  type: string
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
         '201':
-          description: User created successfully
+          description: User created
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User created successfully
+                  user:
+                    $ref: '#/components/schemas/User'
         '400':
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many requests
 
-  /api/v1/auth/login:
+  /auth/login:
     post:
       tags: [Auth]
       summary: Login with email and password
@@ -717,64 +1109,101 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [email, password]
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
           description: Login successful
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      token:
-                        type: string
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
 
-  /api/v1/auth/google:
+  /auth/google:
     post:
       tags: [Auth]
-      summary: Google OAuth login
+      summary: Login or register with Google
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [token]
-              properties:
-                token:
-                  type: string
-                  description: Google ID token
+              $ref: '#/components/schemas/GoogleLoginRequest'
       responses:
         '200':
           description: Google login successful
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      token:
-                        type: string
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
 
-  # ================================
-  # OTP
-  # ================================
-  /api/v1/auth/otp/send:
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  # ---------- OTP ----------
+  /auth/otp/send:
     post:
       tags: [OTP]
       summary: Send OTP to email
@@ -790,9 +1219,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '429':
+          description: Rate limit exceeded
 
-  /api/v1/auth/otp/verify:
+  /auth/otp/verify:
     post:
       tags: [OTP]
       summary: Verify OTP and login/register
@@ -804,51 +1240,25 @@ paths:
               $ref: '#/components/schemas/OtpVerifyRequest'
       responses:
         '200':
-          description: OTP verified, returns JWT token
+          description: OTP verified, login successful
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      token:
-                        type: string
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid or expired OTP
 
-  # ================================
-  # USER
-  # ================================
-  /api/v1/users/select-role:
-    post:
-      tags: [User]
-      summary: Select user role (student/teacher)
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SelectRoleRequest'
-      responses:
-        '200':
-          description: Role assigned
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      role:
-                        type: string
-
-  # ================================
-  # STUDENT
-  # ================================
-  /api/student/dashboard:
+  # ---------- Student ----------
+  /student/dashboard:
     get:
       tags: [Student]
       summary: Get student dashboard data
@@ -860,16 +1270,17 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      subscription:
-                        type: string
-                        example: "FREE"
-                      # Add more fields as per actual implementation
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  subscription:
+                    type: string
+                  # Additional dashboard fields...
+        '403':
+          description: Access denied
 
-  /api/student/profile:
+  /student/profile:
     get:
       tags: [Student]
       summary: Get student profile
@@ -881,12 +1292,13 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+
     put:
       tags: [Student]
       summary: Update student profile
@@ -911,56 +1323,58 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
 
-  /api/student/free/courses:
+  /student/free/courses:
     get:
       tags: [Student]
-      summary: Get list of free courses
+      summary: Get free courses
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Free courses
+          description: List of free courses
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      courses:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Course'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  courses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Course'
 
-  /api/student/free/notes:
+  /student/free/notes:
     get:
       tags: [Student]
-      summary: Get free notes (PDFs)
+      summary: Get free notes
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Free notes list
+          description: List of free notes
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      notes:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/FileInfo'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
 
-  /api/student/blogs:
+  /student/blogs:
     get:
       tags: [Student]
       summary: Get all blogs
@@ -972,19 +1386,19 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      blogs:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Blog'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  blogs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Blog'
 
-  /api/student/schedule:
+  /student/schedule:
     get:
       tags: [Student]
-      summary: Get student schedule (tests/classes)
+      summary: Get student schedule (placeholder)
       security:
         - bearerAuth: []
       responses:
@@ -993,40 +1407,290 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      schedule:
-                        type: array
-                        items:
-                          type: object
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  schedule:
+                    type: array
 
-  /api/student/payment-history:
+  /student/payment-history:
     get:
       tags: [Student]
-      summary: Get payment history for the student
+      summary: Get user payment history
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Payment history
+          description: List of payments
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      payments:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Payment'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
 
-  # ================================
-  # TEACHER
-  # ================================
-  /api/teacher/dashboard:
+  /student/courses:
+    get:
+      tags: [Student]
+      summary: Get all courses with access info
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of courses enriched with accessibility
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  courses:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Course'
+                        - type: object
+                          properties:
+                            isAccessible:
+                              type: boolean
+
+  /student/courses/{id}:
+    get:
+      tags: [Student]
+      summary: Get course details (with access check)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+      responses:
+        '200':
+          description: Course details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  course:
+                    $ref: '#/components/schemas/Course'
+        '403':
+          description: Access denied (paid subscription required)
+        '404':
+          description: Course not found
+
+  /student/notes:
+    get:
+      tags: [Student]
+      summary: Get all notes with access info
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notes enriched with accessibility
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notes:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Note'
+                        - type: object
+                          properties:
+                            isAccessible:
+                              type: boolean
+
+  /student/notes/{id}:
+    get:
+      tags: [Student]
+      summary: Get note details (with access check)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Note details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  note:
+                    $ref: '#/components/schemas/Note'
+        '403':
+          description: Access denied
+        '404':
+          description: Note not found
+
+  /student/paid/notes:
+    get:
+      tags: [Student]
+      summary: Get paid notes (requires subscription)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of paid notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+
+  /student/paid/courses:
+    get:
+      tags: [Student]
+      summary: Get paid courses (requires subscription)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of paid courses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  courses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Course'
+
+  # ---------- Payment ----------
+  /payment/plans:
+    get:
+      tags: [Payment]
+      summary: Get available subscription plans
+      responses:
+        '200':
+          description: List of plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plans:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        price:
+                          type: number
+                        duration:
+                          type: string
+
+  /payment/create-order:
+    post:
+      tags: [Payment]
+      summary: Create a payment order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  order:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      amount:
+                        type: number
+                      currency:
+                        type: string
+                      receipt:
+                        type: string
+        '429':
+          description: Too many requests
+
+  /payment/verify:
+    post:
+      tags: [Payment]
+      summary: Verify payment after success
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPaymentRequest'
+      responses:
+        '200':
+          description: Payment verified, subscription activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /payment/webhook:
+    post:
+      tags: [Payment]
+      summary: Razorpay webhook endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook received
+
+  # ---------- Teacher ----------
+  /teacher/dashboard:
     get:
       tags: [Teacher]
       summary: Get teacher dashboard
@@ -1038,9 +1702,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
 
-  /api/teacher/profile:
+  /teacher/profile:
     get:
       tags: [Teacher]
       summary: Get teacher profile
@@ -1048,23 +1715,22 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Teacher profile
+          description: Profile
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
     put:
       tags: [Teacher]
       summary: Update teacher profile
       security:
         - bearerAuth: []
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -1079,20 +1745,11 @@ paths:
       responses:
         '200':
           description: Profile updated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
 
-  /api/teacher/courses:
+  /teacher/courses:
     post:
       tags: [Teacher]
-      summary: Create a new course (multipart)
+      summary: Create a new course
       security:
         - bearerAuth: []
       requestBody:
@@ -1100,22 +1757,25 @@ paths:
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CourseCreateRequest'
+              $ref: '#/components/schemas/CreateCourseRequest'
       responses:
         '201':
           description: Course created
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      course:
-                        $ref: '#/components/schemas/Course'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  course:
+                    $ref: '#/components/schemas/Course'
+
     get:
       tags: [Teacher]
-      summary: Get all courses created by the teacher
+      summary: Get my courses
       security:
         - bearerAuth: []
       responses:
@@ -1124,33 +1784,264 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      courses:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Course'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  courses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Course'
 
-  /api/teacher/students/performance:
+  /teacher/courses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/courseId'
     get:
       tags: [Teacher]
-      summary: Get student performance overview
+      summary: Get a course by ID
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Performance data
+          description: Course details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  course:
+                    $ref: '#/components/schemas/Course'
+        '404':
+          description: Course not found
 
-  /api/teacher/tests:
+    put:
+      tags: [Teacher]
+      summary: Update a course
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateCourseRequest'
+      responses:
+        '200':
+          description: Course updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  course:
+                    $ref: '#/components/schemas/Course'
+
+    delete:
+      tags: [Teacher]
+      summary: Delete a course
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Course deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /teacher/courses/{courseId}/sections:
+    post:
+      tags: [Teacher]
+      summary: Add a section to a course
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSectionRequest'
+      responses:
+        '201':
+          description: Section added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  section:
+                    $ref: '#/components/schemas/Section'
+
+  /teacher/courses/{courseId}/sections/{sectionId}:
+    parameters:
+      - $ref: '#/components/parameters/courseId'
+      - $ref: '#/components/parameters/sectionId'
+    put:
+      tags: [Teacher]
+      summary: Update a section
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Section updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  section:
+                    $ref: '#/components/schemas/Section'
+
+    delete:
+      tags: [Teacher]
+      summary: Delete a section
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Section deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /teacher/courses/{courseId}/sections/{sectionId}/notes:
+    post:
+      tags: [Teacher]
+      summary: Upload notes to a section
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+        - $ref: '#/components/parameters/sectionId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: PDF files
+      responses:
+        '200':
+          description: Notes uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  notes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/File'
+
+  /teacher/courses/{courseId}/sections/{sectionId}/videos:
+    post:
+      tags: [Teacher]
+      summary: Add a video link to a section
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+        - $ref: '#/components/parameters/sectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddVideoLinkRequest'
+      responses:
+        '200':
+          description: Video link added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  videos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VideoLink'
+
+  /teacher/courses/{courseId}/sections/{sectionId}/videos/{videoIndex}:
+    parameters:
+      - $ref: '#/components/parameters/courseId'
+      - $ref: '#/components/parameters/sectionId'
+      - $ref: '#/components/parameters/videoIndex'
+    delete:
+      tags: [Teacher]
+      summary: Remove a video link from a section
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Video link removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  videos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VideoLink'
+
+  /teacher/tests:
     get:
       tags: [Teacher]
-      summary: List all tests created by teacher
+      summary: Get all tests created by teacher
       security:
         - bearerAuth: []
       responses:
@@ -1159,17 +2050,19 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      tests:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Test'
+
+  /teacher/test:
     post:
       tags: [Teacher]
-      summary: Create a new test (draft)
+      summary: Create a new test
       security:
         - bearerAuth: []
       requestBody:
@@ -1177,176 +2070,250 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TestCreateRequest'
+              $ref: '#/components/schemas/CreateTestRequest'
       responses:
         '201':
           description: Test created
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      test:
-                        $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  test:
+                    $ref: '#/components/schemas/Test'
 
-  /api/teacher/tests/{id}/questions:
+  /teacher/test/{id}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    post:
+      - $ref: '#/components/parameters/testId'
+    get:
       tags: [Teacher]
-      summary: Add existing questions to a test
+      summary: Get test details
       security:
         - bearerAuth: []
+      responses:
+        '200':
+          description: Test details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  test:
+                    $ref: '#/components/schemas/Test'
+
+  /teacher/test/{id}/question:
+    post:
+      tags: [Teacher]
+      summary: Add a question to a test
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                questionIds:
-                  type: array
-                  items:
-                    type: string
+              $ref: '#/components/schemas/CreateQuestionRequest'
       responses:
-        '200':
+        '201':
+          description: Question added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  question:
+                    $ref: '#/components/schemas/Question'
+
+  /teacher/test/{id}/questions/bulk:
+    post:
+      tags: [Teacher]
+      summary: Bulk add questions to a test
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCreateQuestionsRequest'
+      responses:
+        '201':
           description: Questions added
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      test:
-                        $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: number
+                  questions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Question'
 
-  /api/teacher/tests/{id}/config:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /teacher/test/{id}/config:
     post:
       tags: [Teacher]
-      summary: Save test configuration (sections, duration, negative marking)
+      summary: Save test configuration
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TestConfig'
+              $ref: '#/components/schemas/TestConfigRequest'
       responses:
         '200':
           description: Config saved
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      config:
-                        $ref: '#/components/schemas/TestConfig'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  config:
+                    type: object
 
-  /api/teacher/tests/{id}/preview:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /teacher/test/{id}/preview:
     get:
       tags: [Teacher]
-      summary: Preview a test (questions, config)
+      summary: Preview test with questions
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       responses:
         '200':
           description: Test preview
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  preview:
+                    type: object
                     properties:
-                      preview:
-                        type: object
+                      test:
+                        $ref: '#/components/schemas/Test'
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Question'
 
-  /api/teacher/tests/{id}/publish:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /teacher/test/{id}/publish:
     post:
       tags: [Teacher]
       summary: Publish or schedule a test
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TestPublishRequest'
+              $ref: '#/components/schemas/PublishTestRequest'
       responses:
         '200':
           description: Test published/scheduled
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      test:
-                        $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  test:
+                    $ref: '#/components/schemas/Test'
 
-  /api/teacher/tests/{id}/analytics:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /teacher/test/{id}/analytics:
     get:
       tags: [Teacher]
-      summary: Get analytics for a test
+      summary: Get test analytics
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       responses:
         '200':
           description: Test analytics
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  # analytics fields
 
-  # ================================
-  # QUESTIONS
-  # ================================
-  /api/questions/test/{testId}:
+  /teacher/test/{id}/questions/{questionId}/analytics:
+    get:
+      tags: [Teacher]
+      summary: Get question analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
+        - $ref: '#/components/parameters/questionId'
+      responses:
+        '200':
+          description: Question analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  analytics:
+                    $ref: '#/components/schemas/QuestionAnalytics'
+
+  /teacher/students/performance:
+    get:
+      tags: [Teacher]
+      summary: Get student performance (placeholder)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Performance data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  performance:
+                    type: array
+
+  # ---------- Question ----------
+  /questions/test/{testId}:
     parameters:
-      - name: testId
-        in: path
-        required: true
-        schema:
-          type: string
+      - $ref: '#/components/parameters/testId'
     post:
-      tags: [Questions]
-      summary: Create a single question for a test
+      tags: [Question]
+      summary: Create a question for a test
       security:
         - bearerAuth: []
       requestBody:
@@ -1354,21 +2321,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/QuestionCreate'
+              $ref: '#/components/schemas/CreateQuestionRequest'
       responses:
         '201':
           description: Question created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      question:
-                        $ref: '#/components/schemas/Question'
+
     get:
-      tags: [Questions]
+      tags: [Question]
       summary: Get all questions for a test
       security:
         - bearerAuth: []
@@ -1378,60 +2337,41 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      count:
-                        type: integer
-                      questions:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Question'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: number
+                  questions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Question'
 
-  /api/questions/test/{testId}/bulk:
-    parameters:
-      - name: testId
-        in: path
-        required: true
-        schema:
-          type: string
+  /questions/test/{testId}/bulk:
     post:
-      tags: [Questions]
-      summary: Bulk upload questions for a test
+      tags: [Question]
+      summary: Bulk create questions for a test
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkQuestionRequest'
+              $ref: '#/components/schemas/BulkCreateQuestionsRequest'
       responses:
         '201':
           description: Questions created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      questions:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Question'
 
-  /api/questions/{questionId}:
+  /questions/{questionId}:
     parameters:
-      - name: questionId
-        in: path
-        required: true
-        schema:
-          type: string
+      - $ref: '#/components/parameters/questionId'
     get:
-      tags: [Questions]
-      summary: Get a single question by ID
+      tags: [Question]
+      summary: Get a question by ID
       security:
         - bearerAuth: []
       responses:
@@ -1440,14 +2380,15 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      question:
-                        $ref: '#/components/schemas/Question'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  question:
+                    $ref: '#/components/schemas/Question'
+
     put:
-      tags: [Questions]
+      tags: [Question]
       summary: Update a question
       security:
         - bearerAuth: []
@@ -1456,21 +2397,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/QuestionCreate'
+              $ref: '#/components/schemas/CreateQuestionRequest'
       responses:
         '200':
           description: Question updated
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      question:
-                        $ref: '#/components/schemas/Question'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  question:
+                    $ref: '#/components/schemas/Question'
+
     delete:
-      tags: [Questions]
+      tags: [Question]
       summary: Delete a question
       security:
         - bearerAuth: []
@@ -1480,113 +2424,139 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
-  # ================================
-  # TEST ATTEMPTS
-  # ================================
-  /api/test-attempts/start/{testId}:
-    parameters:
-      - name: testId
-        in: path
-        required: true
-        schema:
-          type: string
+  # ---------- Test Attempt ----------
+  /test/start/{testId}:
     post:
       tags: [Test Attempt]
       summary: Start a test attempt
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/testId'
       responses:
         '200':
-          description: Test started, returns attempt details
+          description: Test started, returns attempt ID and questions
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      attemptId:
-                        type: string
-                      test:
-                        $ref: '#/components/schemas/Test'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  attemptId:
+                    type: string
+                  test:
+                    type: object
+                  questions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Question'
 
-  /api/test-attempts/{attemptId}/answer:
-    parameters:
-      - name: attemptId
-        in: path
-        required: true
-        schema:
-          type: string
+  /test/{attemptId}/answer:
     post:
       tags: [Test Attempt]
-      summary: Submit an answer for a question (auto-save)
+      summary: Submit an answer for a question
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/attemptId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnswerSubmission'
+              $ref: '#/components/schemas/SubmitAnswerRequest'
       responses:
         '200':
           description: Answer saved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
-  /api/test-attempts/{attemptId}/submit:
-    parameters:
-      - name: attemptId
-        in: path
-        required: true
-        schema:
-          type: string
+  /test/{attemptId}/submit:
     post:
       tags: [Test Attempt]
       summary: Submit the entire test
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/attemptId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTestRequest'
       responses:
         '200':
-          description: Test submitted, returns result summary
+          description: Test submitted, result returned
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TestResult'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  result:
+                    type: object
+                    properties:
+                      totalQuestions:
+                        type: number
+                      attemptedQuestions:
+                        type: number
+                      correctAnswers:
+                        type: number
+                      wrongAnswers:
+                        type: number
+                      skippedQuestions:
+                        type: number
+                      totalMarks:
+                        type: number
+                      marksObtained:
+                        type: number
+                      percentage:
+                        type: number
 
-  /api/test-attempts/{attemptId}/result:
-    parameters:
-      - name: attemptId
-        in: path
-        required: true
-        schema:
-          type: string
+  /test/{attemptId}/result:
     get:
       tags: [Test Attempt]
-      summary: Get detailed result of a test attempt
+      summary: Get result of a completed test
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/attemptId'
       responses:
         '200':
-          description: Detailed result
+          description: Test result
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      attempt:
-                        $ref: '#/components/schemas/TestAttempt'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  # result details
 
-  /api/test-attempts/my-attempts:
+  /test/my-attempts:
     get:
       tags: [Test Attempt]
-      summary: Get all test attempts of the logged-in student
+      summary: Get all attempts by the logged-in student
       security:
         - bearerAuth: []
       responses:
@@ -1595,106 +2565,62 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      attempts:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/TestAttempt'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  attempts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TestAttempt'
 
-  /api/test-attempts/leaderboard/{testId}:
-    parameters:
-      - name: testId
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: limit
-        in: query
-        schema:
-          type: integer
-          default: 10
+  /test/leaderboard/{testId}:
     get:
       tags: [Test Attempt]
       summary: Get leaderboard for a test
       security:
         - bearerAuth: []
-      responses:
-        '200':
-          description: Leaderboard entries
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      leaderboard:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/LeaderboardEntry'
-
-  # ================================
-  # ADMIN
-  # ================================
-  /api/admin/dashboard:
-    get:
-      tags: [Admin]
-      summary: Get admin dashboard statistics
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Dashboard data
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/AdminDashboard'
-
-  /api/admin/users:
-    get:
-      tags: [Admin]
-      summary: Get all users (with optional role filter)
-      security:
-        - bearerAuth: []
       parameters:
-        - name: role
+        - $ref: '#/components/parameters/testId'
+        - name: limit
           in: query
           schema:
-            type: string
-            enum: [student, teacher, admin]
+            type: integer
+            default: 10
       responses:
         '200':
-          description: List of users
+          description: Leaderboard
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      users:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        student:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            email:
+                              type: string
+                        marksObtained:
+                          type: number
+                        percentage:
+                          type: number
+                        timeTaken:
+                          type: number
 
-  /api/admin/users/{id}/role:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    put:
+  # ---------- Admin ----------
+  /admin/create:
+    post:
       tags: [Admin]
-      summary: Update user role
+      summary: Create a new admin (requires admin)
       security:
         - bearerAuth: []
       requestBody:
@@ -1703,47 +2629,136 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - email
+                - password
               properties:
-                role:
+                name:
                   type: string
-                  enum: [student, teacher, admin]
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  admin:
+                    $ref: '#/components/schemas/User'
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Get admin dashboard stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Get all users (with optional filters)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [student, teacher, admin]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /admin/users/{id}/role:
+    put:
+      tags: [Admin]
+      summary: Update user role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
       responses:
         '200':
           description: Role updated
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
 
-  /api/admin/users/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /admin/users/{id}:
     delete:
       tags: [Admin]
       summary: Delete a user
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: User deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
-  /api/admin/content/pending:
+  /admin/content/pending:
     get:
       tags: [Admin]
-      summary: Get pending content for moderation (courses, etc.)
+      summary: Get pending content (courses, notes) for approval
       security:
         - bearerAuth: []
       responses:
@@ -1752,61 +2767,58 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      content:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Course'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  content:
+                    type: object
 
-  /api/admin/content/course/{id}/approve:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /admin/content/course/{id}/approve:
     put:
       tags: [Admin]
       summary: Approve a course
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
       responses:
         '200':
           description: Course approved
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      course:
-                        $ref: '#/components/schemas/Course'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  course:
+                    $ref: '#/components/schemas/Course'
 
-  /api/admin/content/course/{id}/reject:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /admin/content/course/{id}/reject:
     delete:
       tags: [Admin]
-      summary: Reject and remove a course
+      summary: Reject and delete a course
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
       responses:
         '200':
-          description: Course rejected
+          description: Course rejected and removed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
-  /api/admin/payments:
+  /admin/payments:
     get:
       tags: [Admin]
       summary: Get all payments
@@ -1818,44 +2830,46 @@ paths:
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      payments:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Payment'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
 
-  /api/admin/payments/{id}/refund:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /admin/payments/{id}/refund:
     put:
       tags: [Admin]
-      summary: Issue a refund for a payment
+      summary: Refund a payment
       security:
         - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Payment refunded
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      payment:
-                        $ref: '#/components/schemas/Payment'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  payment:
+                    $ref: '#/components/schemas/Payment'
 
-  /api/admin/cms/blog:
+  /admin/cms/blog:
     post:
       tags: [Admin]
-      summary: Create a new blog post
+      summary: Create a blog post
       security:
         - bearerAuth: []
       requestBody:
@@ -1863,47 +2877,534 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BlogCreateRequest'
+              $ref: '#/components/schemas/CreateBlogRequest'
       responses:
         '200':
           description: Blog created
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      blog:
-                        $ref: '#/components/schemas/Blog'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  blog:
+                    $ref: '#/components/schemas/Blog'
 
-  /api/admin/cms/blog/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+  /admin/cms/blog/{id}:
     delete:
       tags: [Admin]
       summary: Delete a blog post
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/blogId'
       responses:
         '200':
           description: Blog deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
-  # ================================
-  # HEALTH CHECK
-  # ================================
+  /admin/teachers/pending:
+    get:
+      tags: [Admin]
+      summary: Get pending teacher approvals
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of pending teachers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  teachers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /admin/teachers/{id}/approve:
+    put:
+      tags: [Admin]
+      summary: Approve a teacher
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Teacher approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  # ---------- Admin: News Management ----------
+  /admin/news:
+    post:
+      tags: [Admin]
+      summary: Create a news article
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNewsRequest'
+      responses:
+        '201':
+          description: News created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  news:
+                    $ref: '#/components/schemas/News'
+    get:
+      tags: [Admin]
+      summary: Get all news articles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: published
+          in: query
+          schema:
+            type: boolean
+          description: Filter by published status
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  news:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/News'
+
+  /admin/news/{id}:
+    parameters:
+      - $ref: '#/components/parameters/newsId'
+    get:
+      tags: [Admin]
+      summary: Get a news article by ID
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: News article details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  news:
+                    $ref: '#/components/schemas/News'
+        '404':
+          description: News not found
+    put:
+      tags: [Admin]
+      summary: Update a news article
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNewsRequest'
+      responses:
+        '200':
+          description: News updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  news:
+                    $ref: '#/components/schemas/News'
+    delete:
+      tags: [Admin]
+      summary: Delete a news article
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: News deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  # ---------- Admin: Comment Moderation ----------
+  /admin/comments/pending:
+    get:
+      tags: [Admin]
+      summary: Get all pending comments (not approved)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of pending comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  comments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+
+  /admin/comments/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/commentId'
+    put:
+      tags: [Admin]
+      summary: Approve a comment
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Comment approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  comment:
+                    $ref: '#/components/schemas/Comment'
+
+  /admin/comments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/commentId'
+    delete:
+      tags: [Admin]
+      summary: Delete a comment
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /admin/comments:
+    get:
+      tags: [Admin]
+      summary: Get all comments (with filters)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: approved
+          in: query
+          schema:
+            type: boolean
+          description: Filter by approval status
+        - name: blogId
+          in: query
+          schema:
+            type: string
+          description: Filter by blog ID
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  comments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+
+  # ---------- Admin: Subscription Plan Management ----------
+  /admin/plans:
+    post:
+      tags: [Admin]
+      summary: Create a new subscription plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plan:
+                    $ref: '#/components/schemas/SubscriptionPlan'
+    get:
+      tags: [Admin]
+      summary: Get all subscription plans
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plans:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SubscriptionPlan'
+
+  /admin/plans/{id}:
+    parameters:
+      - $ref: '#/components/parameters/planId'
+    put:
+      tags: [Admin]
+      summary: Update a subscription plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanRequest'
+      responses:
+        '200':
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plan:
+                    $ref: '#/components/schemas/SubscriptionPlan'
+    delete:
+      tags: [Admin]
+      summary: Delete a subscription plan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Plan deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  # ---------- Admin: Analytics ----------
+  /admin/analytics/revenue:
+    get:
+      tags: [Admin]
+      summary: Get revenue analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [daily, monthly, yearly]
+            default: monthly
+          description: Aggregation period
+      responses:
+        '200':
+          description: Revenue analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                        total:
+                          type: number
+                        count:
+                          type: number
+
+  /admin/analytics/users:
+    get:
+      tags: [Admin]
+      summary: Get user analytics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: number
+                      byRole:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                            count:
+                              type: number
+                      recent:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                            count:
+                              type: number
+
+  /admin/analytics/tests:
+    get:
+      tags: [Admin]
+      summary: Get test analytics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Test analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      totalTests:
+                        type: number
+                      totalAttempts:
+                        type: number
+                      avgScore:
+                        type: number
+                      attemptsByTest:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            testName:
+                              type: string
+                            attempts:
+                              type: number
+
+  /admin/analytics/courses:
+    get:
+      tags: [Admin]
+      summary: Get course analytics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Course analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      totalCourses:
+                        type: number
+                      byStatus:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            _id:
+                              type: string
+                            count:
+                              type: number
+
+  # ---------- Health ----------
   /health:
     get:
       tags: [System]
-      summary: Health check endpoint
+      summary: Health check
       responses:
         '200':
           description: Server is healthy
@@ -1914,7 +3415,6 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "ok"
                   timestamp:
                     type: string
                     format: date-time

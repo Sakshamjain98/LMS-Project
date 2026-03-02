@@ -49,4 +49,20 @@ export const googleLogin = asyncHandler(async (req, res) => {
       isApproved: result.user.isApproved,
     },
   });
+})
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const result = await forgotPasswordService(req.body);
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: result.message,
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const result = await resetPasswordService(req.body);
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: result.message,
+  });
 });
