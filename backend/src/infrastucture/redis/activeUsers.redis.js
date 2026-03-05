@@ -1,12 +1,28 @@
-import redis from "../../config/redis.js";
+import redisClient from "../../config/redis.js";
 
-const ACTIVE_WINDOW = 60; // seconds
+const ACTIVE_WINDOW = 60;
 
 export const markUserActive = async (userId) => {
-  await redis.setex(`active:user:${userId}`, ACTIVE_WINDOW, "1");
+  if (!userId) return;
+
+  const key = `active:user:${userId.toString()}`;
+  await redisClient.set(key, "1");
+  await redisClient.expire(key, ACTIVE_WINDOW);
 };
 
 export const getActiveUsersCount = async () => {
-  const keys = await redis.keys("active:user:*");
-  return keys.length;
+  let cursor = "0";
+  let total = 0;
+
+  do {
+    const { cursor: nextCursor, keys } = await redisClient.scan(cursor, {
+      MATCH: "active:user:*",
+      COUNT: 100,
+    });
+
+    cursor = nextCursor;
+    total += keys.length;
+  } while (cursor !== "0");
+
+  return total;
 };

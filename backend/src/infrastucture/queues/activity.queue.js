@@ -1,6 +1,8 @@
 import { Queue } from "bullmq";
-import redis from "../../config/redis.js";
 
 export const activityQueue = new Queue("activity-logs", {
-  connection: redis,
+  connection: {
+    host: process.env.REDIS_HOST || "127.0.0.1",
+    port: Number(process.env.REDIS_PORT) || 6379,
+  },
 });

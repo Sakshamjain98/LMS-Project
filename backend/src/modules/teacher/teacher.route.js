@@ -8,13 +8,9 @@ const router = express.Router();
 router.use(authMiddleware);
 router.use(authorize("teacher"));
 router.get("/dashboard", controller.dashboard);
-
 router.get("/profile", controller.profile);
-
 router.put("/profile", controller.updateProfile);
-
 router.post("/courses", upload.fields([{ name: "thumbnail", maxCount: 1 }]), controller.createCourse);
-
 router.get("/courses", controller.myCourses);
 router.get("/courses/:id", controller.getCourse);
 router.put("/courses/:id", upload.fields([{ name: "thumbnail", maxCount: 1 }]), controller.updateCourse);

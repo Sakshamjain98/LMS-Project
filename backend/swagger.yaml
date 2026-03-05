@@ -2,12 +2,12 @@ openapi: 3.0.0
 info:
   title: Pharmacist Shubham API
   description: API for educational platform with courses, tests, notes, payments, and user roles.
-  version: 1.0.0
+  version: 1.1.0
   contact:
     name: Support
     email: support@pharmacistshubham.com
 servers:
-  - url: http://localhost:5000/api
+  - url: http://localhost:4040/api
     description: Local development server
   - url: https://api.pharmacistshubham.com/api
     description: Production server
@@ -93,9 +93,9 @@ components:
           items:
             type: string
         educator:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         thumbnail:
-          $ref: '#/components/schemas/File'
+          $ref: "#/components/schemas/File"
         price:
           type: number
         published:
@@ -103,7 +103,7 @@ components:
         sections:
           type: array
           items:
-            $ref: '#/components/schemas/Section'
+            $ref: "#/components/schemas/Section"
         createdAt:
           type: string
           format: date-time
@@ -121,11 +121,11 @@ components:
         videos:
           type: array
           items:
-            $ref: '#/components/schemas/VideoLink'
+            $ref: "#/components/schemas/VideoLink"
         notes:
           type: array
           items:
-            $ref: '#/components/schemas/File'
+            $ref: "#/components/schemas/File"
 
     VideoLink:
       type: object
@@ -158,9 +158,9 @@ components:
         description:
           type: string
         file:
-          $ref: '#/components/schemas/File'
+          $ref: "#/components/schemas/File"
         teacherId:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         isFree:
           type: boolean
         tags:
@@ -187,11 +187,11 @@ components:
         description:
           type: string
         teacherId:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         questions:
           type: array
           items:
-            $ref: '#/components/schemas/Question'
+            $ref: "#/components/schemas/Question"
         status:
           type: string
           enum: [draft, scheduled, published, closed]
@@ -232,7 +232,7 @@ components:
         options:
           type: array
           items:
-            $ref: '#/components/schemas/Option'
+            $ref: "#/components/schemas/Option"
         correctOptionIndex:
           type: number
         marks:
@@ -278,7 +278,7 @@ components:
         answers:
           type: array
           items:
-            $ref: '#/components/schemas/Answer'
+            $ref: "#/components/schemas/Answer"
         status:
           type: string
           enum: [in_progress, submitted, evaluated, expired]
@@ -338,20 +338,54 @@ components:
           type: string
         orderId:
           type: string
+          description: Razorpay order ID (or dev_order_* in DEV mode)
         paymentId:
           type: string
+          description: Razorpay payment ID after verification
         plan:
           type: string
           enum: [MONTHLY, QUARTERLY, YEARLY]
         amount:
           type: number
+          description: Amount in INR
+        amountInPaise:
+          type: number
+          description: Amount in paise (amount × 100)
         currency:
           type: string
+          default: INR
         status:
           type: string
-          enum: [CREATED, SUCCESS, FAILED, REFUNDED]
+          enum: [PENDING, PENDING_APPROVAL, SUCCESS, FAILED, REFUNDED, REJECTED]
+          description: |
+            - PENDING: Order created, payment not yet attempted
+            - PENDING_APPROVAL: Payment verified by Razorpay, awaiting admin approval
+            - SUCCESS: Admin approved, subscription activated
+            - FAILED: Signature verification failed
+            - REFUNDED: Admin issued refund
+            - REJECTED: Admin rejected the payment
+        adminApproved:
+          type: boolean
+          default: false
+          description: Whether an admin has approved this payment
+        verifiedAt:
+          type: string
+          format: date-time
+          description: When Razorpay signature was successfully verified
+        approvedAt:
+          type: string
+          format: date-time
+          description: When admin approved the payment
+        rejectedAt:
+          type: string
+          format: date-time
+          description: When admin rejected the payment
+        rejectionReason:
+          type: string
+          description: Reason provided by admin for rejection
         gateway:
           type: string
+          default: razorpay
         refundedAt:
           type: string
           format: date-time
@@ -462,7 +496,7 @@ components:
         content:
           type: string
         author:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         published:
           type: boolean
           default: true
@@ -480,9 +514,9 @@ components:
         _id:
           type: string
         user:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
         blog:
-          $ref: '#/components/schemas/Blog'
+          $ref: "#/components/schemas/Blog"
         comment:
           type: string
         approved:
@@ -812,7 +846,7 @@ components:
         questions:
           type: array
           items:
-            $ref: '#/components/schemas/CreateQuestionRequest'
+            $ref: "#/components/schemas/CreateQuestionRequest"
 
     TestConfigRequest:
       type: object
@@ -873,7 +907,7 @@ components:
         answers:
           type: array
           items:
-            $ref: '#/components/schemas/SubmitAnswerRequest'
+            $ref: "#/components/schemas/SubmitAnswerRequest"
 
     CreateOrderRequest:
       type: object
@@ -887,16 +921,24 @@ components:
     VerifyPaymentRequest:
       type: object
       required:
-        - razorpay_payment_id
         - razorpay_order_id
-        - razorpay_signature
       properties:
         razorpay_payment_id:
           type: string
+          description: Required in PRODUCTION mode; optional in DEV mode
         razorpay_order_id:
           type: string
         razorpay_signature:
           type: string
+          description: Required in PRODUCTION mode; skipped in DEV mode
+
+    RejectPaymentRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Optional reason for rejecting the payment
+          example: "Suspicious transaction detected"
 
     UpdateRoleRequest:
       type: object
@@ -984,6 +1026,45 @@ components:
         active:
           type: boolean
 
+    # ---------- Teacher Note Request Bodies ----------
+    CreateNoteRequest:
+      type: object
+      required:
+        - title
+        - file
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isFree:
+          type: boolean
+          default: false
+        tags:
+          type: string
+          description: Comma-separated tags
+        file:
+          type: string
+          format: binary
+          description: Note file (PDF)
+
+    UpdateNoteRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isFree:
+          type: boolean
+        tags:
+          type: string
+          description: Comma-separated tags
+        file:
+          type: string
+          format: binary
+          description: Note file (PDF)
+
   parameters:
     courseId:
       name: id
@@ -1062,6 +1143,13 @@ components:
       schema:
         type: string
       description: Subscription plan ID
+    paymentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Payment ID
 
 paths:
   # ---------- Auth ----------
@@ -1074,9 +1162,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: User created
           content:
             application/json:
@@ -1090,14 +1178,14 @@ paths:
                     type: string
                     example: User created successfully
                   user:
-                    $ref: '#/components/schemas/User'
-        '400':
+                    $ref: "#/components/schemas/User"
+        "400":
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '429':
+                $ref: "#/components/schemas/Error"
+        "429":
           description: Too many requests
 
   /auth/login:
@@ -1109,9 +1197,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Login successful
           content:
             application/json:
@@ -1125,8 +1213,8 @@ paths:
                   token:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
-        '401':
+                    $ref: "#/components/schemas/User"
+        "401":
           description: Invalid credentials
 
   /auth/google:
@@ -1138,9 +1226,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GoogleLoginRequest'
+              $ref: "#/components/schemas/GoogleLoginRequest"
       responses:
-        '200':
+        "200":
           description: Google login successful
           content:
             application/json:
@@ -1154,7 +1242,7 @@ paths:
                   token:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
   /auth/forgot-password:
     post:
@@ -1165,9 +1253,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
+              $ref: "#/components/schemas/ForgotPasswordRequest"
       responses:
-        '200':
+        "200":
           description: Reset email sent
           content:
             application/json:
@@ -1188,9 +1276,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
-        '200':
+        "200":
           description: Password reset successful
           content:
             application/json:
@@ -1212,9 +1300,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OtpSendRequest'
+              $ref: "#/components/schemas/OtpSendRequest"
       responses:
-        '200':
+        "200":
           description: OTP sent
           content:
             application/json:
@@ -1225,7 +1313,7 @@ paths:
                     type: boolean
                   message:
                     type: string
-        '429':
+        "429":
           description: Rate limit exceeded
 
   /auth/otp/verify:
@@ -1237,9 +1325,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OtpVerifyRequest'
+              $ref: "#/components/schemas/OtpVerifyRequest"
       responses:
-        '200':
+        "200":
           description: OTP verified, login successful
           content:
             application/json:
@@ -1253,8 +1341,8 @@ paths:
                   token:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
-        '400':
+                    $ref: "#/components/schemas/User"
+        "400":
           description: Invalid or expired OTP
 
   # ---------- Student ----------
@@ -1265,7 +1353,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Dashboard data
           content:
             application/json:
@@ -1277,7 +1365,7 @@ paths:
                   subscription:
                     type: string
                   # Additional dashboard fields...
-        '403':
+        "403":
           description: Access denied
 
   /student/profile:
@@ -1287,7 +1375,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Profile data
           content:
             application/json:
@@ -1297,7 +1385,7 @@ paths:
                   success:
                     type: boolean
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
     put:
       tags: [Student]
@@ -1318,7 +1406,7 @@ paths:
                 avatar:
                   type: string
       responses:
-        '200':
+        "200":
           description: Profile updated
           content:
             application/json:
@@ -1330,7 +1418,7 @@ paths:
                   message:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
   /student/free/courses:
     get:
@@ -1339,7 +1427,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of free courses
           content:
             application/json:
@@ -1351,7 +1439,7 @@ paths:
                   courses:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Course'
+                      $ref: "#/components/schemas/Course"
 
   /student/free/notes:
     get:
@@ -1360,7 +1448,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of free notes
           content:
             application/json:
@@ -1372,7 +1460,7 @@ paths:
                   notes:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Note'
+                      $ref: "#/components/schemas/Note"
 
   /student/blogs:
     get:
@@ -1381,7 +1469,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of blogs
           content:
             application/json:
@@ -1393,7 +1481,7 @@ paths:
                   blogs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Blog'
+                      $ref: "#/components/schemas/Blog"
 
   /student/schedule:
     get:
@@ -1402,7 +1490,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Schedule data
           content:
             application/json:
@@ -1421,7 +1509,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of payments
           content:
             application/json:
@@ -1433,7 +1521,7 @@ paths:
                   payments:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Payment'
+                      $ref: "#/components/schemas/Payment"
 
   /student/courses:
     get:
@@ -1442,7 +1530,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of courses enriched with accessibility
           content:
             application/json:
@@ -1455,7 +1543,7 @@ paths:
                     type: array
                     items:
                       allOf:
-                        - $ref: '#/components/schemas/Course'
+                        - $ref: "#/components/schemas/Course"
                         - type: object
                           properties:
                             isAccessible:
@@ -1468,9 +1556,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
+        - $ref: "#/components/parameters/courseId"
       responses:
-        '200':
+        "200":
           description: Course details
           content:
             application/json:
@@ -1480,10 +1568,10 @@ paths:
                   success:
                     type: boolean
                   course:
-                    $ref: '#/components/schemas/Course'
-        '403':
+                    $ref: "#/components/schemas/Course"
+        "403":
           description: Access denied (paid subscription required)
-        '404':
+        "404":
           description: Course not found
 
   /student/notes:
@@ -1493,7 +1581,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of notes enriched with accessibility
           content:
             application/json:
@@ -1506,7 +1594,7 @@ paths:
                     type: array
                     items:
                       allOf:
-                        - $ref: '#/components/schemas/Note'
+                        - $ref: "#/components/schemas/Note"
                         - type: object
                           properties:
                             isAccessible:
@@ -1525,7 +1613,7 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Note details
           content:
             application/json:
@@ -1535,10 +1623,10 @@ paths:
                   success:
                     type: boolean
                   note:
-                    $ref: '#/components/schemas/Note'
-        '403':
+                    $ref: "#/components/schemas/Note"
+        "403":
           description: Access denied
-        '404':
+        "404":
           description: Note not found
 
   /student/paid/notes:
@@ -1548,7 +1636,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of paid notes
           content:
             application/json:
@@ -1560,7 +1648,7 @@ paths:
                   notes:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Note'
+                      $ref: "#/components/schemas/Note"
 
   /student/paid/courses:
     get:
@@ -1569,7 +1657,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of paid courses
           content:
             application/json:
@@ -1581,7 +1669,7 @@ paths:
                   courses:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Course'
+                      $ref: "#/components/schemas/Course"
 
   # ---------- Payment ----------
   /payment/plans:
@@ -1589,7 +1677,7 @@ paths:
       tags: [Payment]
       summary: Get available subscription plans
       responses:
-        '200':
+        "200":
           description: List of plans
           content:
             application/json:
@@ -1605,17 +1693,23 @@ paths:
                       properties:
                         id:
                           type: string
+                          enum: [MONTHLY, QUARTERLY, YEARLY]
                         name:
                           type: string
                         price:
                           type: number
+                          description: Price in INR
                         duration:
                           type: string
 
   /payment/create-order:
     post:
       tags: [Payment]
-      summary: Create a payment order
+      summary: Create a Razorpay payment order
+      description: |
+        Creates a payment order. In **PRODUCTION** mode a real Razorpay order is created and
+        `razorpayOrder` is returned. In **DEV** mode a synthetic order ID is generated without
+        calling the Razorpay API.
       security:
         - bearerAuth: []
       requestBody:
@@ -1623,10 +1717,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateOrderRequest'
+              $ref: "#/components/schemas/CreateOrderRequest"
       responses:
-        '200':
-          description: Order created
+        "200":
+          description: Order created successfully
           content:
             application/json:
               schema:
@@ -1639,21 +1733,47 @@ paths:
                   order:
                     type: object
                     properties:
-                      id:
+                      orderId:
                         type: string
+                        description: Use this as `razorpay_order_id` in verify call
                       amount:
                         type: number
+                        description: Amount in INR
+                      amountInPaise:
+                        type: number
+                        description: Amount × 100, pass to Razorpay checkout
                       currency:
                         type: string
-                      receipt:
+                        example: INR
+                      plan:
                         type: string
-        '429':
-          description: Too many requests
+                      planName:
+                        type: string
+                      duration:
+                        type: string
+                      razorpayKeyId:
+                        type: string
+                        description: Razorpay key_id to initialise checkout on frontend
+                      razorpayOrder:
+                        type: object
+                        description: Full Razorpay order object (PRODUCTION only)
+        "400":
+          description: Invalid plan selected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
 
   /payment/verify:
     post:
       tags: [Payment]
-      summary: Verify payment after success
+      summary: Verify Razorpay payment after checkout
+      description: |
+        Verifies the Razorpay signature (skipped in DEV mode) and moves the payment to
+        **PENDING_APPROVAL** status. The subscription is **not** activated until an admin
+        approves the payment via `PUT /admin/payments/{id}/approve`.
       security:
         - bearerAuth: []
       requestBody:
@@ -1661,10 +1781,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VerifyPaymentRequest'
+              $ref: "#/components/schemas/VerifyPaymentRequest"
       responses:
-        '200':
-          description: Payment verified, subscription activated
+        "200":
+          description: Payment verified — awaiting admin approval
           content:
             application/json:
               schema:
@@ -1674,20 +1794,119 @@ paths:
                     type: boolean
                   message:
                     type: string
+                    example: "Payment verified successfully. Awaiting admin approval before subscription is activated."
+                  pendingAdminApproval:
+                    type: boolean
+                    example: true
+                  dev:
+                    type: boolean
+                    description: Present and true only in DEV mode
+                  alreadyProcessed:
+                    type: boolean
+                    description: True if this order was already verified before
+        "400":
+          description: Invalid or missing payment data / signature mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Payment does not belong to the requesting user
 
-  /payment/webhook:
-    post:
+  /payment/pending-approval:
+    get:
       tags: [Payment]
-      summary: Razorpay webhook endpoint
+      summary: "(Admin) Get all payments pending admin approval"
+      description: Returns payments in `PENDING_APPROVAL` status, populated with user info.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of payments awaiting approval
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Payment"
+        "403":
+          description: Admin access required
+
+  /payment/{id}/approve:
+    put:
+      tags: [Payment]
+      summary: "(Admin) Approve a payment and activate subscription"
+      description: |
+        Marks the payment as `SUCCESS`, sets `adminApproved: true`, and queues subscription
+        activation via BullMQ. Only works on payments in `PENDING_APPROVAL` state.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/paymentId"
+      responses:
+        "200":
+          description: Payment approved and subscription queued for activation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: "Payment approved and subscription activated"
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "400":
+          description: Payment is not in PENDING_APPROVAL state
+        "403":
+          description: Admin access required
+        "404":
+          description: Payment not found
+
+  /payment/{id}/reject:
+    put:
+      tags: [Payment]
+      summary: "(Admin) Reject a pending payment"
+      description: |
+        Marks the payment as `REJECTED` and stores the optional rejection reason.
+        Only works on payments in `PENDING_APPROVAL` state.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/paymentId"
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/RejectPaymentRequest"
       responses:
-        '200':
-          description: Webhook received
+        "200":
+          description: Payment rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: "Payment rejected"
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "400":
+          description: Payment is not in PENDING_APPROVAL state
+        "403":
+          description: Admin access required
+        "404":
+          description: Payment not found
 
   # ---------- Teacher ----------
   /teacher/dashboard:
@@ -1697,7 +1916,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Dashboard data
           content:
             application/json:
@@ -1714,7 +1933,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Profile
           content:
             application/json:
@@ -1724,7 +1943,7 @@ paths:
                   success:
                     type: boolean
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
     put:
       tags: [Teacher]
       summary: Update teacher profile
@@ -1743,7 +1962,7 @@ paths:
                 avatar:
                   type: string
       responses:
-        '200':
+        "200":
           description: Profile updated
 
   /teacher/courses:
@@ -1757,9 +1976,9 @@ paths:
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CreateCourseRequest'
+              $ref: "#/components/schemas/CreateCourseRequest"
       responses:
-        '201':
+        "201":
           description: Course created
           content:
             application/json:
@@ -1771,7 +1990,7 @@ paths:
                   message:
                     type: string
                   course:
-                    $ref: '#/components/schemas/Course'
+                    $ref: "#/components/schemas/Course"
 
     get:
       tags: [Teacher]
@@ -1779,7 +1998,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of teacher's courses
           content:
             application/json:
@@ -1791,18 +2010,18 @@ paths:
                   courses:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Course'
+                      $ref: "#/components/schemas/Course"
 
   /teacher/courses/{id}:
     parameters:
-      - $ref: '#/components/parameters/courseId'
+      - $ref: "#/components/parameters/courseId"
     get:
       tags: [Teacher]
       summary: Get a course by ID
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Course details
           content:
             application/json:
@@ -1812,8 +2031,8 @@ paths:
                   success:
                     type: boolean
                   course:
-                    $ref: '#/components/schemas/Course'
-        '404':
+                    $ref: "#/components/schemas/Course"
+        "404":
           description: Course not found
 
     put:
@@ -1825,9 +2044,9 @@ paths:
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CreateCourseRequest'
+              $ref: "#/components/schemas/CreateCourseRequest"
       responses:
-        '200':
+        "200":
           description: Course updated
           content:
             application/json:
@@ -1839,7 +2058,7 @@ paths:
                   message:
                     type: string
                   course:
-                    $ref: '#/components/schemas/Course'
+                    $ref: "#/components/schemas/Course"
 
     delete:
       tags: [Teacher]
@@ -1847,7 +2066,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Course deleted
           content:
             application/json:
@@ -1866,15 +2085,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
+        - $ref: "#/components/parameters/courseId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSectionRequest'
+              $ref: "#/components/schemas/CreateSectionRequest"
       responses:
-        '201':
+        "201":
           description: Section added
           content:
             application/json:
@@ -1886,12 +2105,12 @@ paths:
                   message:
                     type: string
                   section:
-                    $ref: '#/components/schemas/Section'
+                    $ref: "#/components/schemas/Section"
 
   /teacher/courses/{courseId}/sections/{sectionId}:
     parameters:
-      - $ref: '#/components/parameters/courseId'
-      - $ref: '#/components/parameters/sectionId'
+      - $ref: "#/components/parameters/courseId"
+      - $ref: "#/components/parameters/sectionId"
     put:
       tags: [Teacher]
       summary: Update a section
@@ -1908,7 +2127,7 @@ paths:
                 description:
                   type: string
       responses:
-        '200':
+        "200":
           description: Section updated
           content:
             application/json:
@@ -1920,7 +2139,7 @@ paths:
                   message:
                     type: string
                   section:
-                    $ref: '#/components/schemas/Section'
+                    $ref: "#/components/schemas/Section"
 
     delete:
       tags: [Teacher]
@@ -1928,7 +2147,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Section deleted
           content:
             application/json:
@@ -1947,8 +2166,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
-        - $ref: '#/components/parameters/sectionId'
+        - $ref: "#/components/parameters/courseId"
+        - $ref: "#/components/parameters/sectionId"
       requestBody:
         required: true
         content:
@@ -1963,7 +2182,7 @@ paths:
                     format: binary
                   description: PDF files
       responses:
-        '200':
+        "200":
           description: Notes uploaded
           content:
             application/json:
@@ -1977,7 +2196,7 @@ paths:
                   notes:
                     type: array
                     items:
-                      $ref: '#/components/schemas/File'
+                      $ref: "#/components/schemas/File"
 
   /teacher/courses/{courseId}/sections/{sectionId}/videos:
     post:
@@ -1986,16 +2205,16 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
-        - $ref: '#/components/parameters/sectionId'
+        - $ref: "#/components/parameters/courseId"
+        - $ref: "#/components/parameters/sectionId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddVideoLinkRequest'
+              $ref: "#/components/schemas/AddVideoLinkRequest"
       responses:
-        '200':
+        "200":
           description: Video link added
           content:
             application/json:
@@ -2009,20 +2228,20 @@ paths:
                   videos:
                     type: array
                     items:
-                      $ref: '#/components/schemas/VideoLink'
+                      $ref: "#/components/schemas/VideoLink"
 
   /teacher/courses/{courseId}/sections/{sectionId}/videos/{videoIndex}:
     parameters:
-      - $ref: '#/components/parameters/courseId'
-      - $ref: '#/components/parameters/sectionId'
-      - $ref: '#/components/parameters/videoIndex'
+      - $ref: "#/components/parameters/courseId"
+      - $ref: "#/components/parameters/sectionId"
+      - $ref: "#/components/parameters/videoIndex"
     delete:
       tags: [Teacher]
       summary: Remove a video link from a section
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Video link removed
           content:
             application/json:
@@ -2036,8 +2255,162 @@ paths:
                   videos:
                     type: array
                     items:
-                      $ref: '#/components/schemas/VideoLink'
+                      $ref: "#/components/schemas/VideoLink"
 
+  # ---------- Teacher Notes ----------
+  /teacher/notes:
+    post:
+      tags: [Teacher]
+      summary: Create a new note
+      description: Upload a PDF note with metadata. Only accessible by teachers.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateNoteRequest"
+      responses:
+        "201":
+          description: Note created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  note:
+                    $ref: "#/components/schemas/Note"
+        "400":
+          description: Validation error or missing file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not a teacher)
+
+    get:
+      tags: [Teacher]
+      summary: Get all notes created by the teacher
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Note"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /teacher/notes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Note ID
+    get:
+      tags: [Teacher]
+      summary: Get a specific note by ID
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Note details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  note:
+                    $ref: "#/components/schemas/Note"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Note not found
+
+    put:
+      tags: [Teacher]
+      summary: Update a note (metadata and/or file)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdateNoteRequest"
+      responses:
+        "200":
+          description: Note updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  note:
+                    $ref: "#/components/schemas/Note"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Note not found
+
+    delete:
+      tags: [Teacher]
+      summary: Delete a note
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Note deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Note not found
+
+  # ---------- Teacher Tests ----------
   /teacher/tests:
     get:
       tags: [Teacher]
@@ -2045,7 +2418,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of tests
           content:
             application/json:
@@ -2057,7 +2430,7 @@ paths:
                   tests:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Test'
+                      $ref: "#/components/schemas/Test"
 
   /teacher/test:
     post:
@@ -2070,9 +2443,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateTestRequest'
+              $ref: "#/components/schemas/CreateTestRequest"
       responses:
-        '201':
+        "201":
           description: Test created
           content:
             application/json:
@@ -2082,18 +2455,18 @@ paths:
                   success:
                     type: boolean
                   test:
-                    $ref: '#/components/schemas/Test'
+                    $ref: "#/components/schemas/Test"
 
   /teacher/test/{id}:
     parameters:
-      - $ref: '#/components/parameters/testId'
+      - $ref: "#/components/parameters/testId"
     get:
       tags: [Teacher]
       summary: Get test details
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Test details
           content:
             application/json:
@@ -2103,7 +2476,7 @@ paths:
                   success:
                     type: boolean
                   test:
-                    $ref: '#/components/schemas/Test'
+                    $ref: "#/components/schemas/Test"
 
   /teacher/test/{id}/question:
     post:
@@ -2112,15 +2485,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateQuestionRequest'
+              $ref: "#/components/schemas/CreateQuestionRequest"
       responses:
-        '201':
+        "201":
           description: Question added
           content:
             application/json:
@@ -2130,7 +2503,7 @@ paths:
                   success:
                     type: boolean
                   question:
-                    $ref: '#/components/schemas/Question'
+                    $ref: "#/components/schemas/Question"
 
   /teacher/test/{id}/questions/bulk:
     post:
@@ -2139,15 +2512,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkCreateQuestionsRequest'
+              $ref: "#/components/schemas/BulkCreateQuestionsRequest"
       responses:
-        '201':
+        "201":
           description: Questions added
           content:
             application/json:
@@ -2161,7 +2534,7 @@ paths:
                   questions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Question'
+                      $ref: "#/components/schemas/Question"
 
   /teacher/test/{id}/config:
     post:
@@ -2170,15 +2543,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TestConfigRequest'
+              $ref: "#/components/schemas/TestConfigRequest"
       responses:
-        '200':
+        "200":
           description: Config saved
           content:
             application/json:
@@ -2197,9 +2570,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       responses:
-        '200':
+        "200":
           description: Test preview
           content:
             application/json:
@@ -2212,11 +2585,11 @@ paths:
                     type: object
                     properties:
                       test:
-                        $ref: '#/components/schemas/Test'
+                        $ref: "#/components/schemas/Test"
                       questions:
                         type: array
                         items:
-                          $ref: '#/components/schemas/Question'
+                          $ref: "#/components/schemas/Question"
 
   /teacher/test/{id}/publish:
     post:
@@ -2225,14 +2598,14 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PublishTestRequest'
+              $ref: "#/components/schemas/PublishTestRequest"
       responses:
-        '200':
+        "200":
           description: Test published/scheduled
           content:
             application/json:
@@ -2244,7 +2617,7 @@ paths:
                   message:
                     type: string
                   test:
-                    $ref: '#/components/schemas/Test'
+                    $ref: "#/components/schemas/Test"
 
   /teacher/test/{id}/analytics:
     get:
@@ -2253,9 +2626,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       responses:
-        '200':
+        "200":
           description: Test analytics
           content:
             application/json:
@@ -2273,10 +2646,10 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
-        - $ref: '#/components/parameters/questionId'
+        - $ref: "#/components/parameters/testId"
+        - $ref: "#/components/parameters/questionId"
       responses:
-        '200':
+        "200":
           description: Question analytics
           content:
             application/json:
@@ -2286,7 +2659,7 @@ paths:
                   success:
                     type: boolean
                   analytics:
-                    $ref: '#/components/schemas/QuestionAnalytics'
+                    $ref: "#/components/schemas/QuestionAnalytics"
 
   /teacher/students/performance:
     get:
@@ -2295,7 +2668,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Performance data
           content:
             application/json:
@@ -2310,7 +2683,7 @@ paths:
   # ---------- Question ----------
   /questions/test/{testId}:
     parameters:
-      - $ref: '#/components/parameters/testId'
+      - $ref: "#/components/parameters/testId"
     post:
       tags: [Question]
       summary: Create a question for a test
@@ -2321,9 +2694,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateQuestionRequest'
+              $ref: "#/components/schemas/CreateQuestionRequest"
       responses:
-        '201':
+        "201":
           description: Question created
 
     get:
@@ -2332,7 +2705,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of questions
           content:
             application/json:
@@ -2346,7 +2719,7 @@ paths:
                   questions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Question'
+                      $ref: "#/components/schemas/Question"
 
   /questions/test/{testId}/bulk:
     post:
@@ -2355,27 +2728,27 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkCreateQuestionsRequest'
+              $ref: "#/components/schemas/BulkCreateQuestionsRequest"
       responses:
-        '201':
+        "201":
           description: Questions created
 
   /questions/{questionId}:
     parameters:
-      - $ref: '#/components/parameters/questionId'
+      - $ref: "#/components/parameters/questionId"
     get:
       tags: [Question]
       summary: Get a question by ID
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Question details
           content:
             application/json:
@@ -2385,7 +2758,7 @@ paths:
                   success:
                     type: boolean
                   question:
-                    $ref: '#/components/schemas/Question'
+                    $ref: "#/components/schemas/Question"
 
     put:
       tags: [Question]
@@ -2397,9 +2770,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateQuestionRequest'
+              $ref: "#/components/schemas/CreateQuestionRequest"
       responses:
-        '200':
+        "200":
           description: Question updated
           content:
             application/json:
@@ -2411,7 +2784,7 @@ paths:
                   message:
                     type: string
                   question:
-                    $ref: '#/components/schemas/Question'
+                    $ref: "#/components/schemas/Question"
 
     delete:
       tags: [Question]
@@ -2419,7 +2792,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Question deleted
           content:
             application/json:
@@ -2439,9 +2812,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
       responses:
-        '200':
+        "200":
           description: Test started, returns attempt ID and questions
           content:
             application/json:
@@ -2459,7 +2832,7 @@ paths:
                   questions:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Question'
+                      $ref: "#/components/schemas/Question"
 
   /test/{attemptId}/answer:
     post:
@@ -2468,15 +2841,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/attemptId'
+        - $ref: "#/components/parameters/attemptId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitAnswerRequest'
+              $ref: "#/components/schemas/SubmitAnswerRequest"
       responses:
-        '200':
+        "200":
           description: Answer saved
           content:
             application/json:
@@ -2495,14 +2868,14 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/attemptId'
+        - $ref: "#/components/parameters/attemptId"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitTestRequest'
+              $ref: "#/components/schemas/SubmitTestRequest"
       responses:
-        '200':
+        "200":
           description: Test submitted, result returned
           content:
             application/json:
@@ -2540,9 +2913,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/attemptId'
+        - $ref: "#/components/parameters/attemptId"
       responses:
-        '200':
+        "200":
           description: Test result
           content:
             application/json:
@@ -2560,7 +2933,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of attempts
           content:
             application/json:
@@ -2572,7 +2945,7 @@ paths:
                   attempts:
                     type: array
                     items:
-                      $ref: '#/components/schemas/TestAttempt'
+                      $ref: "#/components/schemas/TestAttempt"
 
   /test/leaderboard/{testId}:
     get:
@@ -2581,14 +2954,14 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/testId'
+        - $ref: "#/components/parameters/testId"
         - name: limit
           in: query
           schema:
             type: integer
             default: 10
       responses:
-        '200':
+        "200":
           description: Leaderboard
           content:
             application/json:
@@ -2641,7 +3014,7 @@ paths:
                 password:
                   type: string
       responses:
-        '201':
+        "201":
           description: Admin created
           content:
             application/json:
@@ -2653,7 +3026,7 @@ paths:
                   message:
                     type: string
                   admin:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
   /admin/dashboard:
     get:
@@ -2662,7 +3035,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Dashboard stats
           content:
             application/json:
@@ -2691,7 +3064,7 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: List of users
           content:
             application/json:
@@ -2703,7 +3076,7 @@ paths:
                   users:
                     type: array
                     items:
-                      $ref: '#/components/schemas/User'
+                      $ref: "#/components/schemas/User"
 
   /admin/users/{id}/role:
     put:
@@ -2712,15 +3085,15 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/userId'
+        - $ref: "#/components/parameters/userId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateRoleRequest'
+              $ref: "#/components/schemas/UpdateRoleRequest"
       responses:
-        '200':
+        "200":
           description: Role updated
           content:
             application/json:
@@ -2732,7 +3105,7 @@ paths:
                   message:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
   /admin/users/{id}:
     delete:
@@ -2741,9 +3114,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/userId'
+        - $ref: "#/components/parameters/userId"
       responses:
-        '200':
+        "200":
           description: User deleted
           content:
             application/json:
@@ -2762,7 +3135,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Pending content
           content:
             application/json:
@@ -2781,9 +3154,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
+        - $ref: "#/components/parameters/courseId"
       responses:
-        '200':
+        "200":
           description: Course approved
           content:
             application/json:
@@ -2795,7 +3168,7 @@ paths:
                   message:
                     type: string
                   course:
-                    $ref: '#/components/schemas/Course'
+                    $ref: "#/components/schemas/Course"
 
   /admin/content/course/{id}/reject:
     delete:
@@ -2804,9 +3177,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/courseId'
+        - $ref: "#/components/parameters/courseId"
       responses:
-        '200':
+        "200":
           description: Course rejected and removed
           content:
             application/json:
@@ -2825,7 +3198,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of payments
           content:
             application/json:
@@ -2837,7 +3210,29 @@ paths:
                   payments:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Payment'
+                      $ref: "#/components/schemas/Payment"
+
+  /admin/payments/pending-approval:
+    get:
+      tags: [Admin]
+      summary: Get payments awaiting admin approval
+      description: Shortcut route that mirrors `GET /payment/pending-approval`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of payments in PENDING_APPROVAL state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Payment"
 
   /admin/payments/{id}/refund:
     put:
@@ -2846,13 +3241,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/paymentId"
       responses:
-        '200':
+        "200":
           description: Payment refunded
           content:
             application/json:
@@ -2864,7 +3255,68 @@ paths:
                   message:
                     type: string
                   payment:
-                    $ref: '#/components/schemas/Payment'
+                    $ref: "#/components/schemas/Payment"
+
+  /admin/payments/{id}/approve:
+    put:
+      tags: [Admin]
+      summary: Approve a payment and activate subscription
+      description: Shortcut route that mirrors `PUT /payment/{id}/approve`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/paymentId"
+      responses:
+        "200":
+          description: Payment approved and subscription activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "400":
+          description: Payment not in PENDING_APPROVAL state
+        "404":
+          description: Payment not found
+
+  /admin/payments/{id}/reject:
+    put:
+      tags: [Admin]
+      summary: Reject a pending payment
+      description: Shortcut route that mirrors `PUT /payment/{id}/reject`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/paymentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectPaymentRequest"
+      responses:
+        "200":
+          description: Payment rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "400":
+          description: Payment not in PENDING_APPROVAL state
+        "404":
+          description: Payment not found
 
   /admin/cms/blog:
     post:
@@ -2877,9 +3329,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateBlogRequest'
+              $ref: "#/components/schemas/CreateBlogRequest"
       responses:
-        '200':
+        "200":
           description: Blog created
           content:
             application/json:
@@ -2891,7 +3343,7 @@ paths:
                   message:
                     type: string
                   blog:
-                    $ref: '#/components/schemas/Blog'
+                    $ref: "#/components/schemas/Blog"
 
   /admin/cms/blog/{id}:
     delete:
@@ -2900,9 +3352,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/blogId'
+        - $ref: "#/components/parameters/blogId"
       responses:
-        '200':
+        "200":
           description: Blog deleted
           content:
             application/json:
@@ -2921,7 +3373,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of pending teachers
           content:
             application/json:
@@ -2933,7 +3385,7 @@ paths:
                   teachers:
                     type: array
                     items:
-                      $ref: '#/components/schemas/User'
+                      $ref: "#/components/schemas/User"
 
   /admin/teachers/{id}/approve:
     put:
@@ -2942,9 +3394,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/userId'
+        - $ref: "#/components/parameters/userId"
       responses:
-        '200':
+        "200":
           description: Teacher approved
           content:
             application/json:
@@ -2956,7 +3408,7 @@ paths:
                   message:
                     type: string
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
 
   # ---------- Admin: News Management ----------
   /admin/news:
@@ -2970,9 +3422,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateNewsRequest'
+              $ref: "#/components/schemas/CreateNewsRequest"
       responses:
-        '201':
+        "201":
           description: News created
           content:
             application/json:
@@ -2982,7 +3434,7 @@ paths:
                   success:
                     type: boolean
                   news:
-                    $ref: '#/components/schemas/News'
+                    $ref: "#/components/schemas/News"
     get:
       tags: [Admin]
       summary: Get all news articles
@@ -2995,7 +3447,7 @@ paths:
             type: boolean
           description: Filter by published status
       responses:
-        '200':
+        "200":
           description: List of news articles
           content:
             application/json:
@@ -3007,18 +3459,18 @@ paths:
                   news:
                     type: array
                     items:
-                      $ref: '#/components/schemas/News'
+                      $ref: "#/components/schemas/News"
 
   /admin/news/{id}:
     parameters:
-      - $ref: '#/components/parameters/newsId'
+      - $ref: "#/components/parameters/newsId"
     get:
       tags: [Admin]
       summary: Get a news article by ID
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: News article details
           content:
             application/json:
@@ -3028,8 +3480,8 @@ paths:
                   success:
                     type: boolean
                   news:
-                    $ref: '#/components/schemas/News'
-        '404':
+                    $ref: "#/components/schemas/News"
+        "404":
           description: News not found
     put:
       tags: [Admin]
@@ -3041,9 +3493,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateNewsRequest'
+              $ref: "#/components/schemas/UpdateNewsRequest"
       responses:
-        '200':
+        "200":
           description: News updated
           content:
             application/json:
@@ -3053,14 +3505,14 @@ paths:
                   success:
                     type: boolean
                   news:
-                    $ref: '#/components/schemas/News'
+                    $ref: "#/components/schemas/News"
     delete:
       tags: [Admin]
       summary: Delete a news article
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: News deleted
           content:
             application/json:
@@ -3080,7 +3532,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of pending comments
           content:
             application/json:
@@ -3092,18 +3544,18 @@ paths:
                   comments:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Comment'
+                      $ref: "#/components/schemas/Comment"
 
   /admin/comments/{id}/approve:
     parameters:
-      - $ref: '#/components/parameters/commentId'
+      - $ref: "#/components/parameters/commentId"
     put:
       tags: [Admin]
       summary: Approve a comment
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Comment approved
           content:
             application/json:
@@ -3113,18 +3565,18 @@ paths:
                   success:
                     type: boolean
                   comment:
-                    $ref: '#/components/schemas/Comment'
+                    $ref: "#/components/schemas/Comment"
 
   /admin/comments/{id}:
     parameters:
-      - $ref: '#/components/parameters/commentId'
+      - $ref: "#/components/parameters/commentId"
     delete:
       tags: [Admin]
       summary: Delete a comment
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Comment deleted
           content:
             application/json:
@@ -3154,7 +3606,7 @@ paths:
             type: string
           description: Filter by blog ID
       responses:
-        '200':
+        "200":
           description: List of comments
           content:
             application/json:
@@ -3166,7 +3618,7 @@ paths:
                   comments:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Comment'
+                      $ref: "#/components/schemas/Comment"
 
   # ---------- Admin: Subscription Plan Management ----------
   /admin/plans:
@@ -3180,9 +3632,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreatePlanRequest'
+              $ref: "#/components/schemas/CreatePlanRequest"
       responses:
-        '201':
+        "201":
           description: Plan created
           content:
             application/json:
@@ -3192,14 +3644,14 @@ paths:
                   success:
                     type: boolean
                   plan:
-                    $ref: '#/components/schemas/SubscriptionPlan'
+                    $ref: "#/components/schemas/SubscriptionPlan"
     get:
       tags: [Admin]
       summary: Get all subscription plans
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of plans
           content:
             application/json:
@@ -3211,11 +3663,11 @@ paths:
                   plans:
                     type: array
                     items:
-                      $ref: '#/components/schemas/SubscriptionPlan'
+                      $ref: "#/components/schemas/SubscriptionPlan"
 
   /admin/plans/{id}:
     parameters:
-      - $ref: '#/components/parameters/planId'
+      - $ref: "#/components/parameters/planId"
     put:
       tags: [Admin]
       summary: Update a subscription plan
@@ -3226,9 +3678,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePlanRequest'
+              $ref: "#/components/schemas/UpdatePlanRequest"
       responses:
-        '200':
+        "200":
           description: Plan updated
           content:
             application/json:
@@ -3238,14 +3690,14 @@ paths:
                   success:
                     type: boolean
                   plan:
-                    $ref: '#/components/schemas/SubscriptionPlan'
+                    $ref: "#/components/schemas/SubscriptionPlan"
     delete:
       tags: [Admin]
       summary: Delete a subscription plan
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Plan deleted
           content:
             application/json:
@@ -3273,7 +3725,7 @@ paths:
             default: monthly
           description: Aggregation period
       responses:
-        '200':
+        "200":
           description: Revenue analytics data
           content:
             application/json:
@@ -3301,7 +3753,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: User analytics data
           content:
             application/json:
@@ -3341,7 +3793,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Test analytics data
           content:
             application/json:
@@ -3376,7 +3828,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Course analytics data
           content:
             application/json:
@@ -3406,7 +3858,7 @@ paths:
       tags: [System]
       summary: Health check
       responses:
-        '200':
+        "200":
           description: Server is healthy
           content:
             application/json:

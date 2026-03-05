@@ -7,7 +7,7 @@ import Note from "../../models/note.model.js";
 
 export const getDashboardData = async () => {
   const [freeCourses, blogs] = await Promise.all([
-    Course.find({ isPaid: false }).limit(10).lean(),
+    Course.find({ isPaid: false, status: "approved" }).limit(10).lean(),  
     Blog.find({ published: true }).limit(5).lean(),
   ]);
   return { freeCourses, blogs };
@@ -22,7 +22,7 @@ export const updateProfile = async (userId, data) => {
 };
 
 export const getFreeCourses = async () => {
-  return Course.find({ isPaid: false }).lean();
+  return Course.find({ isPaid: false, status: "approved" }).lean();        
 };
 
 export const getBlogs = async () => {
@@ -40,7 +40,18 @@ export const userHasPaidSubscription = async (userId) => {
     plan: { $ne: "FREE" },
     endDate: { $gt: new Date() },
   }).lean();
-  return !!sub;
+
+  if (!sub) return false;
+
+  // Extra security: verify the underlying payment was admin-approved
+  const approvedPayment = await Payment.findOne({
+    userId,
+    plan: sub.plan,
+    status: "SUCCESS",
+    adminApproved: true,
+  }).lean();
+
+  return !!approvedPayment;
 };
 
 export const getUserPayments = async (userId) => {
@@ -48,11 +59,12 @@ export const getUserPayments = async (userId) => {
 };
 
 export const getAllCourses = async () => {
-  return Course.find().lean();
+  return Course.find({ status: "approved" }).lean();                      
 };
 
 export const getCourseById = async (courseId) => {
-  return Course.findById(courseId).lean();
+  const course = await Course.findOne({ _id: courseId, status: "approved" }).lean(); // ✅ filter by id + approved
+  return course;  // will be null if not approved or not found
 };
 
 export const canAccessCourse = async (userId, course) => {
@@ -60,8 +72,9 @@ export const canAccessCourse = async (userId, course) => {
   return userHasPaidSubscription(userId);
 };
 
+
 export const getPaidCourses = async () => {
-  return Course.find({ isPaid: true }).lean();
+  return Course.find({ isPaid: true, status: "approved" }).lean();       
 };
 
 export const getAllNotes = async () => {

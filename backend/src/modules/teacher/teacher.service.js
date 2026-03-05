@@ -26,11 +26,14 @@ export const getProfile = async (userId) => {
 export const updateProfile = async (userId, data) => {
   return User.findByIdAndUpdate(userId, { $set: data }, { new: true }).select("-password");
 };
-
 export const createCourse = async (data, educatorId) => {
-  return Course.create({ ...data, educator: educatorId });
+  return Course.create({
+    ...data,
+    educator: educatorId,
+    status: "pending",       
+    isApproved: false           
+  });
 };
-
 export const getMyCourses = async (educatorId) => {
   return Course.find({ educator: educatorId }).lean();
 };
