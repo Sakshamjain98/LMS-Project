@@ -4,8 +4,8 @@ import helmet from "helmet";
 import authRoutes from "./modules/auth/auth.routes.js";
 
 import otpRoutes from "./modules/otp/otp.routes.js";
+import { requestLogger } from "./middlewares/requestLogger.middleware.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
-import { requestLogger } from "./middlewares/requestlogger.middleware.js";
 import studentRoutes from "./modules/student/student.route.js";
 import teacherRoutes from "./modules/teacher/teacher.route.js";
 import notesRoutes from "./modules/teacher/note.routes.js";
