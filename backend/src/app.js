@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(requestLogger);
 
 // Health check
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
