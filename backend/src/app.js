@@ -19,8 +19,11 @@ import YAML from "yamljs";
 const app = express();
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "*",
-  credentials: true,
+  origin: [
+    "http://localhost:4040",
+    "https://pharmacist-shubham-api.onrender.com/"
+  ],
+  credentials: true
 }));
 app.use(apiLimiter);
 app.use(express.json({ limit: "10kb" }));
