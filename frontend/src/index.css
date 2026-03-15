@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@theme {
+  /* Brand Colors */
+  --color-brand-primary: #00BA7C;
+  --color-brand-primary-dark: #007950;
+
+  /* Gray Palette */
+  --color-gray-custom-light: #EDF2F7;
+  --color-gray-custom-medium: #7588A3;
+
+  /* Dark Palette */
+  --color-dark-100: #121926;
+  --color-dark-200: #0E1420;
+  --color-dark-300: #080C16;
+  --color-dark-400: #070A13;
+}

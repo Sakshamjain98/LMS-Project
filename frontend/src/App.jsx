@@ -1,15 +1,25 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+/* Auth Pages */
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import Home from "./pages/public/Home.jsx"
+import Navbar from "../src/components/layout/Navbar.jsx";
 
 function App() {
   return (
     <Router>
+             <Navbar/>
       <Routes>
+
+        {/* Public */}
+ 
+        <Route path="/" element={<Home />} />
+      
+
+        {/* Auth */}
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/signup" element={<Register />} />
+
       </Routes>
     </Router>
   );
