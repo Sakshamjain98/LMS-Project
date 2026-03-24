@@ -21,7 +21,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://pharmacist-shubham-api.onrender.com/"
+    "https://lms-project-tnhd.onrender.com"
   ],
   credentials: true
 }));
