@@ -1,0 +1,384 @@
+import api from "./api";
+
+export const getTeacherDashboard = async () => {
+  try {
+    const response = await api.get("/teacher/dashboard");
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Something went wrong" };
+  }
+};
+
+export const createCourse = async (formData) => {
+  try {
+    const res = await api.post("/teacher/courses", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Course creation failed" };
+  }
+};
+
+export const getMyCourses = async () => {
+  try {
+    const res = await api.get("/teacher/courses");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch courses" };
+  }
+};
+
+export const getCourseById = async (courseId) => {
+  try {
+    const res = await api.get(`/teacher/courses/${courseId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Course not found" };
+  }
+};
+
+export const updateCourse = async (courseId, formData) => {
+  try {
+    const res = await api.put(`/teacher/courses/${courseId}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update failed" };
+  }
+};
+
+export const deleteCourse = async (courseId) => {
+  try {
+    const res = await api.delete(`/teacher/courses/${courseId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete failed" };
+  }
+};
+
+export const addSection = async (courseId, sectionData) => {
+  try {
+    const response = await api.post(
+      `/teacher/courses/${courseId}/sections`,
+      sectionData
+    );
+    
+    if (!response.data.section) {
+      throw new Error("Section creation failed - no section returned");
+    }
+    
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Failed to add section" };
+  }
+};
+
+export const updateSection = async (courseId, sectionId, data) => {
+  try {
+    const res = await api.put(`/teacher/courses/${courseId}/sections/${sectionId}`, data);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Section update failed" };
+  }
+};
+
+export const deleteSection = async (courseId, sectionId) => {
+  try {
+    const res = await api.delete(`/teacher/courses/${courseId}/sections/${sectionId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Section delete failed" };
+  }
+};
+
+export const uploadSectionNotes = async (courseId, sectionId, files) => {
+  try {
+    const fd = new FormData();
+    
+    if (Array.isArray(files)) {
+      files.forEach((file) => {
+        if (file instanceof File) {
+          fd.append("notes", file);
+        }
+      });
+    } else if (files instanceof File) {
+      fd.append("notes", files);
+    }
+
+    const response = await api.post(
+      `/teacher/courses/${courseId}/sections/${sectionId}/notes`,
+      fd,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Failed to upload notes" };
+  }
+};
+
+export const addVideoToSection = async (courseId, sectionId, videoData) => {
+  try {
+    const response = await api.post(
+      `/teacher/courses/${courseId}/sections/${sectionId}/videos`,
+      videoData
+    );
+    
+    if (!response.data.videos) {
+      throw new Error("Video addition failed");
+    }
+    
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Failed to add video" };
+  }
+};
+
+export const updateVideoToSection = async (courseId, sectionId, videoIndex, videoData) => {
+  try {
+    const response = await api.put(
+      `/teacher/courses/${courseId}/sections/${sectionId}/videos/${videoIndex}`,
+      videoData
+    );
+    
+    if (!response.data.videos) {
+      throw new Error("Video update failed");
+    }
+    
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Failed to update video" };
+  }
+};
+
+export const deleteVideoFromSection = async (courseId, sectionId, videoIndex) => {
+  try {
+    const res = await api.delete(
+      `/teacher/courses/${courseId}/sections/${sectionId}/videos/${videoIndex}`
+    );
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Video delete failed" };
+  }
+};
+
+// ================= NOTES =================
+export const createNote = async (formData) => {
+  try {
+    const res = await api.post("/teacher/notes", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create failed" };
+  }
+};
+
+export const getTeacherNotes = async () => {
+  try {
+    const res = await api.get("/teacher/notes");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch failed" };
+  }
+};
+
+export const getNoteById = async (id) => {
+  try {
+    const res = await api.get(`/teacher/notes/${id}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch failed" };
+  }
+};
+
+export const updateNote = async (id, formData) => {
+  try {
+    const res = await api.put(`/teacher/notes/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update failed" };
+  }
+};
+
+export const deleteNote = async (id) => {
+  try {
+    const res = await api.delete(`/teacher/notes/${id}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete failed" };
+  }
+};
+
+// ================= TESTS =================
+export const getTeacherTests = async () => {
+  try {
+    const res = await api.get("/teacher/tests");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch tests failed" };
+  }
+};
+
+export const createTeacherTest = async (payload) => {
+  try {
+    const res = await api.post("/teacher/tests", payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Test creation failed" };
+  }
+};
+
+export const getTeacherTestById = async (testId) => {
+  try {
+    const res = await api.get(`/teacher/tests/${testId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Test not found" };
+  }
+};
+
+export const updateTeacherTest = async (testId, payload) => {
+  try {
+    const res = await api.put(`/teacher/tests/${testId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update failed" };
+  }
+};
+
+export const deleteTeacherTest = async (testId) => {
+  try {
+    const res = await api.delete(`/teacher/tests/${testId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete failed" };
+  }
+};
+
+export const saveTestConfig = async (testId, payload) => {
+  try {
+    const res = await api.post(`/teacher/tests/${testId}/config`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Config save failed" };
+  }
+};
+
+export const publishTeacherTest = async (testId, payload) => {
+  try {
+    const res = await api.post(`/teacher/tests/${testId}/publish`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Publish failed" };
+  }
+};
+
+export const previewTeacherTest = async (testId) => {
+  try {
+    const res = await api.get(`/teacher/tests/${testId}/preview`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Preview failed" };
+  }
+};
+
+export const getTeacherTestAnalytics = async (testId) => {
+  try {
+    const res = await api.get(`/teacher/tests/${testId}/analytics`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Analytics fetch failed" };
+  }
+};
+
+export const getTeacherQuestionAnalytics = async (testId, questionId) => {
+  try {
+    const res = await api.get(`/teacher/tests/${testId}/questions/${questionId}/analytics`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Question analytics fetch failed" };
+  }
+};
+
+// ================= QUESTIONS =================
+export const getTestQuestions = async (testId) => {
+  try {
+    const res = await api.get(`/questions/test/${testId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Questions fetch failed" };
+  }
+};
+
+export const bulkAddQuestionsToTest = async (testId, payload) => {
+  try {
+    const res = await api.post(`/questions/test/${testId}/bulk`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Bulk add questions failed" };
+  }
+};
+
+export const addQuestionToTest = async (testId, payload) => {
+  try {
+    const res = await api.post(`/questions/test/${testId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Add question failed" };
+  }
+};
+
+export const updateQuestion = async (questionId, payload) => {
+  try {
+    const res = await api.put(`/questions/${questionId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update question failed" };
+  }
+};
+
+export const deleteQuestion = async (questionId) => {
+  try {
+    const res = await api.delete(`/questions/${questionId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete question failed" };
+  }
+};
+
+export const getQuestionAnalytics = async (questionId) => {
+  try {
+    const res = await api.get(`/questions/${questionId}/analytics`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Question analytics fetch failed" };
+  }
+};
+
+// ================= TEACHER PROFILE =================
+export const getTeacherProfile = async () => {
+  try {
+    const res = await api.get("/teacher/profile");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Profile fetch failed" };
+  }
+};
+
+export const updateTeacherProfile = async (data) => {
+  try {
+    const res = await api.put("/teacher/profile", data);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Profile update failed" };
+  }
+};

@@ -20,7 +20,7 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: [
-    "http://localhost:4040",
+    "http://localhost:5173",
     "https://pharmacist-shubham-api.onrender.com/"
   ],
   credentials: true

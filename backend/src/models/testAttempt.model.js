@@ -93,36 +93,12 @@ const testAttemptSchema = new mongoose.Schema(
 );
 
 // Compound index for unique attempt per student per test
-testAttemptSchema.index({ testId: 1, studentId: 1 }, { unique: true });
+testAttemptSchema.index({ testId: 1, studentId: 1 }, { unique: false });
+testAttemptSchema.index({ testId: 1, status: 1 });
+testAttemptSchema.index({ studentId: 1, status: 1 });
+testAttemptSchema.index({ marksObtained: -1, timeTaken: 1 });
 
-
-testAttemptSchema.methods.calculateResult = function () {
-  let correct = 0;
-  let wrong = 0;
-  let skipped = 0;
-  let marksObtained = 0;
-  this.answers.forEach((answer) => {
-    if (answer.selectedOptionIndex === null) {
-      skipped++;
-    } else if (answer.isCorrect) {
-      correct++;
-      marksObtained += answer.marksObtained;
-    } else {
-      wrong++;
-      marksObtained += answer.marksObtained;
-    }
-  });
-
-  this.correctAnswers = correct;
-  this.wrongAnswers = wrong;
-  this.skippedQuestions = skipped;
-  this.attemptedQuestions = correct + wrong;
-  this.marksObtained = marksObtained;
-  this.percentage = this.totalMarks > 0 
-    ? Math.round((marksObtained / this.totalMarks) * 100 * 100) / 100 
-    : 0;
-
-  return this;
-};
+// Remove calculateResult() method - logic moved to service layer
+// All calculation happens in testAttempt.service.js
 
 export default mongoose.model("TestAttempt", testAttemptSchema);

@@ -82,28 +82,46 @@ components:
       properties:
         _id:
           type: string
+          example: "60d21b4667d0d8992e610c85"
         title:
           type: string
+          example: "Master React with Hooks"
         description:
           type: string
+          example: "Learn modern React development..."
         isPaid:
           type: boolean
+          default: false
+        price:
+          type: number
+          description: Price in INR (required if isPaid is true)
+          example: 999
         tags:
           type: array
           items:
             type: string
+          example: ["react", "frontend", "javascript"]
         educator:
-          $ref: "#/components/schemas/User"
+          allOf:
+            - $ref: "#/components/schemas/User"
+            - description: Teacher who created the course
         thumbnail:
-          $ref: "#/components/schemas/File"
-        price:
-          type: number
+          allOf:
+            - $ref: "#/components/schemas/File"
+            - description: Course thumbnail image
         published:
           type: boolean
+          default: false
+        status:
+          type: string
+          enum: [pending, approved]
+          default: pending
+          description: Admin approval status
         sections:
           type: array
           items:
             $ref: "#/components/schemas/Section"
+          description: Course curriculum sections
         createdAt:
           type: string
           format: date-time
@@ -114,8 +132,11 @@ components:
     Section:
       type: object
       properties:
+        _id:
+          type: string
         title:
           type: string
+          example: "Getting Started"
         description:
           type: string
         videos:
@@ -132,20 +153,27 @@ components:
       properties:
         url:
           type: string
-          example: "https://youtube.com/..."
+          example: "https://www.youtube.com/embed/dQw4w9WgXcQ"
         title:
           type: string
+          example: "Introduction to React"
 
     File:
       type: object
       properties:
         url:
           type: string
+          example: "https://res.cloudinary.com/jatinn/image/upload/v1774177437/..."
+          description: CDN or file server URL
         publicId:
           type: string
+          example: "pharmacist-shubham/course-images/fjat8uyaexvizwtvr4um"
+          description: Cloudinary public ID or unique identifier
         fileType:
           type: string
-          enum: [image, pdf, other]
+          enum: [image, pdf, video, document, other]
+          example: "image"
+          description: Type of file
 
     # ---------- Note ----------
     Note:
@@ -342,15 +370,13 @@ components:
         paymentId:
           type: string
           description: Razorpay payment ID after verification
+          nullable: true
         plan:
           type: string
-          enum: [MONTHLY, QUARTERLY, YEARLY]
+          enum: [MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY]
         amount:
           type: number
           description: Amount in INR
-        amountInPaise:
-          type: number
-          description: Amount in paise (amount × 100)
         currency:
           type: string
           default: INR
@@ -371,26 +397,22 @@ components:
         verifiedAt:
           type: string
           format: date-time
+          nullable: true
           description: When Razorpay signature was successfully verified
         approvedAt:
           type: string
           format: date-time
+          nullable: true
           description: When admin approved the payment
         rejectedAt:
           type: string
           format: date-time
+          nullable: true
           description: When admin rejected the payment
         rejectionReason:
           type: string
+          nullable: true
           description: Reason provided by admin for rejection
-        gateway:
-          type: string
-          default: razorpay
-        refundedAt:
-          type: string
-          format: date-time
-        refundReason:
-          type: string
         createdAt:
           type: string
           format: date-time
@@ -1747,6 +1769,7 @@ paths:
                         example: INR
                       plan:
                         type: string
+                        enum: [MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY]
                       planName:
                         type: string
                       duration:
@@ -1773,7 +1796,7 @@ paths:
       description: |
         Verifies the Razorpay signature (skipped in DEV mode) and moves the payment to
         **PENDING_APPROVAL** status. The subscription is **not** activated until an admin
-        approves the payment via `PUT /admin/payments/{id}/approve`.
+        approves the payment via `PUT /payment/{id}/approve`.
       security:
         - bearerAuth: []
       requestBody:
@@ -1898,7 +1921,6 @@ paths:
                     type: boolean
                   message:
                     type: string
-                    example: "Payment rejected"
                   payment:
                     $ref: "#/components/schemas/Payment"
         "400":
@@ -1969,6 +1991,12 @@ paths:
     post:
       tags: [Teacher]
       summary: Create a new course
+      description: |
+        Create a new course with optional thumbnail image.
+        
+        **Thumbnail handling:**
+        - If a thumbnail file is uploaded, it's automatically processed and embedded
+        - Returns complete course object with thumbnail structure: `{ url, publicId, fileType }`
       security:
         - bearerAuth: []
       requestBody:
@@ -1976,10 +2004,36 @@ paths:
         content:
           multipart/form-data:
             schema:
-              $ref: "#/components/schemas/CreateCourseRequest"
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  example: "Master React with Hooks"
+                  minLength: 3
+                description:
+                  type: string
+                  example: "Comprehensive React course covering hooks, state management, and best practices"
+                isPaid:
+                  type: boolean
+                  default: false
+                price:
+                  type: number
+                  description: Required if isPaid is true
+                  example: 999
+                  minimum: 0
+                tags:
+                  type: string
+                  description: Comma-separated tags
+                  example: "react,frontend,javascript,web-development"
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: JPG, PNG, or WebP image (max 5MB recommended)
       responses:
         "201":
-          description: Course created
+          description: Course created successfully
           content:
             application/json:
               schema:
@@ -1987,14 +2041,37 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   message:
                     type: string
+                    example: "Course created successfully"
                   course:
-                    $ref: "#/components/schemas/Course"
+                    allOf:
+                      - $ref: "#/components/schemas/Course"
+                      - type: object
+                        properties:
+                          thumbnail:
+                            allOf:
+                              - $ref: "#/components/schemas/File"
+                              - example:
+                                  url: "https://res.cloudinary.com/jatinn/image/upload/v1774177437/pharmacist-shubham/course-images/fjat8uyaexvizwtvr4um.png"
+                                  publicId: "pharmacist-shubham/course-images/fjat8uyaexvizwtvr4um"
+                                  fileType: "image"
+        "400":
+          description: Validation error (missing title, invalid price for paid course, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not a teacher)
 
     get:
       tags: [Teacher]
       summary: Get my courses
+      description: Returns all courses created by the authenticated teacher.
       security:
         - bearerAuth: []
       responses:
@@ -2011,6 +2088,10 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Course"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
 
   /teacher/courses/{id}:
     parameters:
@@ -2018,6 +2099,7 @@ paths:
     get:
       tags: [Teacher]
       summary: Get a course by ID
+      description: Returns course details including all sections and content.
       security:
         - bearerAuth: []
       responses:
@@ -2032,22 +2114,53 @@ paths:
                     type: boolean
                   course:
                     $ref: "#/components/schemas/Course"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden (not the course creator)
         "404":
           description: Course not found
 
     put:
       tags: [Teacher]
       summary: Update a course
+      description: |
+        Update course metadata and/or thumbnail.
+        
+        **Important:**
+        - Only the course creator can update it
+        - Thumbnail is optional; if provided, it replaces the current one
+        - Returns updated course with thumbnail structure: `{ url, publicId, fileType }`
       security:
         - bearerAuth: []
       requestBody:
         content:
           multipart/form-data:
             schema:
-              $ref: "#/components/schemas/CreateCourseRequest"
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Advanced React with Hooks"
+                description:
+                  type: string
+                description:
+                  type: string
+                isPaid:
+                  type: boolean
+                price:
+                  type: number
+                  description: Required if isPaid is true
+                tags:
+                  type: string
+                  description: Comma-separated tags
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: New thumbnail image (optional)
       responses:
         "200":
-          description: Course updated
+          description: Course updated successfully
           content:
             application/json:
               schema:
@@ -2059,10 +2172,19 @@ paths:
                     type: string
                   course:
                     $ref: "#/components/schemas/Course"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Course not found
 
     delete:
       tags: [Teacher]
       summary: Delete a course
+      description: Permanently deletes the course and all associated sections/content.
       security:
         - bearerAuth: []
       responses:
@@ -2077,6 +2199,12 @@ paths:
                     type: boolean
                   message:
                     type: string
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Course not found
 
   /teacher/courses/{courseId}/sections:
     post:
@@ -2427,12 +2555,12 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   tests:
                     type: array
                     items:
                       $ref: "#/components/schemas/Test"
 
-  /teacher/test:
     post:
       tags: [Teacher]
       summary: Create a new test
@@ -2454,12 +2582,19 @@ paths:
                 properties:
                   success:
                     type: boolean
+                  message:
+                    type: string
                   test:
                     $ref: "#/components/schemas/Test"
 
-  /teacher/test/{id}:
+  /teacher/tests/{testId}:
     parameters:
-      - $ref: "#/components/parameters/testId"
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
     get:
       tags: [Teacher]
       summary: Get test details
@@ -2477,136 +2612,30 @@ paths:
                     type: boolean
                   test:
                     $ref: "#/components/schemas/Test"
+        "404":
+          description: Test not found
 
-  /teacher/test/{id}/question:
-    post:
+    put:
       tags: [Teacher]
-      summary: Add a question to a test
+      summary: Update test
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateQuestionRequest"
-      responses:
-        "201":
-          description: Question added
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  question:
-                    $ref: "#/components/schemas/Question"
-
-  /teacher/test/{id}/questions/bulk:
-    post:
-      tags: [Teacher]
-      summary: Bulk add questions to a test
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BulkCreateQuestionsRequest"
-      responses:
-        "201":
-          description: Questions added
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  count:
-                    type: number
-                  questions:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Question"
-
-  /teacher/test/{id}/config:
-    post:
-      tags: [Teacher]
-      summary: Save test configuration
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TestConfigRequest"
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                duration:
+                  type: number
       responses:
         "200":
-          description: Config saved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  config:
-                    type: object
-
-  /teacher/test/{id}/preview:
-    get:
-      tags: [Teacher]
-      summary: Preview test with questions
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-      responses:
-        "200":
-          description: Test preview
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  preview:
-                    type: object
-                    properties:
-                      test:
-                        $ref: "#/components/schemas/Test"
-                      questions:
-                        type: array
-                        items:
-                          $ref: "#/components/schemas/Question"
-
-  /teacher/test/{id}/publish:
-    post:
-      tags: [Teacher]
-      summary: Publish or schedule a test
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PublishTestRequest"
-      responses:
-        "200":
-          description: Test published/scheduled
+          description: Test updated
           content:
             application/json:
               schema:
@@ -2619,17 +2648,14 @@ paths:
                   test:
                     $ref: "#/components/schemas/Test"
 
-  /teacher/test/{id}/analytics:
-    get:
+    delete:
       tags: [Teacher]
-      summary: Get test analytics
+      summary: Delete test
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
       responses:
         "200":
-          description: Test analytics
+          description: Test deleted
           content:
             application/json:
               schema:
@@ -2637,20 +2663,261 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  # analytics fields
+                  message:
+                    type: string
 
-  /teacher/test/{id}/questions/{questionId}/analytics:
-    get:
+  /teacher/tests/{testId}/config:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
+    post:
       tags: [Teacher]
-      summary: Get question analytics
+      summary: Save test configuration
+      description: Configure test settings like duration, shuffling, negative marking
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-        - $ref: "#/components/parameters/questionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - duration
+              properties:
+                duration:
+                  type: number
+                  description: Duration in minutes
+                  minimum: 1
+                shuffleQuestions:
+                  type: boolean
+                  default: false
+                shuffleOptions:
+                  type: boolean
+                  default: false
+                showResults:
+                  type: boolean
+                  default: true
+                allowRetake:
+                  type: boolean
+                  default: false
+                negativeMarks:
+                  type: number
+                  default: 0
       responses:
         "200":
-          description: Question analytics
+          description: Config saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  test:
+                    $ref: "#/components/schemas/Test"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /teacher/tests/{testId}/publish:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
+    post:
+      tags: [Teacher]
+      summary: Publish or schedule test
+      description: |
+        Publish test immediately or schedule for future date.
+        If startTime is in the future, test is scheduled; otherwise published.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startTime:
+                  type: string
+                  format: date-time
+                  description: When test becomes available (optional)
+                endTime:
+                  type: string
+                  format: date-time
+                  description: When test closes (optional)
+      responses:
+        "200":
+          description: Test published or scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: "Test published"
+                  test:
+                    $ref: "#/components/schemas/Test"
+        "400":
+          description: Invalid date format or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /teacher/tests/{testId}/preview:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
+    get:
+      tags: [Teacher]
+      summary: Preview test with all questions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Test preview with populated questions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  test:
+                    allOf:
+                      - $ref: "#/components/schemas/Test"
+                      - type: object
+                        properties:
+                          questions:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Question"
+
+  /teacher/tests/{testId}/analytics:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
+    get:
+      tags: [Teacher]
+      summary: Get comprehensive test analytics
+      description: |
+        Returns aggregated analytics for a test:
+        - Total attempts and average scores
+        - Accuracy rate
+        - Completion rate
+        - Min/Max scores
+        - Average time spent
+        
+        Only tests created by the authenticated teacher are accessible.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Test analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  testId:
+                    type: string
+                  totalAttempts:
+                    type: number
+                    description: Total completed attempts
+                  averageScore:
+                    type: string
+                    format: float
+                    description: Average marks obtained (to 2 decimals)
+                    example: "42.50"
+                  averagePercentage:
+                    type: string
+                    format: float
+                    description: Average percentage score
+                    example: "85.00"
+                  accuracy:
+                    type: string
+                    format: float
+                    description: Overall accuracy percentage
+                    example: "78.50"
+                  completionRate:
+                    type: string
+                    format: float
+                    description: Percentage of students who completed
+                    example: "92.00"
+                  maxScore:
+                    type: number
+                    description: Highest score achieved
+                  minScore:
+                    type: number
+                    description: Lowest score achieved
+                  averageTime:
+                    type: string
+                    format: integer
+                    description: Average time spent in seconds
+                    example: "1250"
+        "403":
+          description: Not authorized (not test creator)
+        "404":
+          description: Test not found or unauthorized
+
+  /teacher/tests/{testId}/questions/{questionId}/analytics:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
+      - name: questionId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the question
+    get:
+      tags: [Teacher]
+      summary: Get question analytics for a specific test
+      description: |
+        Returns performance metrics for a specific question within a test:
+        - Correct/wrong/skipped counts
+        - Accuracy percentage
+        - Skip rate
+        - Average time spent
+        
+        Verifies both test ownership and question membership.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Question analytics in test context
           content:
             application/json:
               schema:
@@ -2659,17 +2926,124 @@ paths:
                   success:
                     type: boolean
                   analytics:
-                    $ref: "#/components/schemas/QuestionAnalytics"
+                    type: object
+                    properties:
+                      questionId:
+                        type: string
+                      questionText:
+                        type: string
+                      totalAttempts:
+                        type: number
+                        description: Total times attempted
+                      correctAttempts:
+                        type: number
+                      wrongAttempts:
+                        type: number
+                      skippedCount:
+                        type: number
+                      accuracy:
+                        type: string
+                        format: float
+                        description: Percentage of correct answers (among attempted)
+                        example: "85.50"
+                      skipRate:
+                        type: string
+                        format: float
+                        description: Percentage of skipped attempts
+                        example: "10.00"
+                      averageTime:
+                        type: string
+                        format: float
+                        description: Average time spent in seconds
+                        example: "45.25"
+                      difficulty:
+                        type: string
+                        enum: [easy, medium, hard]
+                      marks:
+                        type: number
+        "403":
+          description: Not authorized
+        "404":
+          description: Question not found in this test, or test not found
 
-  /teacher/students/performance:
+  /questions/{questionId}/analytics:
+    parameters:
+      - name: questionId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the question
+    get:
+      tags: [Question]
+      summary: Get question-level analytics (across all tests)
+      description: |
+        Returns performance metrics for a specific question across all tests using it:
+        - Total attempts (all tests)
+        - Overall accuracy
+        - Average time spent
+        
+        Only the question creator can view this.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Question bank analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  analytics:
+                    type: object
+                    properties:
+                      questionId:
+                        type: string
+                      totalAttempts:
+                        type: number
+                        description: Total attempts across all tests using this question
+                      accuracy:
+                        type: string
+                        format: float
+                        description: Overall accuracy percentage
+                        example: "79.25"
+                      averageTime:
+                        type: string
+                        format: float
+                        description: Average time spent in seconds
+                        example: "52.75"
+        "403":
+          description: Not authorized (not question creator)
+        "404":
+          description: Question not found
+
+  /teacher/tests/{testId}/analytics:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
     get:
       tags: [Teacher]
-      summary: Get student performance (placeholder)
+      summary: Get comprehensive test analytics
+      description: |
+        Returns aggregated analytics for a test:
+        - Total attempts and average scores
+        - Accuracy rate
+        - Completion rate
+        - Min/Max scores
+        - Average time spent
+        
+        Only tests created by the authenticated teacher are accessible.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Performance data
+          description: Test analytics data
           content:
             application/json:
               schema:
@@ -2677,145 +3051,68 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  performance:
-                    type: array
-
-  # ---------- Question ----------
-  /questions/test/{testId}:
-    parameters:
-      - $ref: "#/components/parameters/testId"
-    post:
-      tags: [Question]
-      summary: Create a question for a test
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateQuestionRequest"
-      responses:
-        "201":
-          description: Question created
-
-    get:
-      tags: [Question]
-      summary: Get all questions for a test
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: List of questions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  count:
+                  testId:
+                    type: string
+                  totalAttempts:
                     type: number
-                  questions:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Question"
-
-  /questions/test/{testId}/bulk:
-    post:
-      tags: [Question]
-      summary: Bulk create questions for a test
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BulkCreateQuestionsRequest"
-      responses:
-        "201":
-          description: Questions created
-
-  /questions/{questionId}:
-    parameters:
-      - $ref: "#/components/parameters/questionId"
-    get:
-      tags: [Question]
-      summary: Get a question by ID
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Question details
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  question:
-                    $ref: "#/components/schemas/Question"
-
-    put:
-      tags: [Question]
-      summary: Update a question
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateQuestionRequest"
-      responses:
-        "200":
-          description: Question updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
+                    description: Total completed attempts
+                  averageScore:
                     type: string
-                  question:
-                    $ref: "#/components/schemas/Question"
-
-    delete:
-      tags: [Question]
-      summary: Delete a question
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Question deleted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
+                    format: float
+                    description: Average marks obtained (to 2 decimals)
+                    example: "42.50"
+                  averagePercentage:
                     type: string
+                    format: float
+                    description: Average percentage score
+                    example: "85.00"
+                  accuracy:
+                    type: string
+                    format: float
+                    description: Overall accuracy percentage
+                    example: "78.50"
+                  completionRate:
+                    type: string
+                    format: float
+                    description: Percentage of students who completed
+                    example: "92.00"
+                  maxScore:
+                    type: number
+                    description: Highest score achieved
+                  minScore:
+                    type: number
+                    description: Lowest score achieved
+                  averageTime:
+                    type: string
+                    format: integer
+                    description: Average time spent in seconds
+                    example: "1250"
+        "403":
+          description: Not authorized (not test creator)
+        "404":
+          description: Test not found or unauthorized
 
-  # ---------- Test Attempt ----------
   /test/start/{testId}:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
     post:
       tags: [Test Attempt]
       summary: Start a test attempt
+      description: |
+        Starts a new test or resumes an existing in-progress attempt.
+        Returns sanitized questions (no answers revealed).
+        
+        Test must be in "published" status and current time must be within allowed window.
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/testId"
       responses:
         "200":
-          description: Test started, returns attempt ID and questions
+          description: Test started or resumed, returns attempt and questions
           content:
             application/json:
               schema:
@@ -2823,25 +3120,50 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    example: true
                   message:
                     type: string
-                  attemptId:
-                    type: string
-                  test:
+                    example: "Test started"
+                  data:
                     type: object
-                  questions:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Question"
+                    properties:
+                      attempt:
+                        $ref: "#/components/schemas/TestAttempt"
+                      questions:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Question"
+                      duration:
+                        type: number
+                        description: Test duration in minutes
+                      resuming:
+                        type: boolean
+                        description: Whether this is resuming an existing attempt
+        "400":
+          description: Test not published or already submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Test not found
 
   /test/{attemptId}/answer:
+    parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test attempt
     post:
       tags: [Test Attempt]
       summary: Submit an answer for a question
+      description: |
+        Save answer for a single question. Can be called multiple times to update answer.
+        Answer is auto-evaluated immediately.
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/attemptId"
       requestBody:
         required: true
         content:
@@ -2850,7 +3172,7 @@ paths:
               $ref: "#/components/schemas/SubmitAnswerRequest"
       responses:
         "200":
-          description: Answer saved
+          description: Answer saved successfully
           content:
             application/json:
               schema:
@@ -2860,23 +3182,49 @@ paths:
                     type: boolean
                   message:
                     type: string
+                  data:
+                    type: object
+                    properties:
+                      saved:
+                        type: boolean
+                      isCorrect:
+                        type: boolean
+                      marksObtained:
+                        type: number
+        "400":
+          description: Invalid question or time limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Attempt not found
 
   /test/{attemptId}/submit:
+    parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test attempt
     post:
       tags: [Test Attempt]
-      summary: Submit the entire test
+      summary: Submit the entire test for evaluation
+      description: |
+        Final submission. Validates all answers, auto-evaluates, and calculates results.
+        After submission, test cannot be edited. Returns result with rank on leaderboard.
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/attemptId"
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/SubmitTestRequest"
       responses:
         "200":
-          description: Test submitted, result returned
+          description: Test submitted and evaluated successfully
           content:
             application/json:
               schema:
@@ -2886,7 +3234,7 @@ paths:
                     type: boolean
                   message:
                     type: string
-                  result:
+                  data:
                     type: object
                     properties:
                       totalQuestions:
@@ -2905,18 +3253,34 @@ paths:
                         type: number
                       percentage:
                         type: number
+        "400":
+          description: Validation error or attempt already submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Attempt not found
 
   /test/{attemptId}/result:
+    parameters:
+      - name: attemptId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test attempt
     get:
       tags: [Test Attempt]
-      summary: Get result of a completed test
+      summary: Get detailed result of a completed test
+      description: |
+        Retrieve full result with detailed solutions for each question.
+        Only available after test is submitted (status = submitted or evaluated).
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/attemptId"
       responses:
         "200":
-          description: Test result
+          description: Detailed test result with solutions
           content:
             application/json:
               schema:
@@ -2924,17 +3288,110 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  # result details
+                  data:
+                    type: object
+                    properties:
+                      test:
+                        type: object
+                        properties:
+                          title:
+                            type: string
+                          description:
+                            type: string
+                          totalMarks:
+                            type: number
+                          duration:
+                            type: number
+                      result:
+                        type: object
+                        properties:
+                          totalQuestions:
+                            type: number
+                          attemptedQuestions:
+                            type: number
+                          correctAnswers:
+                            type: number
+                          wrongAnswers:
+                            type: number
+                          skippedQuestions:
+                            type: number
+                          totalMarks:
+                            type: number
+                          marksObtained:
+                            type: number
+                          percentage:
+                            type: number
+                          timeTaken:
+                            type: number
+                            description: Time taken in seconds
+                          submittedAt:
+                            type: string
+                            format: date-time
+                          rank:
+                            type: number
+                            description: Leaderboard rank (1-based)
+                      detailedResult:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            questionId:
+                              type: string
+                            questionText:
+                              type: string
+                            questionType:
+                              type: string
+                            options:
+                              type: array
+                              items:
+                                $ref: "#/components/schemas/Option"
+                            selectedOptionIndex:
+                              type: number
+                              nullable: true
+                            correctOptionIndex:
+                              type: number
+                            isCorrect:
+                              type: boolean
+                            marksObtained:
+                              type: number
+                            explanation:
+                              type: string
+                            difficulty:
+                              type: string
+        "400":
+          description: Test not yet submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Attempt not found
 
   /test/my-attempts:
     get:
       tags: [Test Attempt]
-      summary: Get all attempts by the logged-in student
+      summary: Get all test attempts by the logged-in student
+      description: |
+        Returns attempt history with test details, sorted by most recent first.
+        Shows all attempts (in-progress, submitted, evaluated).
       security:
         - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            description: Maximum number of attempts to return
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+            description: Number of attempts to skip (for pagination)
       responses:
         "200":
-          description: List of attempts
+          description: List of student's test attempts
           content:
             application/json:
               schema:
@@ -2942,27 +3399,53 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  attempts:
+                  data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/TestAttempt"
+                      allOf:
+                        - $ref: "#/components/schemas/TestAttempt"
+                        - type: object
+                          properties:
+                            testId:
+                              type: object
+                              properties:
+                                title:
+                                  type: string
+                                totalMarks:
+                                  type: number
+                                duration:
+                                  type: number
 
   /test/leaderboard/{testId}:
+    parameters:
+      - name: testId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the test
     get:
       tags: [Test Attempt]
       summary: Get leaderboard for a test
+      description: |
+        Returns top performers sorted by:
+        1. Marks obtained (descending)
+        2. Time taken (ascending)
+        
+        Only includes completed attempts (submitted or evaluated status).
       security:
         - bearerAuth: []
       parameters:
-        - $ref: "#/components/parameters/testId"
         - name: limit
           in: query
           schema:
             type: integer
             default: 10
+            maximum: 100
+            description: Number of top performers to return
       responses:
         "200":
-          description: Leaderboard
+          description: Test leaderboard with rankings
           content:
             application/json:
               schema:
@@ -2970,24 +3453,39 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  leaderboard:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        student:
+                  data:
+                    type: object
+                    properties:
+                      leaderboard:
+                        type: array
+                        items:
                           type: object
                           properties:
-                            name:
+                            rank:
+                              type: number
+                              description: 1-based rank position
+                            studentId:
                               type: string
-                            email:
+                            studentName:
                               type: string
-                        marksObtained:
-                          type: number
-                        percentage:
-                          type: number
-                        timeTaken:
-                          type: number
+                            studentEmail:
+                              type: string
+                            marksObtained:
+                              type: number
+                            percentage:
+                              type: number
+                              description: Score percentage
+                            timeTaken:
+                              type: number
+                              description: Time in seconds
+                            submittedAt:
+                              type: string
+                              format: date-time
+                      totalEntries:
+                        type: number
+                        description: Total entries in leaderboard
+        "404":
+          description: Test not found
 
   # ---------- Admin ----------
   /admin/create:

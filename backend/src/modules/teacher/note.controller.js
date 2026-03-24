@@ -6,15 +6,20 @@ import { ApiError } from "../../shared/error/ApiError.js";
 export const createNote = asyncHandler(async (req, res) => {
   const { title, description, isFree, tags } = req.body;
   const file = req.file;
+  
   if (!file) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Note file is required");
   }
 
+  if (!title || !title.trim()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Title is required");
+  }
+
   const noteData = {
-    title,
-    description,
+    title: title.trim(),
+    description: description ? description.trim() : "",
     isFree: isFree === "true" || isFree === true,
-    tags: tags ? tags.split(",").map(t => t.trim()) : [],
+    tags: tags ? (typeof tags === "string" ? tags.split(",").map(t => t.trim()) : tags) : [],
     file: {
       url: file.path,
       publicId: file.filename,
@@ -51,10 +56,10 @@ export const updateNote = asyncHandler(async (req, res) => {
   const file = req.file;
 
   const updateData = {
-    title,
-    description,
-    isFree: isFree === "true" || isFree === true,
-    tags: tags ? tags.split(",").map(t => t.trim()) : [],
+    ...(title && { title: title.trim() }),
+    ...(description && { description: description.trim() }),
+    ...(isFree !== undefined && { isFree: isFree === "true" || isFree === true }),
+    ...(tags && { tags: typeof tags === "string" ? tags.split(",").map(t => t.trim()) : tags }),
   };
 
   if (file) {

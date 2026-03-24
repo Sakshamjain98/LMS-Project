@@ -1,11 +1,19 @@
-import React from 'react';
+import { motion } from "framer-motion";
 
-const StatCard = ({ icon, count, label }) => (
-  <div className="bg-dark-200 p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col items-center transition-transform hover:scale-105">
-    <div className="text-brand-primary text-2xl mb-4">{icon}</div>
-    <div className="text-3xl font-bold mb-1 text-white">{count}</div>
-    <div className="text-gray-500 text-xs uppercase tracking-widest">{label}</div>
-  </div>
-);
+export default function StatCard({ title, value, icon }) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.05 }}
+      className="bg-dark-200 p-5 rounded-xl border border-dark-100 flex items-center justify-between"
+    >
+      <div>
+        <p className="text-grayCustom-medium text-sm">{title}</p>
+        <h2 className="text-2xl font-bold mt-1">{value}</h2>
+      </div>
 
-export default StatCard;
+      <div className="text-brand-primary text-2xl">
+        {icon}
+      </div>
+    </motion.div>
+  );
+}

@@ -1,87 +1,173 @@
+import mongoose from "mongoose";
 import TestAttempt from "../../models/testAttempt.model.js";
 import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import {
+  calculateMarksForAnswer,
+  isAnswerCorrect,
+  calculateTestResult,
+  sanitizeQuestionsForStudent,
+  validateTestTiming,
+  hasExceededTimeLimit,
+  generateDetailedResult,
+} from "../../shared/utils/evaluation.utils.js";
 
+/**
+ * Validate and convert testId to ObjectId
+ */
+const validateTestId = (testId) => {
+  if (!testId) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "testId is required");
+  }
+  
+  if (!mongoose.Types.ObjectId.isValid(testId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid testId format");
+  }
+  
+  return new mongoose.Types.ObjectId(testId);
+};
+
+/**
+ * Validate and convert userId to ObjectId
+ */
+const validateUserId = (userId) => {
+  if (!userId) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "userId is required");
+  }
+  
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid userId format");
+  }
+  
+  return new mongoose.Types.ObjectId(userId);
+};
+
+/**
+ * Start or resume test
+ */
 export const startTest = async (testId, studentId) => {
-  // Check if test exists and is published
-  const test = await Test.findById(testId);
+  const objTestId = validateTestId(testId);
+  const objStudentId = validateUserId(studentId);
+
+  const test = await Test.findById(objTestId).lean();
   if (!test) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Test not found");
   }
 
+  // Validate test timing
+  const timingCheck = validateTestTiming(test);
+  if (!timingCheck.valid) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, timingCheck.reason);
+  }
+
+  // Check if test is published
   if (test.status !== "published") {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test is not available");
   }
 
-  // Check if already attempted
-  const existingAttempt = await TestAttempt.findOne({ testId, studentId });
+  // Check for existing in-progress attempt
+  const existingAttempt = await TestAttempt.findOne({
+    testId: objTestId,
+    studentId: objStudentId,
+    status: "in_progress",
+  }).lean();
+
   if (existingAttempt) {
-    if (existingAttempt.status === "submitted" || existingAttempt.status === "evaluated") {
-      throw new ApiError(STATUS_CODES.CONFLICT, "Test already submitted");
-    }
-    // Return existing in-progress attempt
-    return existingAttempt;
+    // Return existing attempt for resume
+    const questions = await Question.find({
+      _id: { $in: test.questions },
+    }).lean();
+
+    return {
+      attempt: existingAttempt,
+      questions: sanitizeQuestionsForStudent(questions),
+      duration: test.duration,
+      resuming: true,
+    };
   }
 
-  // Get questions for this test (without correct answers for student)
-  const questions = await Question.find({
-    _id: { $in: test.questions }
-  }).select("-correctOptionIndex -options.isCorrect -explanation");
-  
+  // Check if already submitted
+  const submittedAttempt = await TestAttempt.findOne({
+    testId: objTestId,
+    studentId: objStudentId,
+    status: { $in: ["submitted", "evaluated"] },
+  }).lean();
 
-  // Calculate total marks
-  const allQuestions = await Question.find({ testId });
-  const totalMarks = allQuestions.reduce((sum, q) => sum + q.marks, 0);
+  if (submittedAttempt) {
+    throw new ApiError(
+      STATUS_CODES.CONFLICT,
+      "Test already submitted. Retake not allowed."
+    );
+  }
+
+  // Get questions
+  const questions = await Question.find({
+    _id: { $in: test.questions },
+  }).lean();
+
   // Create new attempt
   const attempt = await TestAttempt.create({
-    testId,
-    studentId,
+    testId: objTestId,
+    studentId: objStudentId,
     totalQuestions: questions.length,
-    totalMarks,
+    totalMarks: test.totalMarks || 0,
     status: "in_progress",
   });
 
   return {
-    attempt,
-    questions,
+    attempt: attempt.toObject(),
+    questions: sanitizeQuestionsForStudent(questions),
     duration: test.duration,
+    resuming: false,
   };
 };
 
+/**
+ * Submit a single answer
+ */
 export const submitAnswer = async (attemptId, answerData, studentId) => {
+  const objAttemptId = validateTestId(attemptId);
+  const objStudentId = validateUserId(studentId);
+
   const attempt = await TestAttempt.findOne({
-    _id: attemptId,
-    studentId,
+    _id: objAttemptId,
+    studentId: objStudentId,
     status: "in_progress",
   });
 
   if (!attempt) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, "Attempt not found or already submitted");
+    throw new ApiError(
+      STATUS_CODES.NOT_FOUND,
+      "Attempt not found or already submitted"
+    );
   }
 
   const { questionId, selectedOptionIndex, timeTaken } = answerData;
 
-  // Get question to verify answer
-  const question = await Question.findById(questionId);
+  // Verify question and test ownership
+  const question = await Question.findById(questionId).lean();
   if (!question || question.testId.toString() !== attempt.testId.toString()) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid question");
   }
 
-  // Check if answer already exists
-  const existingAnswerIndex = attempt.answers.findIndex(
+  // Check time limit
+  const test = await Test.findById(attempt.testId).lean();
+  if (hasExceededTimeLimit(attempt, test)) {
+    attempt.status = "evaluated";
+    await attempt.save();
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Time limit exceeded");
+  }
+
+  // Calculate marks
+  const marksObtained = calculateMarksForAnswer(question, selectedOptionIndex);
+  const isCorrect = isAnswerCorrect(question, selectedOptionIndex);
+
+  // Find and update existing answer or create new
+  const existingIndex = attempt.answers.findIndex(
     (a) => a.questionId.toString() === questionId
   );
-
-  const isCorrect = selectedOptionIndex !== null && 
-    question.correctOptionIndex === selectedOptionIndex;
-  
-  const marksObtained = selectedOptionIndex === null
-    ? 0
-    : isCorrect
-    ? question.marks
-    : -question.negativeMarks;
 
   const answerEntry = {
     questionId,
@@ -91,32 +177,43 @@ export const submitAnswer = async (attemptId, answerData, studentId) => {
     timeTaken,
   };
 
-  if (existingAnswerIndex >= 0) {
-    attempt.answers[existingAnswerIndex] = answerEntry;
+  if (existingIndex >= 0) {
+    attempt.answers[existingIndex] = answerEntry;
   } else {
     attempt.answers.push(answerEntry);
   }
 
   await attempt.save();
-  return { saved: true, isCorrect };
+
+  return { saved: true, isCorrect, marksObtained };
 };
 
+/**
+ * Final test submission with auto-evaluation
+ */
 export const submitTest = async (attemptId, answersData, studentId) => {
+  const objAttemptId = validateTestId(attemptId);
+  const objStudentId = validateUserId(studentId);
+
   const attempt = await TestAttempt.findOne({
-    _id: attemptId,
-    studentId,
+    _id: objAttemptId,
+    studentId: objStudentId,
     status: "in_progress",
   });
 
   if (!attempt) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, "Attempt not found or already submitted");
+    throw new ApiError(
+      STATUS_CODES.NOT_FOUND,
+      "Attempt not found or already submitted"
+    );
   }
 
-  // Get all questions for this test
-  const questions = await Question.find({ testId: attempt.testId });
+  const test = await Test.findById(attempt.testId).lean();
+  const questions = await Question.find({ testId: attempt.testId }).lean();
+
+  // Auto-evaluate
   const questionMap = new Map(questions.map((q) => [q._id.toString(), q]));
 
-  // Process all answers
   attempt.answers = answersData.answers.map((answer) => {
     const question = questionMap.get(answer.questionId);
     if (!question) {
@@ -129,16 +226,11 @@ export const submitTest = async (attemptId, answersData, studentId) => {
       };
     }
 
-    const isCorrect =
-      answer.selectedOptionIndex !== null &&
-      question.correctOptionIndex === answer.selectedOptionIndex;
-
-    const marksObtained =
-      answer.selectedOptionIndex === null
-        ? 0
-        : isCorrect
-        ? question.marks
-        : -question.negativeMarks;
+    const isCorrect = isAnswerCorrect(question, answer.selectedOptionIndex);
+    const marksObtained = calculateMarksForAnswer(
+      question,
+      answer.selectedOptionIndex
+    );
 
     return {
       questionId: answer.questionId,
@@ -149,23 +241,48 @@ export const submitTest = async (attemptId, answersData, studentId) => {
     };
   });
 
-  // Calculate time taken
+  // Calculate result
   attempt.timeTaken = Math.round((Date.now() - attempt.startedAt) / 1000);
   attempt.submittedAt = new Date();
   attempt.status = "evaluated";
 
-  // Calculate result
-  attempt.calculateResult();
+  const result = calculateTestResult(
+    attempt.answers,
+    questions,
+    attempt.totalMarks
+  );
+
+  attempt.correctAnswers = result.correctAnswers;
+  attempt.wrongAnswers = result.wrongAnswers;
+  attempt.attemptedQuestions = result.attemptedQuestions;
+  attempt.skippedQuestions = result.skippedQuestions;
+  attempt.marksObtained = result.marksObtained;
+  attempt.percentage = result.percentage;
+
   await attempt.save();
 
-  return attempt;
+  // Calculate rank
+  const rank =
+    (await TestAttempt.countDocuments({
+      testId: attempt.testId,
+      status: "evaluated",
+      marksObtained: { $gt: attempt.marksObtained },
+    })) + 1;
+
+  return { ...attempt.toObject(), rank };
 };
 
+/**
+ * Get detailed test result with solutions
+ */
 export const getTestResult = async (attemptId, studentId) => {
+  const objAttemptId = validateTestId(attemptId);
+  const objStudentId = validateUserId(studentId);
+
   const attempt = await TestAttempt.findOne({
-    _id: attemptId,
-    studentId,
-  }).populate("testId", "title description");
+    _id: objAttemptId,
+    studentId: objStudentId,
+  }).lean();
 
   if (!attempt) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Attempt not found");
@@ -175,27 +292,27 @@ export const getTestResult = async (attemptId, studentId) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test not yet submitted");
   }
 
-  // Get questions with correct answers for review
-  const questions = await Question.find({ testId: attempt.testId });
+  const questions = await Question.find({
+    testId: attempt.testId,
+  }).lean();
 
-  const detailedResult = attempt.answers.map((answer) => {
-    const question = questions.find(
-      (q) => q._id.toString() === answer.questionId.toString()
-    );
-    return {
-      questionId: answer.questionId,
-      questionText: question?.questionText,
-      options: question?.options,
-      selectedOptionIndex: answer.selectedOptionIndex,
-      correctOptionIndex: question?.correctOptionIndex,
-      isCorrect: answer.isCorrect,
-      marksObtained: answer.marksObtained,
-      explanation: question?.explanation,
-    };
-  });
+  const test = await Test.findById(attempt.testId).lean();
+
+  // Calculate rank
+  const rank =
+    (await TestAttempt.countDocuments({
+      testId: attempt.testId,
+      status: "evaluated",
+      marksObtained: { $gt: attempt.marksObtained },
+    })) + 1;
 
   return {
-    test: attempt.testId,
+    test: {
+      title: test.title,
+      description: test.description,
+      totalMarks: test.totalMarks,
+      duration: test.duration,
+    },
     result: {
       totalQuestions: attempt.totalQuestions,
       attemptedQuestions: attempt.attemptedQuestions,
@@ -207,23 +324,99 @@ export const getTestResult = async (attemptId, studentId) => {
       percentage: attempt.percentage,
       timeTaken: attempt.timeTaken,
       submittedAt: attempt.submittedAt,
+      rank,
     },
-    detailedResult,
+    detailedResult: generateDetailedResult(attempt, questions),
   };
 };
 
-export const getStudentAttempts = async (studentId) => {
-  return TestAttempt.find({ studentId })
-    .populate("testId", "title description")
-    .sort({ createdAt: -1 });
+/**
+ * Get student's attempt history
+ */
+export const getStudentAttempts = async (studentId, limit = 50, skip = 0) => {
+  const objStudentId = validateUserId(studentId);
+
+  return TestAttempt.find({ studentId: objStudentId })
+    .populate("testId", "title totalMarks duration")
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .skip(skip)
+    .lean();
 };
 
+/**
+ * Get test leaderboard (optimized with aggregation)
+ */
 export const getTestLeaderboard = async (testId, limit = 10) => {
-  return TestAttempt.find({
-    testId,
-    status: "evaluated",
-  })
-    .populate("studentId", "name email")
-    .sort({ marksObtained: -1, timeTaken: 1 })
-    .limit(limit);
+  const objTestId = validateTestId(testId);
+
+  return TestAttempt.aggregate([
+    {
+      $match: {
+        testId: objTestId,
+        status: { $in: ["submitted", "evaluated"] },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "studentId",
+        foreignField: "_id",
+        as: "student",
+      },
+    },
+    {
+      $unwind: "$student",
+    },
+    {
+      $sort: {
+        marksObtained: -1,
+        timeTaken: 1,
+      },
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        _id: 0,
+        studentId: 1,
+        studentName: "$student.name",
+        studentEmail: "$student.email",
+        marksObtained: 1,
+        percentage: 1,
+        timeTaken: 1,
+        submittedAt: 1,
+      },
+    },
+  ]);
+};
+
+/**
+ * Get attempt summary (for teachers)
+ */
+export const getTestAttemptStats = async (testId) => {
+  const stats = await TestAttempt.aggregate([
+    {
+      $match: { testId, status: "evaluated" },
+    },
+    {
+      $group: {
+        _id: "$testId",
+        totalAttempts: { $sum: 1 },
+        averageMarks: { $avg: "$marksObtained" },
+        averagePercentage: { $avg: "$percentage" },
+        maxMarks: { $max: "$marksObtained" },
+        minMarks: { $min: "$marksObtained" },
+      },
+    },
+  ]);
+
+  return stats[0] || {
+    totalAttempts: 0,
+    averageMarks: 0,
+    averagePercentage: 0,
+    maxMarks: 0,
+    minMarks: 0,
+  };
 };

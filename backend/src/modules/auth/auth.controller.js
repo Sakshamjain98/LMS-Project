@@ -1,4 +1,4 @@
-import { registerUserService, loginUserService, googleLoginService } from "./auth.service.js";
+import { registerUserService, loginUserService, googleLoginService, forgotPasswordService, resetPasswordService } from "./auth.service.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { MESSAGES } from "../../constants/message.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
@@ -49,7 +49,7 @@ export const googleLogin = asyncHandler(async (req, res) => {
       isApproved: result.user.isApproved,
     },
   });
-})
+});
 
 export const forgotPassword = asyncHandler(async (req, res) => {
   const result = await forgotPasswordService(req.body);

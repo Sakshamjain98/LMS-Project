@@ -13,6 +13,10 @@ const testSchema = new mongoose.Schema(
     totalMarks: { type: Number, default: 0 },
     passingMarks: { type: Number, default: 0 },
     instructions: { type: String, trim: true },
+    isPaid: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
