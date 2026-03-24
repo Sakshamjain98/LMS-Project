@@ -47,9 +47,9 @@ app.use("/api/test", testAttemptRoutes);
 app.use("/api/admin", adminRoutes);
 const swaggerDocument = YAML.load("./swagger.yaml");
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
-});
+// app.use((req, res) => {
+//   res.status(404).json({ message: "Route not found" });
+// });
 
 app.use(errorHandler);
 
