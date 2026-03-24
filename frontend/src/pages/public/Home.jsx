@@ -358,13 +358,19 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="relative h-96 md:h-full min-h-96">
-            <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/20 to-transparent rounded-2xl border border-brand-primary/20" />
-            <div className="absolute inset-6 bg-dark-300 rounded-xl border border-dark-100 flex items-center justify-center">
-              <div className="text-center">
-                <FaBook className="text-6xl text-brand-primary mx-auto mb-4 opacity-50" />
-                <p className="text-gray-400">Pharmacy Learning Platform</p>
-              </div>
+          <div className="relative w-full aspect-video lg:min-h-[500px]">
+            <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/20 to-transparent rounded-2xl border border-brand-primary/20 -z-10" />
+            <div className="absolute inset-0 bg-dark-300 rounded-xl border border-dark-100 overflow-hidden shadow-2xl shadow-brand-primary/20">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/Tvf7CXEjFNU?si=toZhTVuzoNa1kNw0&autoplay=0"
+                title="Pharmacist Academy Introduction"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+              />
             </div>
           </div>
         </div>
