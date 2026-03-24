@@ -32,7 +32,11 @@ export const createCourse = async (data, educatorId) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Title must be at least 3 characters");
   }
 
-  if (data.isPaid && (!data.price || data.price <= 0)) {
+  // ✅ FIXED: Parse isPaid as boolean and only validate price if truly paid
+  const isPaid = data.isPaid === "true" || data.isPaid === true;
+  const price = isPaid ? parseFloat(data.price) : 0;
+
+  if (isPaid && (!price || price <= 0)) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Price is required and must be greater than 0 for paid courses");
   }
 
@@ -42,9 +46,9 @@ export const createCourse = async (data, educatorId) => {
     educator: educatorId,
     status: "pending",
     isApproved: false,
-    thumbnail: data.thumbnail || null, // ✅ Expects { url, publicId, fileType } object or null
-    isPaid: data.isPaid ?? false,
-    price: data.price || 0,
+    thumbnail: data.thumbnail || null,
+    isPaid: isPaid,
+    price: price, // ✅ Always set price (0 for free, actual price for paid)
     tags: data.tags ? (Array.isArray(data.tags) ? data.tags : data.tags.split(",").map(t => t.trim())) : [],
   });
 };

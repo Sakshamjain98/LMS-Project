@@ -21,13 +21,13 @@ const defaultState = {
         id: `module-${Date.now()}`,
         title: "",
         description: "",
-        lessons: [
+        lectures: [ // ✅ Changed from 'lessons' to 'lectures'
           {
-            id: `lesson-${Date.now()}`,
+            id: `lecture-${Date.now()}`,
             type: "video",
             title: "",
-            videoUrl: "",
-            resources: [],
+            videoUrl: "", // ✅ Matches Finalize.jsx expectation
+            notes: null,
           },
         ],
       },

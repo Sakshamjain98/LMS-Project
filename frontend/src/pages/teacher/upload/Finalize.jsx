@@ -155,13 +155,35 @@ export default function Finalize() {
   };
 
   const { basics, curriculum, pricing } = formData;
-  const totalLectures = curriculum.modules?.reduce((s, m) => s + (m.lectures?.length || 0), 0) || 0;
+  // ✅ FIXED: Handle both 'lectures' and 'lessons' array names
+  const totalLectures = curriculum.modules?.reduce((s, m) => s + ((m.lectures || m.lessons)?.length || 0), 0) || 0;
   const totalModules = curriculum.modules?.length || 0;
   
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return null;
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
-    return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+    
+    // Handle various YouTube URL formats
+    let videoId = null;
+    
+    // Format: https://www.youtube.com/watch?v=VIDEO_ID
+    const watchMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/);
+    if (watchMatch) {
+      videoId = watchMatch[1];
+    }
+    
+    // Format: https://www.youtube.com/embed/VIDEO_ID
+    const embedMatch = url.match(/youtube\.com\/embed\/([^/?]+)/);
+    if (embedMatch) {
+      videoId = embedMatch[1];
+    }
+    
+    // Format: https://youtu.be/VIDEO_ID
+    const shortMatch = url.match(/youtu\.be\/([^/?]+)/);
+    if (shortMatch) {
+      videoId = shortMatch[1];
+    }
+    
+    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0` : null;
   };
 
   return (
@@ -243,7 +265,7 @@ export default function Finalize() {
                         {module.title || "Module"}
                       </h3>
                       <span className="text-xs text-white/30 ml-auto">
-                        {module.lectures?.length || 0} lesson{(module.lectures?.length || 0) !== 1 ? 's' : ''}
+                        {(module.lectures || module.lessons)?.length || 0} lesson{((module.lectures || module.lessons)?.length || 0) !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </button>
@@ -251,7 +273,7 @@ export default function Finalize() {
                   {/* LECTURES LIST */}
                   {expandedModules.has(module.id) && (
                     <div className="mt-4 space-y-3 pl-6 border-l border-white/10 animate-in fade-in duration-200">
-                      {module.lectures?.map((lecture, lIdx) => {
+                      {(module.lectures || module.lessons)?.map((lecture, lIdx) => {
                         const isLecExpanded = expandedLectures.has(lecture.id);
                         const embedUrl = getYouTubeEmbedUrl(lecture.videoUrl);
 

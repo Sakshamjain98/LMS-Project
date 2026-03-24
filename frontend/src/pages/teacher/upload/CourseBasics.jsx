@@ -187,6 +187,11 @@ export default function CourseBasics() {
       newErrors.title = "Title is required";
     }
     
+    // ✅ FIXED: Only validate price if course is paid
+    if (formData.pricing.isPaid && (!formData.pricing.price || formData.pricing.price <= 0)) {
+      newErrors.price = "Price must be greater than 0 for paid courses";
+    }
+    
     return newErrors;
   };
 
@@ -224,7 +229,7 @@ export default function CourseBasics() {
   };
 
   const handleIsPaidChange = (isPaid) => {
-    // If switching to paid, set price to 1 (minimum). If free, set to 0.
+    // ✅ FIXED: Set price to 0 for free, only require > 0 for paid
     updatePricing({ isPaid, price: isPaid ? 1 : 0 });
   };
 

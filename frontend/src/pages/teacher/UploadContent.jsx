@@ -130,6 +130,7 @@ export default function UploadContent() {
   // ---------------- VALIDATION ----------------
   const validateStep1 = () => {
     if (!form.title.trim()) return "Course title is required";
+    // ✅ FIXED: Only validate price for paid courses
     if (form.isPaid && (!form.price || form.price <= 0)) return "Price must be greater than 0 for paid courses";
     return null;
   };
@@ -162,9 +163,10 @@ export default function UploadContent() {
       const fd = new FormData();
       fd.append("title", form.title);
       fd.append("description", form.description);
-      fd.append("tags", form.tags.split(",").map(t => t.trim()).filter(t => t).join(",")); // send as comma-separated string? Or array? Adjust as needed.
+      fd.append("tags", form.tags.split(",").map(t => t.trim()).filter(t => t).join(","));
       fd.append("isPaid", form.isPaid.toString());
-      fd.append("price", form.price.toString());
+      // ✅ FIXED: Only send price if paid, otherwise send 0
+      fd.append("price", form.isPaid ? form.price : "0");
       if (thumbnail) fd.append("thumbnail", thumbnail);
 
       const res = await createCourse(fd);

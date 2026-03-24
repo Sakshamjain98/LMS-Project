@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCourseById, deleteSection } from "../../services/teacherService";
-import { ArrowLeft, Trash2, Plus, ChevronDown, ChevronUp, Eye, FileText, Video, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, ChevronDown, ChevronUp, Eye, FileText, Video, Lock, Unlock, Play } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 
 export default function CourseDetail() {
@@ -11,6 +11,7 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedSection, setExpandedSection] = useState(null);
+  const [expandedVideo, setExpandedVideo] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, sectionId: null });
 
   useEffect(() => {
@@ -43,8 +44,34 @@ export default function CourseDetail() {
   };
 
   const handleAddSection = () => {
-    // Navigate to edit curriculum page
     navigate(`/teacher/courses/${courseId}/edit-curriculum`);
+  };
+
+  // ✅ Extract YouTube embed URL from various formats
+  const getYouTubeEmbedUrl = (url) => {
+    if (!url) return null;
+    
+    let videoId = null;
+    
+    // Format: https://www.youtube.com/watch?v=VIDEO_ID
+    const watchMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?]+)/);
+    if (watchMatch) {
+      videoId = watchMatch[1];
+    }
+    
+    // Format: https://www.youtube.com/embed/VIDEO_ID
+    const embedMatch = url.match(/youtube\.com\/embed\/([^/?]+)/);
+    if (embedMatch) {
+      videoId = embedMatch[1];
+    }
+    
+    // Format: https://youtu.be/VIDEO_ID
+    const shortMatch = url.match(/youtu\.be\/([^/?]+)/);
+    if (shortMatch) {
+      videoId = shortMatch[1];
+    }
+    
+    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0` : null;
   };
 
   if (loading) {
@@ -196,7 +223,7 @@ export default function CourseDetail() {
 
                   {/* Section Details (Expanded) */}
                   {expandedSection === section._id && (
-                    <div className="bg-dark-200 border-t border-dark-100 p-5 space-y-5">
+                    <div className="bg-dark-200 border-t border-dark-100 p-5 space-y-6 animate-in fade-in duration-200">
                       {section.description && (
                         <div>
                           <p className="text-sm font-medium text-white mb-1">Description</p>
@@ -204,27 +231,67 @@ export default function CourseDetail() {
                         </div>
                       )}
 
-                      {/* Videos */}
+                      {/* Videos Grid with Previews */}
                       {section.videos && section.videos.length > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                          <p className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                             <Video size={14} className="text-brand-primary" />
                             Videos ({section.videos.length})
                           </p>
-                          <div className="space-y-2">
-                            {section.videos.map((video, idx) => (
-                              <div key={idx} className="flex items-start gap-3 text-sm p-3 bg-dark-100 rounded-lg">
-                                <span className="text-xs bg-brand-primary/10 text-brand-primary px-2 py-1 rounded font-medium">
-                                  {idx + 1}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-white truncate">{video.title}</p>
-                                  <a href={video.url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-primary hover:underline truncate block">
-                                    {video.url}
-                                  </a>
+                          <div className="space-y-4">
+                            {section.videos.map((video, idx) => {
+                              const embedUrl = getYouTubeEmbedUrl(video.url);
+                              const isExpanded = expandedVideo === `${section._id}-${idx}`;
+
+                              return (
+                                <div key={idx} className="bg-dark-100 rounded-lg overflow-hidden border border-dark-100 hover:border-brand-primary/30 transition-all">
+                                  {/* Video Header */}
+                                  <button
+                                    onClick={() => setExpandedVideo(isExpanded ? null : `${section._id}-${idx}`)}
+                                    className="w-full flex items-center justify-between p-4 hover:bg-dark-200 transition-all"
+                                  >
+                                    <div className="flex items-center gap-3 flex-1 text-left min-w-0">
+                                      <Play size={16} className="text-brand-primary flex-shrink-0" fill="currentColor" />
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-white truncate">{video.title}</p>
+                                        <p className="text-xs text-grayCustom-medium/70 truncate">{video.url}</p>
+                                      </div>
+                                    </div>
+                                    <span className="text-sm text-grayCustom-medium flex-shrink-0 ml-4">
+                                      {isExpanded ? '−' : '+'}
+                                    </span>
+                                  </button>
+
+                                  {/* Video Preview */}
+                                  {isExpanded && (
+                                    <div className="border-t border-dark-100 p-4 bg-dark-300/50 animate-in slide-in-from-top-2 duration-200">
+                                      {embedUrl ? (
+                                        <div className="space-y-3">
+                                          <div className="aspect-video rounded-lg overflow-hidden bg-black border border-white/5 shadow-lg">
+                                            <iframe
+                                              src={embedUrl}
+                                              title={video.title}
+                                              className="w-full h-full"
+                                              allowFullScreen
+                                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            />
+                                          </div>
+                                          <div className="flex items-center gap-2 text-xs text-green-400 bg-green-500/10 px-3 py-2 rounded-lg border border-green-500/20">
+                                            <span>✓ Video preview available</span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="aspect-video rounded-lg bg-dark-200 border border-dashed border-white/10 flex flex-col items-center justify-center text-white/40">
+                                          <Video size={32} className="mb-2" />
+                                          <p className="text-xs font-medium">Invalid YouTube URL</p>
+                                          <p className="text-[10px] text-white/30 mt-1">Supported formats: youtube.com, youtu.be, embed</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
