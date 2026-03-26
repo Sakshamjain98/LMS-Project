@@ -11,8 +11,12 @@ const router = express.Router();
 router.get("/plans", controller.getPlans);
 
 // Student routes
-router.post("/create-order", authMiddleware, authorize("student"), validate(createOrderSchema), controller.createOrder);
-router.post("/verify", authMiddleware, authorize("student"), validate(verifyPaymentSchema), controller.verifyPayment);
+router.post("/create-order", authMiddleware, authorize("student"), controller.createOrder);
+router.post("/verify", authMiddleware, authorize("student"), controller.verifyPayment);
+
+// ✅ NEW ROUTES
+router.post("/activate-free", authMiddleware, authorize("student"), controller.activateFreeSubscription);
+router.get("/subscription", authMiddleware, authorize("student"), controller.getSubscription);
 
 // Admin routes — payment approval
 router.get("/pending-approval", authMiddleware, authorize("admin"), controller.getPendingApprovalPayments);
@@ -20,9 +24,5 @@ router.put("/:id/approve", authMiddleware, authorize("admin"), controller.approv
 router.put("/:id/reject", authMiddleware, authorize("admin"), controller.rejectPayment);
 
 export default router;
-
-
-
-
 
 

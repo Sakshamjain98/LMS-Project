@@ -90,7 +90,17 @@ router.put(
 router.delete("/notes/:id", controller.deleteNote);
 
 // ========== TESTS ==========
-router.get("/tests", controller.listTests);
+router.get("/tests", (req, res, next) => {
+  // Allow both teacher and student roles
+  if (!["teacher", "student"].includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: "You do not have permission to access this resource"
+    });
+  }
+  next();
+}, controller.listTests);
+
 router.post("/tests", controller.createTestController);
 router.get("/tests/:id", controller.getTest);
 router.put("/tests/:id", controller.updateTest);

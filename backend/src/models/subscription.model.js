@@ -88,3 +88,5 @@ subscriptionSchema.pre("save", function (next) {
 subscriptionSchema.index({ endDate: 1, status: 1 });
 
 export default mongoose.model("Subscription", subscriptionSchema);
+
+

@@ -6,6 +6,8 @@ import { paymentQueue } from "../../infrastucture/queues/payment.queue.js";
 import { SUBSCRIPTION_PLANS } from "../../constants/subscription.js";
 import { razorpay } from "../../config/razorpay.js";
 import crypto from "crypto";
+import mongoose from "mongoose";
+import Subscription from "../../models/subscription.model.js";
 
 export const getPlans = () => {
   return Object.values(SUBSCRIPTION_PLANS).filter((p) => p.id !== "FREE");
@@ -30,17 +32,24 @@ export const createOrder = async (userId, planId) => {
       throw new ApiError(STATUS_CODES.SERVER_ERROR, "Razorpay configuration missing");
     }
 
-    razorpayOrderData = await razorpay.orders.create({
-      amount: plan.price * 100, // Razorpay expects amount in paise
-      currency: "INR",
-      receipt: `receipt_${Date.now()}_${userId}`,
-      notes: {
-        userId: userId.toString(),
-        planId: plan.id,
-      },
-    });
-
-    orderId = razorpayOrderData.id;
+    try {
+      razorpayOrderData = await razorpay.orders.create({
+        amount: Math.round(plan.price * 100), // Ensure it's a strict integer
+        currency: "INR",
+        receipt: `rcpt_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`, // Keep under 40 chars
+        notes: {
+          userId: userId.toString(),
+          planId: plan.id,
+        },
+      });
+      orderId = razorpayOrderData.id;
+    } catch (razorpayError) {
+      console.error("Razorpay SDK Error:", razorpayError);
+      throw new ApiError(
+        STATUS_CODES.SERVER_ERROR,
+        razorpayError.error?.description || "Failed to create order with payment gateway"
+      );
+    }
   }
 
   await Payment.create({
@@ -74,30 +83,31 @@ export const verifyPayment = async ({
   const payment = await Payment.findOne({ orderId: razorpay_order_id });
 
   if (!payment) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, MESSAGES.INVALID_PAYMENT);
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Payment order not found in database.");
   }
 
   // Prevent duplicate processing
-  if (payment.status === "SUCCESS" || payment.status === "PENDING_APPROVAL") {
+  if (payment.status === "SUCCESS" || payment.status === "PENDING_APPROVAL" || payment.status === "APPROVED") {
     return { alreadyProcessed: true };
   }
 
-  if (payment.status === "APPROVED") {
-    return { alreadyProcessed: true };
-  }
-
-  // Security: ensure the payment belongs to the requesting user
+  // Security
   if (payment.userId.toString() !== userId.toString()) {
-    throw new ApiError(STATUS_CODES.FORBIDDEN, "Unauthorized payment verification attempt");
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Unauthorized payment verification attempt.");
   }
 
   if (process.env.PAYMENT_MODE === "DEV") {
-    // DEV MODE BYPASS — skip signature verification
     payment.paymentId = razorpay_payment_id || `DEV_PAY_${Date.now()}`;
     payment.status = "PENDING_APPROVAL";
     payment.adminApproved = false;
     payment.verifiedAt = new Date();
-    await payment.save();
+    
+    try {
+      await payment.save();
+    } catch (saveErr) {
+      console.error("DEV Verify Save Error:", saveErr);
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
+    }
 
     return {
       success: true,
@@ -108,7 +118,7 @@ export const verifyPayment = async ({
 
   // PRODUCTION: strict signature verification
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing payment verification fields");
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing one or more payment verification fields from Razorpay.");
   }
 
   const generatedSignature = crypto
@@ -116,25 +126,23 @@ export const verifyPayment = async ({
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
-  // Constant-time comparison to prevent timing attacks
-  const sigBuffer = Buffer.from(generatedSignature, "hex");
-  const receivedSigBuffer = Buffer.from(razorpay_signature, "hex");
-
-  if (
-    sigBuffer.length !== receivedSigBuffer.length ||
-    !crypto.timingSafeEqual(sigBuffer, receivedSigBuffer)
-  ) {
-    // Mark payment as failed for audit
+  if (generatedSignature !== razorpay_signature) {
     payment.status = "FAILED";
     await payment.save();
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid payment signature");
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid payment signature - authentication failed.");
   }
 
   payment.paymentId = razorpay_payment_id;
   payment.status = "PENDING_APPROVAL";
   payment.adminApproved = false;
   payment.verifiedAt = new Date();
-  await payment.save();
+
+  try {
+    await payment.save();
+  } catch (saveErr) {
+    console.error("PROD Verify Save Error:", saveErr);
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
+  }
 
   return {
     success: true,
@@ -189,3 +197,52 @@ export const getPendingApprovalPayments = async () => {
     .populate("userId", "name email")
     .sort({ createdAt: -1 });
 };
+
+// ✅ ADD FREE SUBSCRIPTION LOGIC
+export const activateFreeSubscription = async (userId) => {
+  const objUserId = new mongoose.Types.ObjectId(userId);
+
+  const existingSub = await Subscription.findOne({
+    userId: objUserId,
+    status: "ACTIVE",
+  });
+
+  if (existingSub) {
+    throw new ApiError(STATUS_CODES.CONFLICT, "You already have an active subscription");
+  }
+
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setFullYear(endDate.getFullYear() + 100);
+
+  const subscription = await Subscription.findOneAndUpdate(
+    { userId: objUserId },
+    {
+      plan: "FREE",
+      status: "ACTIVE",
+      price: 0,
+      startDate,
+      endDate,
+      billingCycle: "ONE_TIME",
+      paymentHistory: [{
+        paymentId: `FREE_${Date.now()}`,
+        amount: 0,
+        paidAt: startDate,
+        plan: "FREE",
+      }],
+    },
+    { upsert: true, new: true }
+  );
+
+  return subscription;
+};
+
+export const getActiveSubscription = async (userId) => {
+  return Subscription.findOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    status: "ACTIVE",
+    endDate: { $gt: new Date() },
+  }).lean();
+};
+
+

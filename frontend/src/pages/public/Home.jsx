@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
-import { getPaymentPlans, createPaymentOrder, verifyPayment } from "../../services/studentService";
-import { FaArrowRight, FaBook, FaUsers, FaClock, FaCheckCircle, FaStar, FaPlay, FaGraduationCap, FaFire, FaUser } from "react-icons/fa";
+import { getPaymentPlans, createPaymentOrder, verifyPayment, activateFreeSubscription } from "../../services/studentService";
+import { FaArrowRight, FaBook, FaUsers, FaClock, FaCheckCircle, FaStar, FaPlay, FaGraduationCap, FaUser } from "react-icons/fa";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -80,117 +80,128 @@ const Home = () => {
       return;
     }
 
+    // Handle FREE plan
+    if (plan.id === "FREE" || plan.price === 0 || plan.price === "Free" || !plan.price) {
+      return handleFreePlanActivation();
+    }
+
+    // Map plans dynamically 
+    const planIdMap = {
+      "Professional": "MONTHLY",
+      "Premium": "YEARLY",
+      "6 Month": "QUARTERLY",
+      "12 Month": "YEARLY",
+    };
+
+    const planId = plan.id || planIdMap[plan.name];
+    
+    if (!["MONTHLY", "QUARTERLY", "YEARLY"].includes(planId)) {
+      setError("Invalid plan selected. Please try again.");
+      return;
+    }
+
     if (!window.Razorpay) {
       setError("Payment gateway not loaded. Please refresh the page.");
       return;
     }
 
-    setProcessingPlan(plan.id);
+    setProcessingPlan(plan.id || planId);
     setError("");
 
     try {
-      console.log("Creating order for plan:", plan.id);
+      console.log("Creating order for plan:", planId);
+      const orderData = await createPaymentOrder(planId);
       
-      // Step 1: Create payment order
-      const orderData = await createPaymentOrder(plan.id);
-      console.log("Order created:", orderData);
+      const internalPaymentHandler = async (response) => {
+        try {
+          const verifyData = {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          };
 
-      // Step 2: Open Razorpay checkout
+          const verifyRes = await verifyPayment(verifyData);
+
+          if (verifyRes.success) {
+            localStorage.setItem("subscriptionStatus", planId);
+            
+            if (verifyRes.dev) {
+              alert(`✅ DEV Mode - Payment Verified\nYour subscription is now active!`);
+            } else if (verifyRes.pendingAdminApproval) {
+              alert(`✅ Payment Received\nYour subscription is pending admin approval.`);
+            } else {
+              alert(`✅ Welcome to Premium!\nYour subscription is now active!`);
+            }
+            setTimeout(() => navigate("/student/dashboard"), 2000);
+          }
+        } catch (verifyErr) {
+          setError(verifyErr.message || "Payment verification failed");
+        } finally {
+          setProcessingPlan(null);
+        }
+      };
+
+      // DEV MODE BYPASS - If order is synthetic, skip SDK
+      if (orderData.orderId.startsWith("dev_order_")) {
+        console.warn("🛠 DEV MODE ACTIVE: Bypassing Razorpay Gateway");
+        return internalPaymentHandler({
+          razorpay_order_id: orderData.orderId,
+          razorpay_payment_id: "DEV_PAY_" + Date.now(),
+          razorpay_signature: "mock_signature"
+        });
+      }
+
+      // PRODUCTION RAZORPAY FLOW
       const options = {
         key: orderData.razorpayKeyId,
         amount: orderData.amountInPaise,
         currency: orderData.currency,
         name: "Pharmacist Academy",
-        description: `${orderData.planName} Plan - ${orderData.duration}`,
+        description: `${orderData.planName} Plan`,
         order_id: orderData.orderId,
-        
-        handler: async function (response) {
-          try {
-            console.log("Payment successful, verifying...");
-
-            // Step 3: Verify payment
-            const verifyData = {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            };
-
-            const verifyRes = await verifyPayment(verifyData);
-
-            if (verifyRes.success) {
-              localStorage.setItem("subscriptionStatus", plan.id);
-              localStorage.setItem("lastPaymentId", response.razorpay_payment_id);
-
-              if (verifyRes.dev) {
-                alert(
-                  `✅ DEV Mode - Payment Verified\n\nPlan: ${orderData.planName}\nAmount: ₹${orderData.amount}\n\nYour subscription is now active!`
-                );
-              } else if (verifyRes.pendingAdminApproval) {
-                alert(
-                  `✅ Payment Received\n\nPlan: ${orderData.planName}\nAmount: ₹${orderData.amount}\n\nYour subscription is pending admin approval. You'll get full access once approved.\n\nPayment ID: ${response.razorpay_payment_id}`
-                );
-              } else {
-                alert(
-                  `✅ Welcome to Premium!\n\nPlan: ${orderData.planName}\nAmount: ₹${orderData.amount}\n\nYour subscription is now active!`
-                );
-              }
-
-              // Redirect to dashboard
-              setTimeout(() => {
-                navigate("/student/dashboard");
-              }, 2000);
-            }
-          } catch (verifyErr) {
-            console.error("Verification error:", verifyErr);
-            const errorMsg = verifyErr.message || "Payment verification failed";
-            setError(errorMsg);
-            alert(`❌ Verification Failed\n\n${errorMsg}`);
-          } finally {
-            setProcessingPlan(null);
-          }
-        },
-
-        modal: {
-          ondismiss: function () {
-            console.log("Payment modal dismissed");
-            setProcessingPlan(null);
-          },
-        },
-
         prefill: {
           email: localStorage.getItem("userEmail") || "",
           contact: localStorage.getItem("userPhone") || "",
         },
-
-        theme: {
-          color: "#00c885",
-        },
-
-        method: {
-          netbanking: true,
-          card: true,
-          upi: true,
-          wallet: true,
+        theme: { color: "#00c885" },
+        handler: internalPaymentHandler,
+        modal: {
+          ondismiss: () => {
+            setProcessingPlan(null);
+          },
         },
       };
 
-      console.log("Opening Razorpay checkout");
       const rzp = new window.Razorpay(options);
-      
       rzp.on("payment.failed", function (response) {
-        console.error("Payment failed:", response);
         setError(`Payment failed: ${response.error.description}`);
         setProcessingPlan(null);
-        alert(`❌ Payment Failed\n\n${response.error.description}`);
       });
-
       rzp.open();
+      
     } catch (err) {
-      console.error("Order creation error:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Failed to initiate payment";
-      setError(errorMsg);
+      console.error("Order error:", err);
+      setError(err.message || "Failed to initiate payment");
       setProcessingPlan(null);
-      alert(`❌ Error\n\n${errorMsg}`);
+    }
+  };
+
+  const handleFreePlanActivation = async () => {
+    setProcessingPlan("FREE");
+    setError("");
+
+    try {
+      const response = await activateFreeSubscription();
+      if (response.success) {
+        localStorage.setItem("subscriptionPlan", "FREE");
+        localStorage.setItem("subscriptionStatus", "ACTIVE");
+        alert("✅ Welcome to Pharmacist Academy!\nFree plan activated.");
+        setTimeout(() => navigate("/student/dashboard"), 2000);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to activate plan");
+    } finally {
+      setProcessingPlan(null);
     }
   };
 

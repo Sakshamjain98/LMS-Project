@@ -4,7 +4,7 @@ import { MESSAGES } from "../../constants/message.js";
 import { activityQueue } from "../../infrastucture/queues/activity.queue.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { ApiError } from "../../shared/error/ApiError.js";
-
+import Test from "../test/test.model.js";
 export const dashboard = asyncHandler(async (req, res) => {
   const data = await service.getDashboardData();
   await activityQueue.add("dashboard_view", {
@@ -50,8 +50,6 @@ export const freeCourses = asyncHandler(async (req, res) => {
     courses,
   });
 });
-
-
 
 export const blogs = asyncHandler(async (req, res) => {
   await activityQueue.add("blogs_view", { userId: req.user._id });
@@ -121,7 +119,6 @@ export const paidCourses = asyncHandler(async (req, res) => {
   });
 });
 
-
 export const getAllNotes = asyncHandler(async (req, res) => {
   const notes = await service.getAllNotes();
   const canAccessPaid = await service.userHasPaidSubscription(req.user._id);
@@ -173,5 +170,16 @@ export const paidNotes = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     notes,
+  });
+});
+
+export const getAvailableTests = asyncHandler(async (req, res) => {
+  const tests = await Test.find({ status: "published" })
+    .select("_id title description duration totalMarks")
+    .lean();
+  
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    tests,
   });
 });

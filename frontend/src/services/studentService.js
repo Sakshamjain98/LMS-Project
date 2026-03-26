@@ -213,6 +213,7 @@ export const verifyPayment = async (paymentData) => {
     const res = await api.post("/payment/verify", paymentData);
     return res.data;
   } catch (err) {
+    console.error("VERIFY ERR DATA:", err?.response?.data || err);
     throw err?.response?.data || { message: "Payment verification failed" };
   }
 };
@@ -223,5 +224,24 @@ export const getPaymentPlans = async () => {
     return res.data.plans;
   } catch (err) {
     throw err?.response?.data || { message: "Failed to fetch plans" };
+  }
+};
+
+// ✅ ADD FREE SUBSCRIPTION HANDLER
+export const activateFreeSubscription = async () => {
+  try {
+    const res = await api.post("/payment/activate-free");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to activate free plan" };
+  }
+};
+
+export const getAvailableTests = async () => {
+  try {
+    const res = await api.get("/student/tests");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch available tests" };
   }
 };

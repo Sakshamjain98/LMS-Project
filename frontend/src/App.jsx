@@ -32,7 +32,7 @@ import UploadContextProvider from "./pages/teacher/upload/UploadContextProvider"
 import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentCourses from "./pages/student/Courses";
 import StudentNotes from "./pages/student/Notes";
-import StudentTests from "./pages/student/Tests";
+import StudentTests from "./pages/student/StudentTest";
 import StudentPerformance from "./pages/student/Performance";
 import CourseDetailStudent from "./pages/student/CourseDetail";
 import StudentProfile from "./pages/student/StudentProfile";
@@ -89,7 +89,6 @@ function App() {
           <Route path="notes" element={<StudentNotes />} />
           <Route path="tests" element={<StudentTests />} />
           <Route path="performance" element={<StudentPerformance />} />
-        
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 

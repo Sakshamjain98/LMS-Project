@@ -1693,6 +1693,54 @@ paths:
                     items:
                       $ref: "#/components/schemas/Course"
 
+  /student/tests:
+    get:
+      tags: [Student]
+      summary: Get all published tests available to students
+      description: |
+        Returns a list of all published tests that students can take.
+        Tests must have status = "published" to appear in this list.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of available tests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tests:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        _id:
+                          type: string
+                          example: "60d21b4667d0d8992e610c85"
+                        title:
+                          type: string
+                          example: "GPAT Full Length Mock Test"
+                        description:
+                          type: string
+                          example: "Comprehensive GPAT exam simulation"
+                        duration:
+                          type: number
+                          description: Duration in minutes
+                          example: 180
+                        totalMarks:
+                          type: number
+                          example: 200
+                        status:
+                          type: string
+                          enum: [published]
+                          example: "published"
+        "401":
+          description: Unauthorized
+
   # ---------- Payment ----------
   /payment/plans:
     get:

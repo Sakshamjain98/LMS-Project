@@ -24,7 +24,7 @@ router.get("/notes", controller.getAllNotes);
 router.get("/notes/:id", controller.getNoteDetails);
 router.get("/paid/notes", checkCourseAccess, controller.paidNotes); 
 router.get("/paid/courses", checkCourseAccess, controller.paidCourses);
-
+router.get("/tests", controller.getAvailableTests);
 
 
 

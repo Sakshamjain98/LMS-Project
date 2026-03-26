@@ -33,13 +33,22 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["CREATED", "SUCCESS", "FAILED", "REFUNDED"],
-      default: "CREATED",
+      enum: ["PENDING", "PENDING_APPROVAL", "SUCCESS", "FAILED", "REFUNDED", "REJECTED", "pending", "success", "failed"],
+      default: "PENDING",
     },
     refundedAt: Date,
     refundReason: String,
+    adminApproved: {
+      type: Boolean,
+      default: false,
+    },
+    verifiedAt: Date,
+    approvedAt: Date,
+    rejectedAt: Date,
+    rejectionReason: String,
   },
   { timestamps: true }
 );
 
 export default mongoose.model("Payment", paymentSchema);
+

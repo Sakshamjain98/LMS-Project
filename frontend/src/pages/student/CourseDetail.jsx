@@ -2,21 +2,48 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCourseById } from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
-import { ChevronLeft, Play, Clock, Users, Star, Lock, BookOpen, Zap, ChevronDown } from "lucide-react";
+import { 
+  ChevronLeft, Play, Clock, Users, Star, Lock, 
+  BookOpen, Zap, ChevronDown, ChevronUp, FileText, CheckCircle2 
+} from "lucide-react";
+
+// Helper to safely format YouTube URLs for iframes
+const getEmbedUrl = (url) => {
+  if (!url) return "";
+  if (url.includes("embed/")) return url;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/))([^&?]*)/);
+  return match ? `https://www.youtube.com/embed/${match[1]}` : url;
+};
 
 export default function CourseDetail() {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [expandedSection, setExpandedSection] = useState(null);
+  
+  // LMS State
+  const [expandedSections, setExpandedSections] = useState(new Set());
+  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeSectionId, setActiveSectionId] = useState(null);
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
         setLoading(true);
         const res = await getCourseById(courseId);
-        setCourse(res.course);
+        const fetchedCourse = res.course;
+        setCourse(fetchedCourse);
+
+        // Auto-select first module & first video on load
+        if (fetchedCourse?.sections?.length > 0) {
+          const firstSection = fetchedCourse.sections[0];
+          setExpandedSections(new Set([firstSection._id]));
+          
+          if (firstSection.videos?.length > 0) {
+            setActiveVideo(firstSection.videos[0]);
+            setActiveSectionId(firstSection._id);
+          }
+        }
       } catch (err) {
         console.error("Failed to fetch course:", err);
       } finally {
@@ -26,14 +53,29 @@ export default function CourseDetail() {
     fetchCourse();
   }, [courseId]);
 
+  const toggleSection = (sectionId) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
+
+  const handleVideoSelect = (video, sectionId) => {
+    setActiveVideo(video);
+    setActiveSectionId(sectionId);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to video on mobile
+  };
+
   if (loading) {
     return (
       <>
         <StudentNavbar />
-        <div className="flex items-center justify-center h-screen bg-dark-400">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-white/50">Loading course...</p>
+        <div className="flex h-screen items-center justify-center bg-dark-400">
+          <div className="space-y-4 text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-brand-primary border-t-transparent"></div>
+            <p className="text-white/50">Loading course environment...</p>
           </div>
         </div>
       </>
@@ -44,231 +86,229 @@ export default function CourseDetail() {
     return (
       <>
         <StudentNavbar />
-        <div className="flex items-center justify-center h-screen bg-dark-400">
+        <div className="flex h-screen items-center justify-center bg-dark-400">
           <p className="text-gray-400">Course not found</p>
         </div>
       </>
     );
   }
 
-  const totalSections = course.sections?.length || 0;
-  const totalVideos = course.sections?.reduce((sum, s) => sum + (s.videos?.length || 0), 0) || 0;
+  // Get active section data to display its corresponding notes
+  const activeSectionData = course.sections?.find(s => s._id === activeSectionId);
 
   return (
     <>
       <StudentNavbar />
-      <div className="bg-dark-400 min-h-screen">
-        {/* HERO SECTION */}
-        <div className="bg-dark-300 border-b border-dark-100">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
+      <div className="min-h-screen bg-dark-400 pb-12">
+        
+        {/* TOP HEADER - Sticky Name */}
+        <div className="sticky top-0 z-40 border-b border-dark-100 bg-dark-300/95 py-4 backdrop-blur-md">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 md:px-6">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm mb-4"
+              className="flex items-center gap-1 text-gray-400 transition hover:text-white"
             >
-              <ChevronLeft size={18} />
-              Back
+              <ChevronLeft size={20} />
+              <span className="hidden sm:inline">Back</span>
             </button>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-              {/* LEFT: Thumbnail */}
-              <div className="md:col-span-1">
-                <div className="relative w-full aspect-video bg-dark-200 rounded-lg overflow-hidden flex items-center justify-center mb-4">
-                  {course.thumbnail?.url ? (
-                    <img src={course.thumbnail.url} alt={course.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="text-6xl opacity-20">📚</div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <Play size={48} className="text-white/70" fill="white" />
-                  </div>
-                </div>
-
-                {/* QUICK STATS */}
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Clock size={16} />
-                    <span>{totalVideos} video lessons</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <BookOpen size={16} />
-                    <span>{totalSections} modules</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Users size={16} />
-                    <span>{(course.students || 0).toLocaleString()} students</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT: Info */}
-              <div className="md:col-span-2">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{course.title}</h1>
-                    <p className="text-gray-400 text-sm md:text-base leading-relaxed">{course.description}</p>
-                  </div>
-                  <span
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 whitespace-nowrap flex items-center gap-1 ${
-                      course.isPaid
-                        ? "bg-dark-400 text-white border border-dark-100"
-                        : "bg-brand-primary/15 text-brand-primary border border-brand-primary/30"
-                    }`}
-                  >
-                    {course.isPaid ? (
-                      <>
-                        <Lock size={13} />
-                        Premium
-                      </>
-                    ) : (
-                      <>
-                        <Zap size={13} />
-                        Free
-                      </>
-                    )}
-                  </span>
-                </div>
-
-                {/* RATING & PRICE */}
-                <div className="flex items-center justify-between py-4 border-t border-dark-100 mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={14}
-                          className={i < Math.floor(course.rating || 4) ? "fill-brand-primary text-brand-primary" : "text-gray-600"}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium text-white">{(course.rating || 4).toFixed(1)}</span>
-                    <span className="text-xs text-gray-500">(1,234 reviews)</span>
-                  </div>
-
-                  {course.isPaid && (
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400 mb-1">Subscription required</p>
-                      <p className="text-lg font-bold text-brand-primary">₹{course.price}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* CTA BUTTONS */}
-                <div className="flex gap-3">
-                  <button className="flex-1 py-3 px-4 bg-brand-primary text-dark-400 rounded-lg font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                    <Play size={16} fill="currentColor" />
-                    {course.isPaid ? "Unlock Course" : "Start Learning"}
-                  </button>
-                  <button className="px-4 py-3 bg-dark-200 text-white border border-dark-100 rounded-lg hover:border-brand-primary/30 transition">
-                    <BookOpen size={18} />
-                  </button>
-                </div>
-
-                {/* TAGS */}
-                {course.tags?.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-dark-100">
-                    <p className="text-xs text-gray-500 mb-3 uppercase tracking-wider font-semibold">Topics</p>
-                    <div className="flex flex-wrap gap-2">
-                      {course.tags.map((tag, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-dark-300 text-gray-300 rounded-full text-xs">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <div className="h-6 w-px bg-dark-100"></div>
+            <h1 className="truncate text-lg font-bold text-white md:text-xl">
+              {course.title}
+            </h1>
           </div>
         </div>
 
-        {/* CURRICULUM */}
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Course Curriculum</h2>
-
-            <div className="space-y-3">
-              {course.sections?.map((section, sectionIdx) => (
-                <div key={section._id} className="bg-dark-200 border border-dark-100 rounded-lg overflow-hidden">
-                  {/* SECTION HEADER */}
-                  <button
-                    onClick={() =>
-                      setExpandedSection(expandedSection === section._id ? null : section._id)
-                    }
-                    className="w-full px-4 md:px-6 py-4 flex items-center justify-between hover:bg-dark-300/50 transition"
-                  >
-                    <div className="flex-1 text-left">
-                      <h3 className="font-semibold text-white text-sm md:text-base">
-                        Module {sectionIdx + 1}: {section.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {section.videos?.length || 0} videos {section.notes?.length ? `• ${section.notes.length} notes` : ""}
-                      </p>
-                    </div>
-                    <ChevronDown
-                      size={18}
-                      className={`text-gray-500 transition-transform ${
-                        expandedSection === section._id ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {/* SECTION CONTENT */}
-                  {expandedSection === section._id && (
-                    <div className="bg-dark-300/50 border-t border-dark-100 px-4 md:px-6 py-4 space-y-2">
-                      {/* VIDEOS */}
-                      {section.videos?.map((video, vidIdx) => (
-                        <div key={vidIdx} className="flex items-center gap-3 py-2 text-sm">
-                          <Play size={14} className="text-brand-primary flex-shrink-0" />
-                          <span className="text-gray-300 flex-1 truncate">{video.title}</span>
-                          <span className="text-xs text-gray-500">5:30</span>
-                        </div>
-                      ))}
-
-                      {/* NOTES */}
-                      {section.notes?.map((note, noteIdx) => (
-                        <div key={noteIdx} className="flex items-center gap-3 py-2 text-sm">
-                          <BookOpen size={14} className="text-blue-400 flex-shrink-0" />
-                          <span className="text-gray-300 flex-1 truncate">{note.title || "Study Notes"}</span>
-                          <span className="text-xs text-gray-500">PDF</span>
-                        </div>
-                      ))}
+        {/* LMS MAIN LAYOUT */}
+        <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+            
+            {/* LEFT COLUMN: Video Player & Notes (70%) */}
+            <div className="flex-1 space-y-6 lg:min-w-[65%]">
+              
+              {/* VIDEO PLAYER SECTION */}
+              <div className="overflow-hidden rounded-xl border border-dark-100 bg-dark-300 shadow-lg">
+                <div className="relative aspect-video w-full bg-black">
+                  {activeVideo ? (
+                    <iframe
+                      src={getEmbedUrl(activeVideo.url)}
+                      title={activeVideo.title}
+                      className="absolute inset-0 h-full w-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      loading="lazy"
+                    ></iframe>
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center text-gray-500">
+                      <Play size={48} className="mb-4 opacity-20" />
+                      <p>Select a lecture from the curriculum to begin</p>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* ABOUT SECTION */}
-          <div className="bg-dark-200 border border-dark-100 rounded-lg p-6 md:p-8">
-            <h2 className="text-xl font-bold text-white mb-4">About This Course</h2>
-            <div className="space-y-4 text-sm text-gray-300">
-              <p>
-                This comprehensive course covers {course.title} from fundamentals to advanced concepts. Perfect for
-                students preparing for professional exams and career advancement.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-4">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Difficulty</p>
-                  <p className="text-white font-medium">Intermediate</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Duration</p>
-                  <p className="text-white font-medium">6-8 weeks</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Language</p>
-                  <p className="text-white font-medium">English</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Certificate</p>
-                  <p className="text-white font-medium">{course.isPaid ? "Yes" : "No"}</p>
+                {/* CURRENT LECTURE DETAILS */}
+                <div className="p-5 md:p-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    {activeVideo?.title || "Course Overview"}
+                  </h2>
+                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={16} /> Duration: ~
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Users size={16} /> {course.students?.toLocaleString() || 0} enrolled
+                    </span>
+                    <span className="flex items-center gap-1.5 text-brand-primary">
+                      <Star size={16} className="fill-brand-primary" /> 
+                      {(course.rating || 4).toFixed(1)} Rating
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* NOTES SECTION */}
+              {activeSectionData?.notes?.length > 0 && (
+                <div className="rounded-xl border border-dark-100 bg-dark-300 p-5 md:p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <BookOpen className="text-brand-primary" size={20} />
+                    <h3 className="text-lg font-bold text-white">Module Resources & Notes</h3>
+                  </div>
+                  
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {activeSectionData.notes.map((note, idx) => (
+                      <a
+                        key={idx}
+                        href={note.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-4 rounded-lg border border-dark-100 bg-dark-200 p-4 transition hover:border-brand-primary/30 hover:bg-dark-100"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 group-hover:bg-brand-primary/10 group-hover:text-brand-primary">
+                          <FileText size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {note.title || `Resource File ${idx + 1}`}
+                          </p>
+                          <p className="text-xs text-gray-500 uppercase mt-0.5">{note.fileType || 'Document'}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* COURSE DESCRIPTION */}
+              <div className="rounded-xl border border-dark-100 bg-dark-300 p-5 md:p-6">
+                <h3 className="mb-3 text-lg font-bold text-white">About this course</h3>
+                <p className="text-sm leading-relaxed text-gray-300">
+                  {course.description}
+                </p>
+              </div>
+
             </div>
+
+            {/* RIGHT COLUMN: Curriculum Sidebar (30%) */}
+            <div className="w-full shrink-0 lg:sticky lg:top-24 lg:w-[320px] xl:w-[380px]">
+              <div className="flex h-[calc(100vh-120px)] flex-col overflow-hidden rounded-xl border border-dark-100 bg-dark-300 shadow-lg">
+                
+                <div className="border-b border-dark-100 bg-dark-200 p-4">
+                  <h3 className="text-lg font-bold text-white">Course Content</h3>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {course.sections?.length || 0} Modules • {" "}
+                    {course.sections?.reduce((acc, s) => acc + (s.videos?.length || 0), 0) || 0} Lectures
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  {course.sections?.map((section, sectionIdx) => {
+                    const isExpanded = expandedSections.has(section._id);
+                    
+                    return (
+                      <div key={section._id} className="border-b border-dark-100 last:border-0">
+                        {/* MODULE HEADER */}
+                        <button
+                          onClick={() => toggleSection(section._id)}
+                          className={`flex w-full items-center justify-between p-4 transition hover:bg-dark-200 ${
+                            isExpanded ? "bg-dark-200" : "bg-dark-300"
+                          }`}
+                        >
+                          <div className="text-left">
+                            <h4 className="text-sm font-semibold text-white">
+                              Section {sectionIdx + 1}: {section.title}
+                            </h4>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {section.videos?.length || 0} lectures
+                            </p>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp size={16} className="text-gray-400" />
+                          ) : (
+                            <ChevronDown size={16} className="text-gray-400" />
+                          )}
+                        </button>
+
+                        {/* LECTURES LIST */}
+                        {isExpanded && (
+                          <div className="bg-dark-400/50 py-2">
+                            {section.videos?.map((video, vidIdx) => {
+                              const isActive = activeVideo?._id === video._id || activeVideo?.url === video.url;
+                              
+                              return (
+                                <button
+                                  key={vidIdx}
+                                  onClick={() => handleVideoSelect(video, section._id)}
+                                  className={`group flex w-full items-start gap-3 px-4 py-2.5 text-left transition ${
+                                    isActive 
+                                      ? "bg-brand-primary/10 text-brand-primary" 
+                                      : "text-gray-300 hover:bg-dark-200 hover:text-white"
+                                  }`}
+                                >
+                                  <div className="mt-0.5 shrink-0">
+                                    {isActive ? (
+                                      <Play size={14} className="fill-brand-primary text-brand-primary" />
+                                    ) : (
+                                      <CheckCircle2 size={14} className="text-gray-600 group-hover:text-gray-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className={`text-sm ${isActive ? "font-semibold" : "font-medium"}`}>
+                                      {vidIdx + 1}. {video.title}
+                                    </p>
+                                    <p className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                                      <Play size={10} /> Video
+                                    </p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                            
+                            {/* Empty state if no videos */}
+                            {(!section.videos || section.videos.length === 0) && (
+                              <div className="px-8 py-3 text-xs italic text-gray-500">
+                                No lectures in this module yet.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
+      
+      {/* Scrollbar styling for the sidebar */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #13161F; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2A2F42; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #00DC82; }
+      `}} />
     </>
   );
 }

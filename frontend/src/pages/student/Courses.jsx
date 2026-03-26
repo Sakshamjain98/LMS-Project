@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllCourses, getFreeCourses, getPaidCourses } from "../../services/studentService";
+import { getAllCourses } from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
-import { Search, Filter, ChevronDown, Clock, Users, Star, Lock, Unlock } from "lucide-react";
+import { Search, Filter, ChevronDown, Clock, Users, Star, Lock, Unlock, PlayCircle } from "lucide-react";
 
 export default function Courses() {
   const navigate = useNavigate();
@@ -32,14 +32,12 @@ export default function Courses() {
   useEffect(() => {
     let filtered = courses;
 
-    // Filter by type
     if (selectedFilter === "free") {
       filtered = filtered.filter(c => !c.isPaid);
     } else if (selectedFilter === "paid") {
       filtered = filtered.filter(c => c.isPaid);
     }
 
-    // Filter by search
     if (searchQuery.trim()) {
       filtered = filtered.filter(c =>
         c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,9 +52,9 @@ export default function Courses() {
     return (
       <>
         <StudentNavbar />
-        <div className="flex items-center justify-center h-screen bg-dark-400">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <div className="flex h-screen items-center justify-center bg-dark-400">
+          <div className="space-y-4 text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-brand-primary border-t-transparent"></div>
             <p className="text-white/50">Loading courses...</p>
           </div>
         </div>
@@ -67,62 +65,65 @@ export default function Courses() {
   return (
     <>
       <StudentNavbar />
-      <div className="bg-dark-400 min-h-screen">
+      <div className="min-h-screen bg-dark-400">
+        
         {/* HEADER */}
-        <div className="bg-dark-300 border-b border-dark-100">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Explore Courses</h1>
-            <p className="text-sm text-gray-400">Browse our complete collection of pharmacy courses</p>
+        <div className="border-b border-dark-100 bg-dark-300">
+          <div className="mx-auto max-w-[1400px] px-4 py-8 md:px-6 md:py-10">
+            <h1 className="mb-2 text-3xl font-bold text-white md:text-4xl">Explore Catalog</h1>
+            <p className="text-sm text-gray-400 md:text-base">Browse our complete collection of educational modules.</p>
           </div>
         </div>
 
         {/* SEARCH & FILTER BAR */}
-        <div className="bg-dark-400 border-b border-dark-100 sticky top-16 z-30">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <div className="sticky top-0 z-30 border-b border-dark-100 bg-dark-400/95 py-4 backdrop-blur-md">
+          <div className="mx-auto max-w-[1400px] px-4 md:px-6">
+            <div className="flex flex-col gap-3 md:flex-row">
+              <div className="relative flex-1">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search courses..."
+                  placeholder="Search by course title or keyword..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-dark-200 border border-dark-100 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm text-white placeholder:text-gray-500 transition"
+                  className="w-full rounded-xl border border-dark-100 bg-dark-200 py-3 pl-11 pr-4 text-sm text-white placeholder:text-gray-500 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
                 />
               </div>
 
-              {/* Filter Dropdown */}
-              <div className="relative w-full md:w-48">
+              <div className="relative w-full md:w-56">
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className="w-full px-4 py-2.5 bg-dark-200 border border-dark-100 rounded-lg hover:border-brand-primary/30 transition flex items-center justify-between text-sm font-medium text-white"
+                  className="flex w-full items-center justify-between rounded-xl border border-dark-100 bg-dark-200 px-4 py-3 text-sm font-medium text-white transition hover:border-brand-primary/30"
                 >
                   <div className="flex items-center gap-2">
-                    <Filter size={16} />
+                    <Filter size={16} className="text-brand-primary" />
                     <span>
-                      {selectedFilter === "all" ? "All Courses" : selectedFilter === "free" ? "Free" : "Paid"}
+                      {selectedFilter === "all" ? "All Formats" : selectedFilter === "free" ? "Free Only" : "Premium Only"}
                     </span>
                   </div>
                   <ChevronDown size={16} className={`transition-transform ${showFilterDropdown ? "rotate-180" : ""}`} />
                 </button>
 
                 {showFilterDropdown && (
-                  <div className="absolute top-full mt-2 w-full bg-dark-300 border border-dark-100 rounded-lg shadow-lg z-40">
-                    {["all", "free", "paid"].map((option) => (
+                  <div className="absolute top-full mt-2 w-full overflow-hidden rounded-xl border border-dark-100 bg-dark-300 shadow-xl z-40">
+                    {[
+                      { id: "all", label: "All Formats" },
+                      { id: "free", label: "Free Courses" },
+                      { id: "paid", label: "Premium Courses" }
+                    ].map((option) => (
                       <button
-                        key={option}
+                        key={option.id}
                         onClick={() => {
-                          setSelectedFilter(option);
+                          setSelectedFilter(option.id);
                           setShowFilterDropdown(false);
                         }}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition ${
-                          selectedFilter === option
-                            ? "bg-brand-primary/10 text-brand-primary font-medium"
+                        className={`w-full px-4 py-3 text-left text-sm transition ${
+                          selectedFilter === option.id
+                            ? "bg-brand-primary/10 font-medium text-brand-primary"
                             : "text-gray-300 hover:bg-dark-200"
                         }`}
                       >
-                        {option === "all" ? "All Courses" : option === "free" ? "Free Courses" : "Paid Courses"}
+                        {option.label}
                       </button>
                     ))}
                   </div>
@@ -133,116 +134,101 @@ export default function Courses() {
         </div>
 
         {/* COURSES GRID */}
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+        <div className="mx-auto max-w-[1400px] px-4 py-8 md:px-6">
           {filteredCourses.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-400 text-lg mb-2">No courses found</p>
-              <p className="text-sm text-gray-500">Try adjusting your search or filters</p>
+            <div className="py-20 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-dark-300 text-gray-500">
+                <Search size={28} />
+              </div>
+              <p className="mb-2 text-lg font-medium text-white">No courses found</p>
+              <p className="text-sm text-gray-400">Try adjusting your search terms or clearing the filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredCourses.map((course) => (
                 <CourseCard key={course._id} course={course} navigate={navigate} />
               ))}
             </div>
           )}
-
-          {/* RESULTS COUNT */}
-          <div className="mt-8 pt-6 border-t border-dark-100 text-sm text-gray-400">
-            Showing {filteredCourses.length} of {courses.length} courses
-          </div>
         </div>
       </div>
     </>
   );
 }
 
-// COURSE CARD COMPONENT
+// EXTRACTED COMPONENT
 function CourseCard({ course, navigate }) {
+  // Safe calculations
+  const totalModules = course.sections?.length || 0;
+  const rating = course.rating || 4.5;
+  const students = course.students || 0;
+
   return (
     <div
       onClick={() => navigate(`/student/courses/${course._id}`)}
-      className="bg-dark-200 border border-dark-100 rounded-lg overflow-hidden hover:border-brand-primary/30 hover:shadow-lg hover:shadow-black/20 transition-all duration-300 cursor-pointer group flex flex-col h-full"
+      className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-dark-100 bg-dark-200 transition-all duration-300 hover:-translate-y-1 hover:border-brand-primary/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
     >
-      {/* THUMBNAIL */}
-      <div className="relative h-40 bg-dark-300 overflow-hidden flex items-center justify-center">
+      {/* THUMBNAIL AREA */}
+      <div className="relative aspect-video w-full overflow-hidden bg-dark-300">
         {course.thumbnail?.url ? (
           <img
             src={course.thumbnail.url}
             alt={course.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="text-4xl opacity-30">📚</div>
+          <div className="flex h-full w-full items-center justify-center text-dark-100">
+            <PlayCircle size={48} />
+          </div>
         )}
-        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
+        <div className="absolute inset-0 bg-black/20 transition-colors group-hover:bg-black/40" />
 
-        {/* BADGE */}
-        <div className="absolute top-3 right-3">
-          <span
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+        {/* PRICE BADGE */}
+        <div className="absolute right-3 top-3">
+          <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
               course.isPaid
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                : "bg-green-500/20 text-green-300 border border-green-500/30"
+                ? "bg-dark-400/90 text-white backdrop-blur-sm"
+                : "bg-brand-primary text-dark-400"
             }`}
           >
-            {course.isPaid ? (
-              <>
-                <Lock size={12} />
-                Paid
-              </>
-            ) : (
-              <>
-                <Unlock size={12} />
-                Free
-              </>
-            )}
+            {course.isPaid ? <><Lock size={10} /> Premium</> : <><Unlock size={10} /> Free</>}
           </span>
         </div>
       </div>
 
-      {/* CONTENT */}
-      <div className="p-4 flex flex-col flex-1">
-        {/* TITLE */}
-        <h3 className="text-sm font-bold text-white mb-2 line-clamp-2 group-hover:text-brand-primary transition h-9">
+      {/* CARD CONTENT */}
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="line-clamp-2 min-h-[40px] text-base font-bold text-white transition-colors group-hover:text-brand-primary">
           {course.title}
         </h3>
 
-        {/* DESCRIPTION */}
-        <p className="text-xs text-gray-400 line-clamp-2 mb-4 flex-1">
-          {course.description || "No description available"}
+        <p className="mt-2 line-clamp-2 flex-1 text-sm text-gray-400">
+          {course.description || "Learn the comprehensive fundamentals and advanced concepts in this module."}
         </p>
 
-        {/* META INFO */}
-        <div className="flex items-center justify-between gap-3 py-3 border-t border-dark-100 text-xs text-gray-500 mb-4">
-          <div className="flex items-center gap-1">
-            <Clock size={13} />
-            <span>{course.sections?.length || 0} modules</span>
+        {/* METRICS ROW */}
+        <div className="mt-5 flex items-center justify-between border-t border-dark-100 pt-4 text-xs font-medium text-gray-400">
+          <div className="flex items-center gap-1.5">
+            <Clock size={14} className="text-brand-primary/70" />
+            <span>{totalModules} Modules</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Users size={13} />
-            <span>{(course.students || 0).toLocaleString()}</span>
+          <div className="flex items-center gap-1.5">
+            <Users size={14} className="text-brand-primary/70" />
+            <span>{students.toLocaleString()} Students</span>
           </div>
         </div>
 
-        {/* RATING */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                size={12}
-                className={i < Math.floor(course.rating || 4) ? "fill-yellow-400 text-yellow-400" : "text-gray-600"}
-              />
-            ))}
+        {/* RATING & ACTION ROW */}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Star size={14} className="fill-brand-primary text-brand-primary" />
+            <span className="text-sm font-bold text-white">{rating.toFixed(1)}</span>
           </div>
-          <span className="text-xs font-medium text-white">{(course.rating || 4).toFixed(1)}</span>
+          
+          <span className="text-sm font-bold text-brand-primary transition-transform group-hover:translate-x-1">
+            Start Learning →
+          </span>
         </div>
-
-        {/* CTA BUTTON */}
-        <button className="w-full py-2 px-3 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary hover:text-dark-400 rounded-lg text-xs font-bold transition-colors">
-          View Course
-        </button>
       </div>
     </div>
   );

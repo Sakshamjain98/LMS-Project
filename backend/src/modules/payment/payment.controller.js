@@ -32,6 +32,28 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// ✅ FREE SUBSCRIPTION CONTROLLER
+export const activateFreeSubscription = asyncHandler(async (req, res) => {
+  const subscription = await service.activateFreeSubscription(req.user._id);
+  res.status(STATUS_CODES.CREATED).json({
+    success: true,
+    message: "FREE subscription activated successfully",
+    subscription,
+  });
+});
+
+// ✅ GET SUBSCRIPTION CONTROLLER
+export const getSubscription = asyncHandler(async (req, res) => {
+  const subscription = await service.getActiveSubscription(req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    subscription: subscription || {
+      plan: "FREE",
+      status: "INACTIVE",
+    },
+  });
+});
+
 // Admin: get all payments awaiting approval
 export const getPendingApprovalPayments = asyncHandler(async (req, res) => {
   const payments = await service.getPendingApprovalPayments();
@@ -57,3 +79,5 @@ export const rejectPayment = asyncHandler(async (req, res) => {
     payment,
   });
 });
+
+
