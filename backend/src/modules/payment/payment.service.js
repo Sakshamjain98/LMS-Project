@@ -9,6 +9,75 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import Subscription from "../../models/subscription.model.js";
 
+const getPlanDurationInDays = (plan) => {
+  if (plan === "YEARLY") return 365;
+  if (plan === "QUARTERLY") return 90;
+  return 30;
+};
+
+const activatePaidSubscription = async (payment) => {
+  const durationInDays = getPlanDurationInDays(payment.plan);
+  const now = new Date();
+  const currentSubscription = await Subscription.findOne({ userId: payment.userId });
+
+  let startDate = now;
+  if (
+    currentSubscription?.status === "ACTIVE" &&
+    currentSubscription?.endDate &&
+    currentSubscription.endDate > now &&
+    currentSubscription.plan !== "FREE"
+  ) {
+    startDate = currentSubscription.endDate;
+  }
+
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + durationInDays);
+
+  await Subscription.findOneAndUpdate(
+    { userId: payment.userId },
+    {
+      $set: {
+        plan: payment.plan,
+        status: "ACTIVE",
+        price: payment.amount,
+        currency: payment.currency || "INR",
+        startDate: currentSubscription?.plan === payment.plan ? currentSubscription.startDate || now : now,
+        endDate,
+        billingCycle: payment.plan,
+      },
+      $push: {
+        paymentHistory: {
+          paymentId: payment.paymentId,
+          amount: payment.amount,
+          paidAt: payment.approvedAt || payment.verifiedAt || now,
+          plan: payment.plan,
+        },
+      },
+    },
+    { upsert: true, new: true }
+  );
+};
+
+export const userHasPaidSubscription = async (userId) => {
+  const sub = await Subscription.findOne({
+    userId,
+    status: "ACTIVE",
+    plan: { $ne: "FREE" },
+    endDate: { $gt: new Date() },
+  }).lean();
+
+  if (!sub) return false;
+
+  const approvedPayment = await Payment.findOne({
+    userId,
+    plan: sub.plan,
+    status: "SUCCESS",
+    adminApproved: true,
+  }).lean();
+
+  return !!approvedPayment;
+};
+
 export const getPlans = () => {
   return Object.values(SUBSCRIPTION_PLANS).filter((p) => p.id !== "FREE");
 };
@@ -98,12 +167,14 @@ export const verifyPayment = async ({
 
   if (process.env.PAYMENT_MODE === "DEV") {
     payment.paymentId = razorpay_payment_id || `DEV_PAY_${Date.now()}`;
-    payment.status = "PENDING_APPROVAL";
-    payment.adminApproved = false;
+    payment.status = "SUCCESS";
+    payment.adminApproved = true;
     payment.verifiedAt = new Date();
+    payment.approvedAt = new Date();
     
     try {
       await payment.save();
+      await activatePaidSubscription(payment);
     } catch (saveErr) {
       console.error("DEV Verify Save Error:", saveErr);
       throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
@@ -112,7 +183,8 @@ export const verifyPayment = async ({
     return {
       success: true,
       dev: true,
-      message: "Payment verified (DEV mode). Awaiting admin approval before subscription is activated.",
+      subscriptionActivated: true,
+      message: "Payment verified and subscription activated.",
     };
   }
 
@@ -133,12 +205,14 @@ export const verifyPayment = async ({
   }
 
   payment.paymentId = razorpay_payment_id;
-  payment.status = "PENDING_APPROVAL";
-  payment.adminApproved = false;
+  payment.status = "SUCCESS";
+  payment.adminApproved = true;
   payment.verifiedAt = new Date();
+  payment.approvedAt = new Date();
 
   try {
     await payment.save();
+    await activatePaidSubscription(payment);
   } catch (saveErr) {
     console.error("PROD Verify Save Error:", saveErr);
     throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
@@ -146,30 +220,26 @@ export const verifyPayment = async ({
 
   return {
     success: true,
-    message: "Payment verified successfully. Awaiting admin approval before subscription is activated.",
+    subscriptionActivated: true,
+    message: "Payment verified successfully and subscription activated.",
   };
 };
 
 // Called by admin to approve a verified payment and activate subscription
+
+
 export const approvePaymentAndActivate = async (paymentId) => {
-  const payment = await Payment.findById(paymentId);
+  // 1. Mark payment as successful and admin-approved
+  const payment = await Payment.findByIdAndUpdate(
+    paymentId,
+    { status: "SUCCESS", adminApproved: true, approvedAt: new Date() },
+    { new: true }
+  );
+
   if (!payment) throw new ApiError(STATUS_CODES.NOT_FOUND, "Payment not found");
 
-  if (payment.status !== "PENDING_APPROVAL") {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Payment is in '${payment.status}' state and cannot be approved`);
-  }
-
-  payment.status = "SUCCESS";
-  payment.adminApproved = true;
-  payment.approvedAt = new Date();
-  await payment.save();
-
-  // Queue subscription activation
-  await paymentQueue.add("activate-subscription", {
-    userId: payment.userId,
-    plan: payment.plan,
-    paymentId: payment._id,
-  });
+  // 2. Activate the matching subscription in DB
+  await activatePaidSubscription(payment);
 
   return payment;
 };
@@ -244,5 +314,3 @@ export const getActiveSubscription = async (userId) => {
     endDate: { $gt: new Date() },
   }).lean();
 };
-
-

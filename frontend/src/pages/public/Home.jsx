@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
-import { getPaymentPlans, createPaymentOrder, verifyPayment, activateFreeSubscription } from "../../services/studentService";
+import { getPaymentPlans, createPaymentOrder, verifyPayment, activateFreeSubscription, getStudentSubscription } from "../../services/studentService";
 import { FaArrowRight, FaBook, FaUsers, FaClock, FaCheckCircle, FaStar, FaPlay, FaGraduationCap, FaUser } from "react-icons/fa";
+
 
 const Home = () => {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ const Home = () => {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [processingPlan, setProcessingPlan] = useState(null);
   const [error, setError] = useState("");
+  const [subscriptionStatus, setSubscriptionStatus] = useState(localStorage.getItem("subscriptionStatus") || "FREE");
+  
 
   // Load Razorpay script
   useEffect(() => {
@@ -60,6 +63,26 @@ const Home = () => {
   const isAuthenticated = !!localStorage.getItem("token");
   const userRole = localStorage.getItem("userRole");
 
+  useEffect(() => {
+    const syncSubscription = async () => {
+      if (!isAuthenticated || userRole !== "student") return;
+
+      try {
+        const subscription = await getStudentSubscription();
+        const activePlan =
+          subscription?.status === "ACTIVE" && subscription?.plan !== "FREE"
+            ? subscription.plan
+            : "FREE";
+        setSubscriptionStatus(activePlan);
+        localStorage.setItem("subscriptionStatus", activePlan);
+      } catch (err) {
+        console.error("Failed to sync subscription:", err);
+      }
+    };
+
+    syncSubscription();
+  }, [isAuthenticated, userRole]);
+
   const handleGetStarted = () => {
     if (isAuthenticated) {
       if (userRole === "teacher") navigate("/teacher/dashboard");
@@ -73,6 +96,7 @@ const Home = () => {
   const handleSubscribe = async (plan) => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("userRole");
+    const currentPlan = subscriptionStatus;
     
     if (!token || role !== "student") {
       alert("Please login as a student to subscribe");
@@ -83,6 +107,10 @@ const Home = () => {
     // Handle FREE plan
     if (plan.id === "FREE" || plan.price === 0 || plan.price === "Free" || !plan.price) {
       return handleFreePlanActivation();
+    }
+    if (currentPlan && currentPlan !== "FREE") {
+      alert("You are already a Premium member! 🎉");
+      return;
     }
 
     // Map plans dynamically 
@@ -124,11 +152,10 @@ const Home = () => {
 
           if (verifyRes.success) {
             localStorage.setItem("subscriptionStatus", planId);
+            setSubscriptionStatus(planId);
             
             if (verifyRes.dev) {
               alert(`✅ DEV Mode - Payment Verified\nYour subscription is now active!`);
-            } else if (verifyRes.pendingAdminApproval) {
-              alert(`✅ Payment Received\nYour subscription is pending admin approval.`);
             } else {
               alert(`✅ Welcome to Premium!\nYour subscription is now active!`);
             }
@@ -194,7 +221,8 @@ const Home = () => {
       const response = await activateFreeSubscription();
       if (response.success) {
         localStorage.setItem("subscriptionPlan", "FREE");
-        localStorage.setItem("subscriptionStatus", "ACTIVE");
+        localStorage.setItem("subscriptionStatus", "FREE");
+        setSubscriptionStatus("FREE");
         alert("✅ Welcome to Pharmacist Academy!\nFree plan activated.");
         setTimeout(() => navigate("/student/dashboard"), 2000);
       }
@@ -766,86 +794,101 @@ const Home = () => {
       {/* PRICING SECTION */}
       {/* ═════════════════════════════════════════════════════════════ */}
       <section id="pricing" className="py-24 px-6 md:px-12 border-t border-dark-100">
-        <div className="max-w-7xl mx-auto">
-          
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl md:text-5xl font-black">Flexible Pricing Plans</h2>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-              Choose the perfect plan for your learning goals
-            </p>
-          </div>
+  <div className="max-w-7xl mx-auto">
+    
+    <div className="text-center mb-16 space-y-4">
+      <h2 className="text-4xl md:text-5xl font-black">Flexible Pricing Plans</h2>
+      <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+        Choose the perfect plan for your learning goals
+      </p>
+    </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-8 text-red-400 text-sm">
-              {error}
+    {error && (
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-8 text-red-400 text-sm">
+        {error}
+      </div>
+    )}
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      
+      {pricingPlans.map((plan, idx) => {
+        // 1. Plan Logic Calculations
+        const isFree = plan.price === 0 || plan.price === "Free" || plan.id === "FREE";
+        const isMostPopular = plan.featured || (plans.length > 0 && idx === Math.floor(plans.length / 2));
+        const planPrice = typeof plan.price === "number" ? `₹${plan.price}` : plan.price;
+        const planDuration = plan.period || (plan.duration ? `/${Math.ceil(plan.duration / 30)} months` : "");
+
+        // 2. Subscription Check Logic
+        const userCurrentPlan = subscriptionStatus;
+        // We consider them "subscribed" if they have a plan that is NOT "FREE" and NOT null
+        const isAlreadySubscribed = userCurrentPlan && userCurrentPlan !== "FREE" && userCurrentPlan !== "INACTIVE";
+        
+        // This specific card is the one the user currently owns
+        const isUserCurrentPlan = userCurrentPlan === (plan.id || plan.name.toUpperCase());
+
+        return (
+          <div
+            key={idx}
+            className={`rounded-xl border p-8 transition relative ${
+              isMostPopular
+                ? "bg-gradient-to-br from-brand-primary/20 to-transparent border-brand-primary/50 transform scale-105 md:scale-110"
+                : "bg-dark-200 border-dark-100 hover:border-brand-primary/30"
+            }`}
+          >
+            {isMostPopular && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-brand-primary text-dark-400 text-xs font-bold rounded-full">
+                MOST POPULAR
+              </div>
+            )}
+
+            <h3 className="text-2xl font-bold mb-2 text-white">{plan.name}</h3>
+            <p className="text-sm text-gray-400 mb-6">{plan.desc}</p>
+
+            <div className="mb-6">
+              <span className="text-4xl font-black text-brand-primary">{planPrice}</span>
+              {planDuration && <span className="text-gray-400">{planDuration}</span>}
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            
-            {pricingPlans.map((plan, idx) => {
-              // For API plans, check if it's a free plan
-              const isFree = plan.price === 0 || plan.price === "Free" || plan.id === "FREE";
-              const isMostPopular = plan.featured || (plans.length > 0 && idx === Math.floor(plans.length / 2));
-              const planPrice = typeof plan.price === "number" ? `₹${plan.price}` : plan.price;
-              const planDuration = plan.period || (plan.duration ? `/${Math.ceil(plan.duration / 30)} months` : "");
-              
-              return (
-                <div
-                  key={idx}
-                  className={`rounded-xl border p-8 transition relative ${
-                    isMostPopular
-                      ? "bg-gradient-to-br from-brand-primary/20 to-transparent border-brand-primary/50 transform scale-105 md:scale-110"
-                      : "bg-dark-200 border-dark-100 hover:border-brand-primary/30"
-                  }`}
-                >
-                  {isMostPopular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-brand-primary text-dark-400 text-xs font-bold rounded-full">
-                      MOST POPULAR
-                    </div>
-                  )}
+            <ul className="space-y-3 mb-8">
+              {plan.features.map((feature, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm text-gray-300">
+                  <FaCheckCircle className="text-brand-primary shrink-0" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
 
-                  <h3 className="text-2xl font-bold mb-2 text-white">{plan.name}</h3>
-                  <p className="text-sm text-gray-400 mb-6">{plan.desc}</p>
-
-                  <div className="mb-6">
-                    <span className="text-4xl font-black text-brand-primary">{planPrice}</span>
-                    {planDuration && <span className="text-gray-400">{planDuration}</span>}
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-3 text-sm text-gray-300">
-                        <FaCheckCircle className="text-brand-primary shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={() => {
-                      if (isFree) {
-                        handleGetStarted();
-                      } else {
-                        handleSubscribe(plan);
-                      }
-                    }}
-                    disabled={processingPlan === plan.id}
-                    className={`w-full py-3 rounded-lg font-bold transition ${
-                      isMostPopular
-                        ? "bg-brand-primary text-dark-400 hover:opacity-90 disabled:opacity-50"
-                        : "bg-dark-300 text-white border border-dark-100 hover:border-brand-primary/50 disabled:opacity-50"
-                    }`}
-                  >
-                    {processingPlan === plan.id ? "Processing..." : isFree ? "Get Started" : "Subscribe Now"}
-                  </button>
-                </div>
-              );
-            })}
-
+            <button
+              onClick={() => {
+                if (isFree) {
+                  handleGetStarted();
+                } else if (!isAlreadySubscribed) {
+                  handleSubscribe(plan);
+                }
+              }}
+              // Disable if: currently processing OR (user is already premium AND this isn't a free plan)
+              disabled={processingPlan === plan.id || (isAlreadySubscribed && !isFree)}
+              className={`w-full py-3 rounded-lg font-bold transition ${
+                isMostPopular
+                  ? "bg-brand-primary text-dark-400 hover:opacity-90 disabled:opacity-50 disabled:bg-dark-100 disabled:text-gray-500"
+                  : "bg-dark-300 text-white border border-dark-100 hover:border-brand-primary/50 disabled:opacity-50"
+              }`}
+            >
+              {processingPlan === plan.id 
+                ? "Processing..." 
+                : isAlreadySubscribed && !isFree 
+                  ? (isUserCurrentPlan ? "Your Active Plan" : "Already Subscribed")
+                  : isFree 
+                    ? "Get Started" 
+                    : "Subscribe Now"}
+            </button>
           </div>
-        </div>
-      </section>
+        );
+      })}
+
+    </div>
+  </div>
+</section>
 
       {/* ═════════════════════════════════════════════════════════════ */}
       {/* FINAL CTA SECTION */}

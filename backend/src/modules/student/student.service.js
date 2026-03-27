@@ -30,7 +30,11 @@ export const getBlogs = async () => {
 };
 
 export const getUserSubscription = async (userId) => {
-  return Subscription.findOne({ userId, status: "ACTIVE" }).lean();
+  return Subscription.findOne({
+    userId,
+    status: "ACTIVE",
+    $or: [{ plan: "FREE" }, { endDate: { $gt: new Date() } }],
+  }).lean();
 };
 
 export const userHasPaidSubscription = async (userId) => {

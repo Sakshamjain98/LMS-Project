@@ -227,6 +227,15 @@ export const getPaymentPlans = async () => {
   }
 };
 
+export const getStudentSubscription = async () => {
+  try {
+    const res = await api.get("/payment/subscription");
+    return res.data.subscription;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch subscription" };
+  }
+};
+
 // ✅ ADD FREE SUBSCRIPTION HANDLER
 export const activateFreeSubscription = async () => {
   try {
@@ -245,3 +254,4 @@ export const getAvailableTests = async () => {
     throw err?.response?.data || { message: "Failed to fetch available tests" };
   }
 };
+

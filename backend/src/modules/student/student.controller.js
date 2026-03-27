@@ -24,10 +24,15 @@ export const dashboard = asyncHandler(async (req, res) => {
 export const profile = asyncHandler(async (req, res) => {
   await activityQueue.add("profile_view", { userId: req.user._id });
   const user = await service.getProfile(req.user._id);
+  const subscription = await service.getUserSubscription(req.user._id);
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: MESSAGES.SUCCESS,
     user,
+    subscription: subscription || {
+      plan: "FREE",
+      status: "ACTIVE",
+    },
   });
 });
 
@@ -164,6 +169,10 @@ export const freeNotes = asyncHandler(async (req, res) => {
   });
 });
 
+
+
+
+
 // Update paidNotes to return only paid notes (already protected by middleware)
 export const paidNotes = asyncHandler(async (req, res) => {
   const notes = await service.getPaidNotes();
@@ -183,3 +192,8 @@ export const getAvailableTests = asyncHandler(async (req, res) => {
     tests,
   });
 });
+
+
+
+
+

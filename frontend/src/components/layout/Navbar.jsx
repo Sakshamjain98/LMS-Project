@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaBars, FaTimes } from "react-icons/fa";
 import { Zap, LogOut, LayoutDashboard } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
+import { getStudentSubscription } from "../../services/studentService";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,13 +19,32 @@ const Navbar = () => {
   const isHomePage = location.pathname === "/";
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("userRole");
-    const subscription = localStorage.getItem("subscriptionStatus");
-    
-    setIsAuthenticated(!!token);
-    setUserRole(role);
-    setSubscriptionStatus(subscription || "FREE");
+    const syncAuthState = async () => {
+      const token = localStorage.getItem("token");
+      const role = localStorage.getItem("userRole");
+      const subscription = localStorage.getItem("subscriptionStatus");
+
+      setIsAuthenticated(!!token);
+      setUserRole(role);
+      setSubscriptionStatus(subscription || "FREE");
+
+      if (!token || role !== "student") return;
+
+      try {
+        const currentSubscription = await getStudentSubscription();
+        const currentPlan =
+          currentSubscription?.status === "ACTIVE" && currentSubscription?.plan !== "FREE"
+            ? currentSubscription.plan
+            : "FREE";
+
+        setSubscriptionStatus(currentPlan);
+        localStorage.setItem("subscriptionStatus", currentPlan);
+      } catch (err) {
+        console.error("Failed to sync subscription status:", err);
+      }
+    };
+
+    syncAuthState();
   }, []);
 
   const navLinks = [

@@ -41,14 +41,18 @@ export default function StudentSidebar() {
     navigate("/login");
   };
 
-  // Extra Large text and padding
+  const handleLogoClick = () => {
+    navigate("/");
+  };
+
+  // Reduced padding and text size
   const baseClass =
-    "flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all duration-200 w-full text-lg font-medium";
+    "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 w-full text-sm font-medium";
   const activeClass = "bg-brand-primary text-dark-400";
   const inactiveClass = "text-gray-400 hover:bg-dark-300 hover:text-white";
 
-  // Extra Large sidebar widths (w-80 = 320px, w-24 = 96px)
-  const sidebarWidth = collapsed ? "w-24" : "w-80";
+  // Smaller sidebar widths (w-64 = 256px, w-20 = 80px)
+  const sidebarWidth = collapsed ? "w-20" : "w-64";
   const textHidden = collapsed ? "hidden" : "inline";
 
   const navItems = [
@@ -76,25 +80,28 @@ export default function StudentSidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Header */}
+        {/* Header - Clickable Logo */}
         <div className="flex flex-col h-full">
-          <div className="p-6 flex items-center justify-between border-b border-dark-100 min-h-[90px]">
-            {!collapsed && (
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center text-dark-400 font-bold text-base">
-                  PQ
-                </div>
-                <span className="text-white font-bold text-2xl tracking-tight">Quest</span>
+          <div className={`p-4 flex items-center justify-between border-b border-dark-100 min-h-[72px]`}>
+            <button
+              onClick={handleLogoClick}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <div className="w-8 h-8 bg-brand-primary rounded-lg flex items-center justify-center">
+                <span className="text-dark-400 font-bold text-base">S</span>
               </div>
-            )}
+              {!collapsed && (
+                <span className="text-white font-semibold text-lg">Student</span>
+              )}
+            </button>
             
             {/* Desktop Collapse/Expand Toggle */}
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className={`hidden lg:flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:bg-dark-300 hover:text-white transition ${collapsed ? 'mx-auto' : ''}`}
+              className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-dark-300 hover:text-white transition ${collapsed ? 'mx-auto' : ''}`}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {collapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
+              {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             </button>
 
             {/* Mobile Close Toggle */}
@@ -102,12 +109,12 @@ export default function StudentSidebar() {
               onClick={() => setMobileOpen(false)}
               className="lg:hidden text-gray-400 hover:text-white p-2"
             >
-              <X size={28} />
+              <X size={24} />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-2 px-4 py-8 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 space-y-1.5 px-3 py-6 overflow-y-auto custom-scrollbar">
             {navItems.map(item => (
               <NavLink
                 key={item.path}
@@ -118,7 +125,7 @@ export default function StudentSidebar() {
                 }
                 title={collapsed ? item.label : ""}
               >
-                <item.icon size={24} className="shrink-0" />
+                <item.icon size={18} className="shrink-0" />
                 <span className={textHidden}>{item.label}</span>
               </NavLink>
             ))}
@@ -126,13 +133,13 @@ export default function StudentSidebar() {
         </div>
 
         {/* Logout */}
-        <div className="p-4 border-t border-dark-100">
+        <div className="p-3 border-t border-dark-100">
           <button
             onClick={handleLogout}
             className={`${baseClass} text-red-400 hover:bg-red-500/10 hover:text-red-400 ${collapsed ? 'justify-center px-0' : ''}`}
             title={collapsed ? "Logout" : ""}
           >
-            <LogOut size={24} className="shrink-0" />
+            <LogOut size={18} className="shrink-0" />
             <span className={textHidden}>Logout</span>
           </button>
         </div>
@@ -141,12 +148,12 @@ export default function StudentSidebar() {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-10 p-3.5 bg-brand-primary shadow-[0_8px_30px_rgba(0,220,130,0.3)] rounded-xl text-dark-400 hover:scale-105 transition-transform"
+        className="lg:hidden fixed bottom-6 right-6 z-10 p-3 bg-brand-primary shadow-[0_8px_30px_rgba(0,220,130,0.3)] rounded-lg text-dark-400 hover:scale-105 transition-transform"
       >
-        <Menu size={28} />
+        <Menu size={24} />
       </button>
 
-      {/* Subtle scrollbar styles for nav items if they overflow vertically */}
+      {/* Subtle scrollbar styles */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

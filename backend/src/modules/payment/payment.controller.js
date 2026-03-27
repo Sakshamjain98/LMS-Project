@@ -9,14 +9,27 @@ export const getPlans = asyncHandler(async (req, res) => {
 });
 
 export const createOrder = asyncHandler(async (req, res) => {
-  const order = await service.createOrder(req.user._id, req.body.planId);
+  const userId = req.user._id;
+
+  // 1. Check for active premium subscription BEFORE creating order
+  const isPremium = await service.userHasPaidSubscription(userId);
+  
+  if (isPremium) {
+    return res.status(STATUS_CODES.BAD_REQUEST).json({
+      success: false,
+      message: "You already have an active premium subscription."
+    });
+  }
+
+  // 2. Only proceed to order creation if not subscribed
+  const order = await service.createOrder(userId, req.body.planId);
+
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: MESSAGES.PAYMENT_INITIATED,
     order,
   });
 });
-
 export const verifyPayment = asyncHandler(async (req, res) => {
   const result = await service.verifyPayment({
     userId: req.user._id,
@@ -27,7 +40,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     message: result.alreadyProcessed
       ? "Payment already processed"
       : MESSAGES.PAYMENT_SUCCESS,
-    pendingAdminApproval: !result.alreadyProcessed,
+    pendingAdminApproval: false,
     ...result,
   });
 });
@@ -79,5 +92,4 @@ export const rejectPayment = asyncHandler(async (req, res) => {
     payment,
   });
 });
-
 
