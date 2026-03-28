@@ -5,9 +5,15 @@ const ACTIVE_WINDOW = 60;
 export const markUserActive = async (userId) => {
   if (!userId) return;
 
+  if (!redisClient?.isOpen) return;
+
   const key = `active:user:${userId.toString()}`;
-  await redisClient.set(key, "1");
-  await redisClient.expire(key, ACTIVE_WINDOW);
+  try {
+    await redisClient.set(key, "1");
+    await redisClient.expire(key, ACTIVE_WINDOW);
+  } catch (error) {
+    console.error("Failed to mark user active:", error?.message || error);
+  }
 };
 
 export const getActiveUsersCount = async () => {

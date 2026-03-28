@@ -39,7 +39,9 @@ if (user.passwordChangedAt) {
       );
     }
     req.user = user;
-    await markUserActive(user._id);
+    markUserActive(user._id).catch((error) => {
+      console.error("Failed to update active user state:", error?.message || error);
+    });
     next();
   } catch (error) {
     next(error);
