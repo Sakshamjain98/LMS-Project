@@ -9,16 +9,33 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import Subscription from "../../models/subscription.model.js";
 
+// TEMPORARY CLEANUP: Run this once, then you can delete it.
+mongoose.connection.on('open', async () => {
+  try {
+    const collection = mongoose.connection.db.collection('subscriptions');
+    // This removes the index that is causing the "studentId: null" error
+    await collection.dropIndex('studentId_1');
+    console.log("Successfully dropped the ghost index: studentId_1");
+  } catch (err) {
+    console.log("Index studentId_1 not found or already deleted. Skipping.");
+  }
+});
+
 const getPlanDurationInDays = (plan) => {
   if (plan === "YEARLY") return 365;
   if (plan === "QUARTERLY") return 90;
   return 30;
 };
 
+// payment.service.js
 const activatePaidSubscription = async (payment) => {
   const durationInDays = getPlanDurationInDays(payment.plan);
   const now = new Date();
-  const currentSubscription = await Subscription.findOne({ userId: payment.userId });
+  
+  // CRITICAL: Ensure we use the userId from the payment record
+  const userId = payment.userId;
+
+  const currentSubscription = await Subscription.findOne({ userId });
 
   let startDate = now;
   if (
@@ -33,15 +50,16 @@ const activatePaidSubscription = async (payment) => {
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + durationInDays);
 
-  await Subscription.findOneAndUpdate(
-    { userId: payment.userId },
+  // Use findOneAndUpdate with upsert to prevent duplicate subscription docs
+  return await Subscription.findOneAndUpdate(
+    { userId: userId }, 
     {
       $set: {
         plan: payment.plan,
         status: "ACTIVE",
         price: payment.amount,
         currency: payment.currency || "INR",
-        startDate: currentSubscription?.plan === payment.plan ? currentSubscription.startDate || now : now,
+        startDate: currentSubscription?.plan === payment.plan ? (currentSubscription.startDate || now) : now,
         endDate,
         billingCycle: payment.plan,
       },
@@ -54,28 +72,34 @@ const activatePaidSubscription = async (payment) => {
         },
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, new: true, runValidators: true }
   );
 };
-
+// payment.service.js
 export const userHasPaidSubscription = async (userId) => {
-  const sub = await Subscription.findOne({
-    userId,
-    status: "ACTIVE",
-    plan: { $ne: "FREE" },
-    endDate: { $gt: new Date() },
-  }).lean();
+  try {
+    const sub = await Subscription.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      status: "ACTIVE",
+      plan: { $ne: "FREE" },
+      endDate: { $gt: new Date() },
+    }).lean();
 
-  if (!sub) return false;
+    if (!sub) return false;
 
-  const approvedPayment = await Payment.findOne({
-    userId,
-    plan: sub.plan,
-    status: "SUCCESS",
-    adminApproved: true,
-  }).lean();
+    // Extra security: verify the underlying payment was admin-approved
+    const approvedPayment = await Payment.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      plan: sub.plan,
+      status: "SUCCESS",
+      adminApproved: true,
+    }).lean();
 
-  return !!approvedPayment;
+    return !!approvedPayment;
+  } catch (error) {
+    console.error("Error checking paid subscription:", error);
+    return false;
+  }
 };
 
 export const getPlans = () => {
@@ -149,22 +173,24 @@ export const verifyPayment = async ({
   razorpay_payment_id,
   razorpay_signature,
 }) => {
+  // 1. Find the payment record
   const payment = await Payment.findOne({ orderId: razorpay_order_id });
 
   if (!payment) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Payment order not found in database.");
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Payment order not found.");
   }
 
-  // Prevent duplicate processing
-  if (payment.status === "SUCCESS" || payment.status === "PENDING_APPROVAL" || payment.status === "APPROVED") {
+  // 2. Prevent duplicate processing
+  if (["SUCCESS", "APPROVED"].includes(payment.status)) {
     return { alreadyProcessed: true };
   }
 
-  // Security
+  // 3. Security Check
   if (payment.userId.toString() !== userId.toString()) {
-    throw new ApiError(STATUS_CODES.FORBIDDEN, "Unauthorized payment verification attempt.");
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "Unauthorized verification attempt.");
   }
 
+  // 4. Handle DEV Mode
   if (process.env.PAYMENT_MODE === "DEV") {
     payment.paymentId = razorpay_payment_id || `DEV_PAY_${Date.now()}`;
     payment.status = "SUCCESS";
@@ -175,24 +201,14 @@ export const verifyPayment = async ({
     try {
       await payment.save();
       await activatePaidSubscription(payment);
-    } catch (saveErr) {
-      console.error("DEV Verify Save Error:", saveErr);
-      throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
+      return { success: true, dev: true, message: "Dev Payment Success" };
+    } catch (dbErr) {
+      // If you still get E11000 here, it means step 1 (dropping index) wasn't successful
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${dbErr.message}`);
     }
-
-    return {
-      success: true,
-      dev: true,
-      subscriptionActivated: true,
-      message: "Payment verified and subscription activated.",
-    };
   }
 
-  // PRODUCTION: strict signature verification
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing one or more payment verification fields from Razorpay.");
-  }
-
+  // 5. PRODUCTION Logic: Signature Verification
   const generatedSignature = crypto
     .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -201,9 +217,10 @@ export const verifyPayment = async ({
   if (generatedSignature !== razorpay_signature) {
     payment.status = "FAILED";
     await payment.save();
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid payment signature - authentication failed.");
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid signature.");
   }
 
+  // 6. Update Payment and Activate
   payment.paymentId = razorpay_payment_id;
   payment.status = "SUCCESS";
   payment.adminApproved = true;
@@ -213,16 +230,10 @@ export const verifyPayment = async ({
   try {
     await payment.save();
     await activatePaidSubscription(payment);
+    return { success: true, message: "Payment verified and activated." };
   } catch (saveErr) {
-    console.error("PROD Verify Save Error:", saveErr);
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, `DB Error: ${saveErr.message}`);
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Subscription Error: ${saveErr.message}`);
   }
-
-  return {
-    success: true,
-    subscriptionActivated: true,
-    message: "Payment verified successfully and subscription activated.",
-  };
 };
 
 // Called by admin to approve a verified payment and activate subscription
@@ -269,48 +280,82 @@ export const getPendingApprovalPayments = async () => {
 };
 
 // ✅ ADD FREE SUBSCRIPTION LOGIC
+// payment.service.js
 export const activateFreeSubscription = async (userId) => {
   const objUserId = new mongoose.Types.ObjectId(userId);
 
-  const existingSub = await Subscription.findOne({
-    userId: objUserId,
-    status: "ACTIVE",
-  });
-
-  if (existingSub) {
-    throw new ApiError(STATUS_CODES.CONFLICT, "You already have an active subscription");
-  }
-
-  const startDate = new Date();
-  const endDate = new Date();
-  endDate.setFullYear(endDate.getFullYear() + 100);
-
-  const subscription = await Subscription.findOneAndUpdate(
-    { userId: objUserId },
-    {
-      plan: "FREE",
+  try {
+    // Check if user already has an active subscription
+    const existingSub = await Subscription.findOne({
+      userId: objUserId,
       status: "ACTIVE",
-      price: 0,
-      startDate,
-      endDate,
-      billingCycle: "ONE_TIME",
-      paymentHistory: [{
-        paymentId: `FREE_${Date.now()}`,
-        amount: 0,
-        paidAt: startDate,
-        plan: "FREE",
-      }],
-    },
-    { upsert: true, new: true }
-  );
+    });
 
-  return subscription;
+    if (existingSub) {
+      // If they have an active subscription, just return it
+      return existingSub;
+    }
+
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 100);
+
+    // Use findOneAndUpdate with upsert
+    const subscription = await Subscription.findOneAndUpdate(
+      { userId: objUserId },
+      {
+        $setOnInsert: {
+          userId: objUserId,
+          startDate,
+        },
+        $set: {
+          plan: "FREE",
+          status: "ACTIVE",
+          price: 0,
+          endDate,
+          billingCycle: "ONE_TIME",
+        },
+        $push: {
+          paymentHistory: {
+            paymentId: `FREE_${Date.now()}`,
+            amount: 0,
+            paidAt: startDate,
+            plan: "FREE",
+          },
+        },
+      },
+      { 
+        upsert: true, 
+        new: true,
+        setDefaultsOnInsert: true 
+      }
+    );
+
+    return subscription;
+  } catch (error) {
+    console.error("Error activating free subscription:", error);
+    
+    // Handle race condition - if duplicate key, fetch existing
+    if (error.code === 11000) {
+      const existingSub = await Subscription.findOne({ userId: objUserId });
+      if (existingSub) {
+        return existingSub;
+      }
+    }
+    throw new ApiError(STATUS_CODES.SERVER_ERROR, "Failed to activate free subscription");
+  }
 };
 
+// payment.service.js
 export const getActiveSubscription = async (userId) => {
-  return Subscription.findOne({
-    userId: new mongoose.Types.ObjectId(userId),
-    status: "ACTIVE",
-    endDate: { $gt: new Date() },
-  }).lean();
+  try {
+    return await Subscription.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      status: "ACTIVE",
+      endDate: { $gt: new Date() },
+    }).lean();
+  } catch (error) {
+    console.error("Error getting active subscription:", error);
+    return null;
+  }
 };
