@@ -185,13 +185,13 @@ const Navbar = () => {
                     title={subscriptionStatus === "FREE" ? "Click to subscribe" : "View subscription details"}
                   >
                     <Zap size={16} />
-                    {subscriptionStatus === "FREE" ? "Free Plan" : "Premium"}
+                    {subscriptionStatus === "FREE" ? "Free Plan" : "Subscribed"}
                   </button>
 
                   {/* Subscription Menu */}
                   {showSubscriptionMenu && subscriptionStatus !== "FREE" && (
                     <div className="absolute right-0 top-full mt-2 w-64 bg-dark-300 border border-white/10 rounded-xl shadow-2xl p-4 z-50">
-                      <h3 className="font-bold text-white mb-3">Premium Features</h3>
+                      <h3 className="font-bold text-white mb-3">Subscribed Features</h3>
                       <ul className="space-y-2 text-sm text-gray-300">
                         <li>✓ Access all premium courses</li>
                         <li>✓ Unlimited test attempts</li>
@@ -200,7 +200,7 @@ const Navbar = () => {
                         <li>✓ Certificates of completion</li>
                         <li>✓ Ad-free learning experience</li>
                       </ul>
-                      <p className="text-xs text-gray-500 mt-4">Your premium access is active</p>
+                      <p className="text-xs text-gray-500 mt-4">Your subscription is active</p>
                     </div>
                   )}
                 </div>
@@ -294,7 +294,7 @@ const Navbar = () => {
                 }`}
               >
                 <Zap size={16} />
-                {subscriptionStatus === "FREE" ? "Get Premium" : "Premium"}
+                {subscriptionStatus === "FREE" ? "Get Premium" : "Subscribed"}
               </button>
               <Link
                 to="/student/dashboard"

@@ -8,8 +8,6 @@ __pycache__/
 *.egg-info/
 
 # Environment variables
-.env
-.env.local
 .env.*.local
 
 # IDE
@@ -41,3 +39,4 @@ coverage/
 
 # Logs
 logs/
+config.bat
