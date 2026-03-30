@@ -22,9 +22,13 @@ export const dashboard = asyncHandler(async (req, res) => {
   });
 });
 export const profile = asyncHandler(async (req, res) => {
-  await activityQueue.add("profile_view", { userId: req.user._id });
+  // 1. Get user profile
   const user = await service.getProfile(req.user._id);
+
+  // 2. Get subscription
   const subscription = await service.getUserSubscription(req.user._id);
+
+  // 3. Send response
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: MESSAGES.SUCCESS,

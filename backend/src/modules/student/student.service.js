@@ -16,12 +16,19 @@ export const getDashboardData = async () => {
 
   return { freeCourses, blogs };
 };
+
 export const getProfile = async (userId) => {
-  return User.findById(userId).select("-password").lean();
+  return User.findById(userId)
+    .select("-password")
+    .lean(); // ✅ faster
 };
 
 export const updateProfile = async (userId, data) => {
-  return User.findByIdAndUpdate(userId, { $set: data }, { new: true }).select("-password");
+  return User.findByIdAndUpdate(
+    userId,
+    { $set: data },
+    { new: true, runValidators: true } // ✅ important
+  ).select("-password");
 };
 
 export const getFreeCourses = async () => {
