@@ -5,19 +5,15 @@ import { activityQueue } from "../../infrastucture/queues/activity.queue.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import Test from "../test/test.model.js";
-export const dashboard = asyncHandler(async (req, res) => {
-  const data = await service.getDashboardData(); try {
-    await activityQueue.add("dashboard_view", {
-      userId: req.user._id,
-      role: req.user.role,
-      action: "STUDENT_DASHBOARD_VIEW",
-    }, { timeout: 5000 }); // set a timeout
-  } catch (err) {
-    console.error("Failed to add activity job:", err.message);
-    // Do not fail the request
-  }
 
+export const dashboard = asyncHandler(async (req, res) => {
+  // 1. Fetch dashboard data
+  const data = await service.getDashboardData();
+
+  // 2. Fetch subscription
   const subscription = await service.getUserSubscription(req.user._id);
+
+  // 3. Send response
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: MESSAGES.SUCCESS,
@@ -25,7 +21,6 @@ export const dashboard = asyncHandler(async (req, res) => {
     ...data,
   });
 });
-
 export const profile = asyncHandler(async (req, res) => {
   await activityQueue.add("profile_view", { userId: req.user._id });
   const user = await service.getProfile(req.user._id);

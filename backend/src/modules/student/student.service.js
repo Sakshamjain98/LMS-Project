@@ -4,15 +4,18 @@ import User from "../../models/user.model.js";
 import Subscription from "../../models/subscription.model.js";
 import Payment from "../../models/payment.model.js";
 import Note from "../../models/note.model.js";
-
 export const getDashboardData = async () => {
   const [freeCourses, blogs] = await Promise.all([
-    Course.find({ isPaid: false, status: "approved" }).limit(10).lean(),  
-    Blog.find({ published: true }).limit(5).lean(),
+    Course.find({ isPaid: false, status: "approved" })
+      .limit(10)
+      .lean(),
+    Blog.find({ published: true })
+      .limit(5)
+      .lean(),
   ]);
+
   return { freeCourses, blogs };
 };
-
 export const getProfile = async (userId) => {
   return User.findById(userId).select("-password").lean();
 };
