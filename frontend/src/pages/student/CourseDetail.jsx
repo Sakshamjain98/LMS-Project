@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getCourseById } from "../../services/studentService";
+import { getCourseById, getStudentSubscription } from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import { 
   ChevronLeft, Play, Clock, Users, Star, Lock, 
   BookOpen, Zap, ChevronDown, ChevronUp, FileText, CheckCircle2 
 } from "lucide-react";
 
-// Helper to safely format YouTube URLs for iframes
 const getEmbedUrl = (url) => {
   if (!url) return "";
   if (url.includes("embed/")) return url;
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/))([^&?]*)/);
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/))([^?&]*)/);
   return match ? `https://www.youtube.com/embed/${match[1]}` : url;
 };
 
@@ -20,11 +19,34 @@ export default function CourseDetail() {
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(
+    localStorage.getItem("subscriptionStatus") || "FREE"
+  );
+  const [isSubscribed, setIsSubscribed] = useState(false);
   
   // LMS State
   const [expandedSections, setExpandedSections] = useState(new Set());
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeSectionId, setActiveSectionId] = useState(null);
+
+  // Fetch subscription status
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        const res = await getStudentSubscription();
+        const plan = res?.plan || "FREE";
+        const active = res?.status === "ACTIVE" && plan !== "FREE";
+        setSubscriptionStatus(plan);
+        setIsSubscribed(active);
+        localStorage.setItem("subscriptionStatus", active ? plan : "FREE");
+      } catch (err) {
+        console.error("Failed to fetch subscription:", err);
+        const stored = localStorage.getItem("subscriptionStatus");
+        setIsSubscribed(stored && stored !== "FREE" && stored !== "null");
+      }
+    };
+    fetchSubscription();
+  }, []);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -34,7 +56,7 @@ export default function CourseDetail() {
         const fetchedCourse = res.course;
         setCourse(fetchedCourse);
 
-        // Auto-select first module & first video on load
+        // Auto-select first module & first video if accessible
         if (fetchedCourse?.sections?.length > 0) {
           const firstSection = fetchedCourse.sections[0];
           setExpandedSections(new Set([firstSection._id]));
@@ -53,6 +75,9 @@ export default function CourseDetail() {
     fetchCourse();
   }, [courseId]);
 
+  // Determine if the whole course is accessible
+  const isCourseAccessible = !course?.isPaid || isSubscribed;
+
   const toggleSection = (sectionId) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
@@ -63,9 +88,10 @@ export default function CourseDetail() {
   };
 
   const handleVideoSelect = (video, sectionId) => {
+    if (!isCourseAccessible) return; // prevent selection if locked
     setActiveVideo(video);
     setActiveSectionId(sectionId);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to video on mobile
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (loading) {
@@ -93,7 +119,6 @@ export default function CourseDetail() {
     );
   }
 
-  // Get active section data to display its corresponding notes
   const activeSectionData = course.sections?.find(s => s._id === activeSectionId);
 
   return (
@@ -115,6 +140,11 @@ export default function CourseDetail() {
             <h1 className="truncate text-lg font-bold text-white md:text-xl">
               {course.title}
             </h1>
+            {course.isPaid && !isSubscribed && (
+              <div className="ml-auto flex items-center gap-1 rounded-full bg-brand-primary/10 px-3 py-1 text-xs font-semibold text-brand-primary">
+                <Lock size={12} /> Premium
+              </div>
+            )}
           </div>
         </div>
 
@@ -128,7 +158,20 @@ export default function CourseDetail() {
               {/* VIDEO PLAYER SECTION */}
               <div className="overflow-hidden rounded-xl border border-dark-100 bg-dark-300 shadow-lg">
                 <div className="relative aspect-video w-full bg-black">
-                  {activeVideo ? (
+                  {!isCourseAccessible ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-dark-400/95 backdrop-blur-sm z-10">
+                      <Lock size={48} className="mb-4 text-gray-500" />
+                      <p className="text-white text-center px-4">
+                        This is a premium course. Subscribe to unlock full access.
+                      </p>
+                      <button
+                        onClick={() => navigate("/#pricing")}
+                        className="mt-4 rounded-lg bg-brand-primary px-6 py-2 text-dark-400 font-bold hover:opacity-90 transition"
+                      >
+                        Subscribe Now
+                      </button>
+                    </div>
+                  ) : activeVideo ? (
                     <iframe
                       src={getEmbedUrl(activeVideo.url)}
                       title={activeVideo.title}
@@ -165,14 +208,13 @@ export default function CourseDetail() {
                 </div>
               </div>
 
-              {/* NOTES SECTION */}
-              {activeSectionData?.notes?.length > 0 && (
+              {/* NOTES SECTION (only shown if accessible) */}
+              {isCourseAccessible && activeSectionData?.notes?.length > 0 && (
                 <div className="rounded-xl border border-dark-100 bg-dark-300 p-5 md:p-6">
                   <div className="mb-4 flex items-center gap-2">
                     <BookOpen className="text-brand-primary" size={20} />
                     <h3 className="text-lg font-bold text-white">Module Resources & Notes</h3>
                   </div>
-                  
                   <div className="grid gap-3 sm:grid-cols-2">
                     {activeSectionData.notes.map((note, idx) => (
                       <a
@@ -225,12 +267,12 @@ export default function CourseDetail() {
                     
                     return (
                       <div key={section._id} className="border-b border-dark-100 last:border-0">
-                        {/* MODULE HEADER */}
                         <button
                           onClick={() => toggleSection(section._id)}
                           className={`flex w-full items-center justify-between p-4 transition hover:bg-dark-200 ${
                             isExpanded ? "bg-dark-200" : "bg-dark-300"
                           }`}
+                          disabled={!isCourseAccessible && course.isPaid}
                         >
                           <div className="text-left">
                             <h4 className="text-sm font-semibold text-white">
@@ -252,16 +294,18 @@ export default function CourseDetail() {
                           <div className="bg-dark-400/50 py-2">
                             {section.videos?.map((video, vidIdx) => {
                               const isActive = activeVideo?._id === video._id || activeVideo?.url === video.url;
+                              const isSelectable = isCourseAccessible || !course.isPaid;
                               
                               return (
                                 <button
                                   key={vidIdx}
-                                  onClick={() => handleVideoSelect(video, section._id)}
+                                  onClick={() => isSelectable && handleVideoSelect(video, section._id)}
+                                  disabled={!isSelectable}
                                   className={`group flex w-full items-start gap-3 px-4 py-2.5 text-left transition ${
                                     isActive 
                                       ? "bg-brand-primary/10 text-brand-primary" 
                                       : "text-gray-300 hover:bg-dark-200 hover:text-white"
-                                  }`}
+                                  } ${!isSelectable ? "cursor-not-allowed opacity-50" : ""}`}
                                 >
                                   <div className="mt-0.5 shrink-0">
                                     {isActive ? (
@@ -282,7 +326,6 @@ export default function CourseDetail() {
                               );
                             })}
                             
-                            {/* Empty state if no videos */}
                             {(!section.videos || section.videos.length === 0) && (
                               <div className="px-8 py-3 text-xs italic text-gray-500">
                                 No lectures in this module yet.
@@ -302,7 +345,6 @@ export default function CourseDetail() {
         </div>
       </div>
       
-      {/* Scrollbar styling for the sidebar */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #13161F; }
