@@ -16,7 +16,11 @@ import {
   addVideoLink,
   removeVideoLink,
   updateVideoLink,
+  createTest, bulkCreateQuestions
 } from "../teacher/teacher.service.js";
+import csv from "csv-parser"
+import fs from "fs";
+import https from "https";
 
 import * as testService from "../test/test.service.js";
 import * as noteService from "../teacher/note.service.js";
@@ -25,6 +29,7 @@ import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 
+import axios from 'axios';
 
 // ================= DASHBOARD =================
 export const dashboard = asyncHandler(async (req, res) => {
@@ -474,3 +479,57 @@ export const studentPerformance = asyncHandler(async (req, res) => {
     data: stats,
   });
 });
+
+
+// src/modules/teacher/teacher.controller.js
+
+
+
+export const createTestFromCSV = async (req, res, next) => {
+  try {
+    if (!req.file) throw new ApiError(400, "No CSV file uploaded");
+
+    const questions = [];
+    const response = await axios.get(req.file.path, { responseType: 'stream' });
+
+    // Define the exact header names expected from the CSV
+    const requiredHeaders = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'answer', 'marks'];
+
+    response.data
+      .pipe(csv())
+      .on('data', (row) => {
+        // Validate headers for the current row
+        const isValid = requiredHeaders.every(field => 
+          Object.prototype.hasOwnProperty.call(row, field) && row[field]?.trim() !== ""
+        );
+
+        if (!isValid) {
+          // Destroying the stream triggers the 'error' event below
+          response.data.destroy(new Error("Invalid CSV format. Please ensure all columns (question, optionA, etc.) are present and not empty."));
+        } else {
+          questions.push(row);
+        }
+      })
+      .on('end', async () => {
+        if (questions.length === 0) {
+          return res.status(400).json({ success: false, message: "CSV file is empty." });
+        }
+
+        // Logic to save questions to DB would go here
+        // e.g., await teacherService.bulkCreateQuestions(questions, req.body.testId, req.user._id);
+
+        res.status(200).json({ 
+          success: true, 
+          message: `Successfully processed ${questions.length} questions.` 
+        });
+      })
+      .on('error', (err) => {
+        // This handles the error gracefully and prevents the 'nodemon app crashed' error
+        console.error("CSV Processing Error:", err.message);
+        res.status(400).json({ success: false, message: err.message });
+      });
+
+  } catch (error) {
+    next(error);
+  }
+};

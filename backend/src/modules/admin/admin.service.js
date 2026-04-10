@@ -292,3 +292,8 @@ export const getCourseAnalytics = async () => {
   ]);
   return { totalCourses, byStatus };
 };
+
+
+export const getBlogs = async (filter = {}) => {
+  return Blog.find(filter).sort({ createdAt: -1 }).lean();
+};

@@ -298,7 +298,6 @@ export const linkQuestionToTest = async (testId, questionId) => {
     $inc: { totalMarks: question.marks || 0 },
   });
 };
-
 export const bulkCreateQuestions = async (questionsArray, testId, teacherId) => {
   const questionsToInsert = questionsArray.map((q) => ({
     ...q,
@@ -367,3 +366,6 @@ export const getTestAnalytics = async (testId) => {
 export const getQuestionAnalytics = async (questionId) => {
   return QuestionAnalytics.findOne({ questionId }).lean();
 };
+
+
+

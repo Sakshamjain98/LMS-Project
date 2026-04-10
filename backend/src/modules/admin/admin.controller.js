@@ -179,3 +179,22 @@ export const getCourseAnalytics = asyncHandler(async (req, res) => {
   const data = await service.getCourseAnalytics();
   res.json({ success: true, data });
 });
+
+
+
+export const getBlogs = asyncHandler(async (req, res) => {
+  const { published } = req.query; // Optional filter for published blogs
+  const filter = {};
+
+  if (published !== undefined) {
+    filter.published = published === "true";
+  }
+
+  const blogs = await service.getBlogs(filter);
+
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: "Blogs fetched successfully",
+    blogs,
+  });
+});

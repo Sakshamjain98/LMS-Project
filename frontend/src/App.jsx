@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 /* Public Pages */
 import Login from "./pages/auth/Login";
@@ -40,6 +40,32 @@ import StudentProfile from "./pages/student/StudentProfile";
 /* Layouts */
 import DashboardLayout from "./components/layout/DashboardLayout";
 import StudentLayout from "./pages/student/StudentLayout";
+import AdminLayout from "./pages/admin/AdminLayout";
+
+/* Admin Pages */
+import AdminDashboard from "./pages/admin/Dashboard";
+import Users from "./pages/admin/Users";
+import PendingContent from "./pages/admin/PendingContent";
+import Payments from "./pages/admin/Payments";
+import News from "./pages/admin/News";
+
+import TeacherApproval from "./pages/admin/TeacherApproval";
+
+import Analytics from "./pages/admin/Analytics";
+import Blogs from "./pages/admin/Blog";
+import CreateAdmin from "./pages/admin/CreateAdmin"
+import UploadTestCsv from "./pages/teacher/UploadTestCsv"
+
+// Simple admin route guard using localStorage
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem("token");
+  const userRole = localStorage.getItem("userRole");
+
+  if (!token || userRole !== "admin") {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
 
 function App() {
   return (
@@ -80,6 +106,10 @@ function App() {
         <Route path="/teacher/tests/analytics" element={<DashboardLayout><TestAnalyticsOverview /></DashboardLayout>} />
         <Route path="/teacher/tests/:id/questions/add" element={<DashboardLayout><AddQuestion /></DashboardLayout>} />
         <Route path="/teacher/questions/:questionId/analytics" element={<DashboardLayout><QuestionAnalytics /></DashboardLayout>} />
+        <Route path="/teacher/tests/upload-csv" element={<DashboardLayout><UploadTestCsv/></DashboardLayout>} />
+
+
+
 
         {/* Student */}
         <Route path="/student" element={<StudentLayout />}>
@@ -90,6 +120,27 @@ function App() {
           <Route path="tests" element={<StudentTests />} />
           <Route path="performance" element={<StudentPerformance />} />
           <Route path="profile" element={<StudentProfile />} />
+        </Route>
+
+        {/* Admin - Protected */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<Users />} />
+          <Route path="pending-content" element={<PendingContent />} />
+          <Route path="teachers" element={<TeacherApproval />} />
+          <Route path="payments" element={<Payments />} />
+          <Route path="news" element={<News />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="blogs" element={<Blogs/>}/>
+          <Route path="create-admin" element={<CreateAdmin />} />
         </Route>
 
         {/* Fallback */}

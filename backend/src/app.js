@@ -21,13 +21,15 @@ app.use(helmet());
 app.use(cors({
   origin: [
     "http://localhost:5173",
+    "http://localhost:5174",
     "https://lms-project-tnhd.onrender.com"
   ],
-  credentials: true
+  credentials: true,
+  
 }));
 app.use(apiLimiter);
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(express.json({ limit: "10mb" })); 
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(requestLogger);
 
 // Health check

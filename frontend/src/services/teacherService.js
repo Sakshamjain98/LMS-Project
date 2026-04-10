@@ -382,3 +382,11 @@ export const updateTeacherProfile = async (data) => {
     throw err?.response?.data || { message: "Profile update failed" };
   }
 };
+
+
+export const uploadTestCSV = async (formData) => {
+  const res = await api.post("/teacher/tests/upload-csv", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};

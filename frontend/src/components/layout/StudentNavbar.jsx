@@ -58,14 +58,16 @@ export default function StudentNavbar() {
           onClick={handleLogoClick}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          {/* Your logo image/icon goes here */}
-          
-          {/* Subscription Badge - Now visible and uses "Subscribed" */}
-          <div className="ml-2">
+
+
+          {/* Subscription Badge */}
+          {/* <div className="ml-2">
             {isSubscribed ? (
               <div className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 rounded-full border border-yellow-500/30">
                 <Crown size={14} className="text-yellow-500" />
-                <span className="text-xs font-medium text-yellow-500">Subscribed</span>
+                <span className="text-xs font-medium text-yellow-500">
+                  {subscriptionPlan === "PREMIUM" ? "Premium" : subscriptionPlan}
+                </span>
               </div>
             ) : (
               <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-500/20 rounded-full border border-gray-500/30">
@@ -73,14 +75,29 @@ export default function StudentNavbar() {
                 <span className="text-xs font-medium text-gray-400">Free</span>
               </div>
             )}
-          </div>
+          </div> */}
         </button>
 
         <div className="flex items-center gap-4">
           <div className="relative flex items-center">
-          
+            <button
+              onClick={handleSubscriptionClick}
+              className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${isSubscribed
+                  ? "bg-yellow-500/20 text-yellow-500 border border-yellow-500/40"
+                  : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                }`}
+              title={isSubscribed ? `${subscriptionPlan} Plan Active` : "Upgrade to Premium"}
+            >
+              {isSubscribed ? <Crown size={16} /> : <Star size={16} />}
+            </button>
 
-           
+            {showSubscriptionMenu && isSubscribed && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-dark-300 border border-white/10 rounded-lg shadow-2xl p-3 z-50">
+                <p className="text-sm text-white font-medium text-center">
+                  You have the <span className="text-yellow-500">{subscriptionPlan}</span> plan! 🎉
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="relative">

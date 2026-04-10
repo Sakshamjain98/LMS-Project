@@ -108,6 +108,8 @@ export default function Sidebar() {
   const testSubmenu = [
     { to: "/teacher/tests", icon: <ListChecks size={16} />, label: "All Tests" },
     { to: "/teacher/tests/create", icon: <PlusSquare size={16} />, label: "Create Test" },
+    { to: "/teacher/tests/upload-csv", icon: <Upload size={16} />, label: "Upload Test CSV" }, 
+    
   ];
 
   return (
@@ -226,45 +228,46 @@ export default function Sidebar() {
           </NavLink>
 
           {/* Tests Dropdown */}
-          <div className="space-y-2">
-            <button
-              onClick={() => setOpenTests((prev) => !prev)}
-              className={`${baseClass} ${inactiveClass} justify-between`}
-              title={collapsed ? "Tests" : ""}
-            >
-              <span className="flex items-center gap-3">
-                <FileText size={18} />
-                <span className={textHidden}>Tests</span>
-              </span>
-              {!collapsed &&
-                (openTests ? (
-                  <ChevronDown size={16} />
-                ) : (
-                  <ChevronRight size={16} />
-                ))}
-            </button>
 
-            {/* Test Submenu */}
-            {openTests && (
-              <div className={`${collapsed ? "ml-0" : "ml-4 border-l border-dark-100 pl-3"} space-y-2`}>
-                {testSubmenu.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === "/teacher/tests"}
-                    onClick={handleNavClick}
-                    className={({ isActive }) =>
-                      `${baseClass} text-xs ${isActive ? activeClass : inactiveClass}`
-                    }
-                    title={collapsed ? item.label : ""}
-                  >
-                    <span className="flex-shrink-0">{item.icon}</span>
-                    <span className={textHidden}>{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
+<div className="space-y-2">
+  <button
+    onClick={() => setOpenTests((prev) => !prev)}
+    className={`${baseClass} ${inactiveClass} justify-between`}
+    title={collapsed ? "Tests" : ""}
+  >
+    <span className="flex items-center gap-3">
+      <FileText size={18} />
+      <span className={textHidden}>Tests</span>
+    </span>
+    {!collapsed &&
+      (openTests ? (
+        <ChevronDown size={16} />
+      ) : (
+        <ChevronRight size={16} />
+      ))}
+  </button>
+
+  {/* Test Submenu */}
+  {openTests && (
+    <div className={`${collapsed ? "ml-0" : "ml-4 border-l border-dark-100 pl-3"} space-y-2`}>
+      {testSubmenu.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.to === "/teacher/tests"}
+          onClick={handleNavClick}
+          className={({ isActive }) =>
+            `${baseClass} text-xs ${isActive ? activeClass : inactiveClass}`
+          }
+          title={collapsed ? item.label : ""}
+        >
+          <span className="flex-shrink-0">{item.icon}</span>
+          <span className={textHidden}>{item.label}</span>
+        </NavLink>
+      ))}
+    </div>
+  )}
+</div>
         </nav>
 
         {/* Bottom Section - Profile & Logout */}

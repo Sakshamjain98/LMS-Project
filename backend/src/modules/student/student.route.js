@@ -8,7 +8,6 @@ const router = express.Router();
 
 
 router.use(authMiddleware);
-
 router.use(authorize("student"));
 router.get("/dashboard", controller.dashboard);
 router.get("/profile", controller.profile);
@@ -25,7 +24,6 @@ router.get("/notes/:id", controller.getNoteDetails);
 router.get("/paid/notes", checkCourseAccess, controller.paidNotes); 
 router.get("/paid/courses", checkCourseAccess, controller.paidCourses);
 router.get("/tests", controller.getAvailableTests);
-
 
 
 export default router;

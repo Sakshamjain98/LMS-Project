@@ -3,6 +3,7 @@ import * as controller from "./teacher.controller.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { upload } from "../../middlewares/upload.middleware.js";
+
 import * as analyticsController from "../analytics/analytics.controller.js";
 
 const router = express.Router();
@@ -128,5 +129,11 @@ router.get(
 
 // ========== PERFORMANCE ==========
 router.get("/performance", controller.studentPerformance);
+
+router.post(
+  "/tests/upload-csv",
+  upload.single("file"), // Middleware to handle file uploads
+  controller.createTestFromCSV
+);
 
 export default router;

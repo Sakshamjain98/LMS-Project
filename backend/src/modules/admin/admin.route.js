@@ -20,6 +20,7 @@ router.get("/payments", controller.payments);
 router.put("/payments/:id/refund", controller.refund);
 router.post("/cms/blog", controller.createBlog);
 router.delete("/cms/blog/:id", controller.deleteBlog);
+router.get("/blogs", controller.getBlogs);
 router.get("/teachers/pending", controller.pendingTeachers);
 router.put("/teachers/:id/approve", controller.approveTeacher);
 
