@@ -174,13 +174,47 @@ export const publishTest = async (testId, payload, teacherId) => {
 /**
  * Get teacher's tests
  */
-export const getTeacherTests = async (teacherId) => {
+export const getTeacherTests = async (teacherId, query = {}) => {
   const objTeacherId = validateUserId(teacherId);
 
-  return Test.find({ teacherId: objTeacherId })
-    .select("title description status totalMarks questions duration createdAt")
-    .sort({ createdAt: -1 })
-    .lean();
+  const page = Math.max(parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
+  const skip = (page - 1) * limit;
+  const search = query.search?.trim();
+  const status = query.status?.trim();
+
+  const filter = { teacherId: objTeacherId };
+  if (status) {
+    filter.status = status;
+  }
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const [tests, total] = await Promise.all([
+    Test.find(filter)
+      .select("title description status totalMarks questions duration createdAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Test.countDocuments(filter),
+  ]);
+
+  return {
+    tests,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
+    },
+  };
 };
 
 /**

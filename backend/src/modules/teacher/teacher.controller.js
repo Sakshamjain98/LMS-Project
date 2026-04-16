@@ -2,6 +2,7 @@
 
 import {
   getDashboardData,
+  getTeacherUiSettings,
   getProfile,
   updateProfile,
   createCourse,
@@ -38,6 +39,15 @@ export const dashboard = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: stats,
+  });
+});
+
+export const getUiSettings = asyncHandler(async (req, res) => {
+  const settings = await getTeacherUiSettings();
+
+  res.json({
+    success: true,
+    settings,
   });
 });
 
@@ -350,11 +360,11 @@ export const deleteNote = asyncHandler(async (req, res) => {
 
 // ================= TESTS =================
 export const listTests = asyncHandler(async (req, res) => {
-  const tests = await testService.getTeacherTests(req.user._id);
+  const result = await testService.getTeacherTests(req.user._id, req.query);
 
   res.json({
     success: true,
-    tests,
+    ...result,
   });
 });
 
@@ -489,42 +499,115 @@ export const createTestFromCSV = async (req, res, next) => {
   try {
     if (!req.file) throw new ApiError(400, "No CSV file uploaded");
 
-    const questions = [];
+    const parsedQuestions = [];
     const response = await axios.get(req.file.path, { responseType: 'stream' });
 
-    // Define the exact header names expected from the CSV
-    const requiredHeaders = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'answer', 'marks'];
+    // Core required headers, while other fields are optional.
+    const requiredHeaders = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'answer'];
+
+    const parseCorrectOptionIndex = (answerValue, options) => {
+      const raw = (answerValue || "").toString().trim();
+
+      // Accept 1-based numeric values (1-4)
+      const numeric = Number(raw);
+      if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= options.length) {
+        return numeric - 1;
+      }
+
+      // Accept letters (A-D)
+      const upper = raw.toUpperCase();
+      const letterIndex = ["A", "B", "C", "D"].indexOf(upper);
+      if (letterIndex >= 0 && letterIndex < options.length) {
+        return letterIndex;
+      }
+
+      // Accept exact option text
+      const textIndex = options.findIndex((opt) => opt.text.toLowerCase() === raw.toLowerCase());
+      if (textIndex >= 0) {
+        return textIndex;
+      }
+
+      return -1;
+    };
 
     response.data
       .pipe(csv())
       .on('data', (row) => {
-        // Validate headers for the current row
+        const normalized = Object.fromEntries(
+          Object.entries(row).map(([k, v]) => [k.trim(), typeof v === 'string' ? v.trim() : v])
+        );
+
         const isValid = requiredHeaders.every(field => 
-          Object.prototype.hasOwnProperty.call(row, field) && row[field]?.trim() !== ""
+          Object.prototype.hasOwnProperty.call(normalized, field) && normalized[field] !== ""
         );
 
         if (!isValid) {
-          // Destroying the stream triggers the 'error' event below
           response.data.destroy(new Error("Invalid CSV format. Please ensure all columns (question, optionA, etc.) are present and not empty."));
         } else {
-          questions.push(row);
+          const options = [
+            { text: normalized.optionA, isCorrect: false },
+            { text: normalized.optionB, isCorrect: false },
+            { text: normalized.optionC, isCorrect: false },
+            { text: normalized.optionD, isCorrect: false },
+          ];
+
+          const correctOptionIndex = parseCorrectOptionIndex(normalized.answer, options);
+
+          if (correctOptionIndex < 0) {
+            response.data.destroy(new Error(`Invalid answer value '${normalized.answer}'. Use 1-4, A-D, or exact option text.`));
+            return;
+          }
+
+          options[correctOptionIndex].isCorrect = true;
+
+          const marks = Number(normalized.marks);
+          const negativeMarks = Number(normalized.negativeMarks);
+          const difficulty = ["easy", "medium", "hard"].includes((normalized.difficulty || "").toLowerCase())
+            ? normalized.difficulty.toLowerCase()
+            : "medium";
+
+          parsedQuestions.push({
+            questionText: normalized.question,
+            questionType: "MCQ",
+            options,
+            correctOptionIndex,
+            marks: Number.isFinite(marks) && marks > 0 ? marks : 1,
+            negativeMarks: Number.isFinite(negativeMarks) && negativeMarks >= 0 ? negativeMarks : 0,
+            difficulty,
+            explanation: normalized.explanation || "",
+            tags: (normalized.tags || "")
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          });
         }
       })
       .on('end', async () => {
-        if (questions.length === 0) {
+        if (parsedQuestions.length === 0) {
           return res.status(400).json({ success: false, message: "CSV file is empty." });
         }
 
-        // Logic to save questions to DB would go here
-        // e.g., await teacherService.bulkCreateQuestions(questions, req.body.testId, req.user._id);
+        const testPayload = {
+          title: (req.body.title || "CSV Imported Test").toString().trim() || "CSV Imported Test",
+          description: (req.body.description || "").toString().trim(),
+          duration: Number(req.body.duration) > 0 ? Number(req.body.duration) : 60,
+          passingMarks: Number(req.body.passingMarks) >= 0 ? Number(req.body.passingMarks) : 0,
+          isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
+        };
+
+        const createdTest = await createTest(testPayload, req.user._id);
+        const createdQuestions = await bulkCreateQuestions(parsedQuestions, createdTest._id, req.user._id);
 
         res.status(200).json({ 
           success: true, 
-          message: `Successfully processed ${questions.length} questions.` 
+          message: `Successfully created '${createdTest.title}' with ${createdQuestions.length} questions.`,
+          data: {
+            testId: createdTest._id,
+            questionsImported: createdQuestions.length,
+          },
         });
       })
       .on('error', (err) => {
-        // This handles the error gracefully and prevents the 'nodemon app crashed' error
         console.error("CSV Processing Error:", err.message);
         res.status(400).json({ success: false, message: err.message });
       });

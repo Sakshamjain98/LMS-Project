@@ -1,27 +1,60 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getPendingTeachers, approveTeacher } from "../../services/adminService";
-import { CheckCircle, UserCheck, Calendar, Mail, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle, UserCheck, Calendar, Mail, Loader2, ShieldCheck, Search } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function TeacherApproval() {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [limit]);
 
   useEffect(() => {
     fetchTeachers();
-  }, []);
+  }, [debouncedSearch, page, limit]);
 
   const fetchTeachers = async () => {
     try {
-      const res = await getPendingTeachers();
+      setLoading(true);
+      const res = await getPendingTeachers({ search: debouncedSearch, page, limit });
       setTeachers(res.teachers || []);
+      setPagination(res.pagination || pagination);
     } catch (error) {
       toast.error("Failed to load pending teachers");
     } finally {
       setLoading(false);
     }
   };
+
+  const summaryText = useMemo(() => {
+    if (!pagination.total) return "No requests found";
+    const start = (pagination.page - 1) * pagination.limit + 1;
+    const end = Math.min(pagination.page * pagination.limit, pagination.total);
+    return `Showing ${start}-${end} of ${pagination.total}`;
+  }, [pagination]);
 
   const handleApprove = async (teacherId) => {
     setProcessingId(teacherId);
@@ -57,8 +90,20 @@ export default function TeacherApproval() {
           <p className="text-grayCustom-medium text-sm font-medium">Review and verify professional teacher credentials.</p>
         </div>
         <div className="bg-dark-200 border border-dark-100 px-4 py-2 rounded-xl">
-          <span className="text-brand-primary font-bold text-xl">{teachers.length}</span>
+          <span className="text-brand-primary font-bold text-xl">{pagination.total || 0}</span>
           <span className="text-grayCustom-medium text-xs font-bold uppercase tracking-widest ml-2">Pending</span>
+        </div>
+      </div>
+
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-wrap gap-3 items-center">
+        <div className="relative min-w-70 flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grayCustom-medium w-4 h-4" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search teachers by name or email"
+            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-grayCustom-medium/70 focus:outline-none focus:ring-2 focus:ring-brand-primary/60"
+          />
         </div>
       </div>
 
@@ -120,6 +165,39 @@ export default function TeacherApproval() {
           ))}
         </div>
       )}
+
+      <div className="border border-white/10 px-4 py-3 flex flex-col gap-3 bg-dark-300/30 rounded-xl sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-gray-400">{summaryText}</p>
+        <div className="flex items-center justify-end gap-2">
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+          >
+            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
+            <option value={15}>15 / page</option>
+            <option value={20}>20 / page</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={!pagination.hasPrevPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-white/80">{pagination.page}/{pagination.totalPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={!pagination.hasNextPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

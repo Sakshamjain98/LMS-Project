@@ -9,6 +9,12 @@ router.use(authorize("admin"));
 
 // Existing routes
 router.post("/create", controller.createAdmin);
+router.get("/admins", controller.getAdmins);
+router.put("/admins/:id", controller.updateAdmin);
+router.delete("/admins/:id", controller.deleteAdmin);
+router.get("/profile", controller.getAdminProfile);
+router.put("/profile", controller.updateAdminProfile);
+router.put("/change-password", controller.changeAdminPassword);
 router.get("/dashboard", controller.dashboard);
 router.get("/users", controller.users);
 router.put("/users/:id/role", controller.updateRole);
@@ -19,6 +25,7 @@ router.delete("/content/course/:id/reject", controller.rejectCourse); // now sof
 router.get("/payments", controller.payments);
 router.put("/payments/:id/refund", controller.refund);
 router.post("/cms/blog", controller.createBlog);
+router.put("/cms/blog/:id", controller.updateBlog);
 router.delete("/cms/blog/:id", controller.deleteBlog);
 router.get("/blogs", controller.getBlogs);
 router.get("/teachers/pending", controller.pendingTeachers);
@@ -48,5 +55,9 @@ router.get("/analytics/revenue", controller.getRevenueAnalytics);
 router.get("/analytics/users", controller.getUserAnalytics);
 router.get("/analytics/tests", controller.getTestAnalytics);
 router.get("/analytics/courses", controller.getCourseAnalytics);
+
+// -------------------- Teacher Feature Settings --------------------
+router.get("/settings/teacher", controller.getTeacherSettings);
+router.put("/settings/teacher", controller.updateTeacherSettings);
 
 export default router;

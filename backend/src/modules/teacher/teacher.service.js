@@ -4,18 +4,42 @@ import User from "../../models/user.model.js";
 import Test from "../test/test.model.js";
 import TestConfig from "../../models/testConfig.model.js";
 import QuestionAnalytics from "../../models/questionAnalysis.model.js";
+import PlatformSettings, { DEFAULT_TEACHER_SETTINGS } from "../../models/platformSettings.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import Question from "../../models/question.model.js";
+
+export const getTeacherUiSettings = async () => {
+  const settings = await PlatformSettings.findOne({ key: "singleton" }).lean();
+
+  if (!settings) {
+    return DEFAULT_TEACHER_SETTINGS;
+  }
+
+  return {
+    teacherVisibility: {
+      ...DEFAULT_TEACHER_SETTINGS.teacherVisibility,
+      ...(settings.teacherVisibility || {}),
+    },
+    teacherDashboardStats: {
+      ...DEFAULT_TEACHER_SETTINGS.teacherDashboardStats,
+      ...(settings.teacherDashboardStats || {}),
+    },
+  };
+};
+
 export const getDashboardData = async (teacherId) => {
-  const [myCourses, blogs] = await Promise.all([
+  const [myCourses, blogs, uiSettings] = await Promise.all([
     Course.find({ educator: teacherId }).limit(10),
     Blog.find({ author: teacherId, published: true }).limit(5),
+    getTeacherUiSettings(),
   ]);
+
   return {
     totalCourses: myCourses.length,
     myCourses,
     blogs,
+    uiSettings,
   };
 };
 

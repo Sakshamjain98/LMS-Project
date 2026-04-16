@@ -16,6 +16,8 @@ import {
   Eye,
   User,
 } from "lucide-react";
+import { getTeacherUiSettings } from "../../services/teacherService";
+import { DEFAULT_TEACHER_UI_SETTINGS, mergeTeacherUiSettings } from "../../constants/teacherUiDefaults";
 
 export default function Sidebar() {
   const location = useLocation();
@@ -39,6 +41,47 @@ export default function Sidebar() {
     }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [uiSettings, setUiSettings] = useState(DEFAULT_TEACHER_UI_SETTINGS);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await getTeacherUiSettings();
+        const merged = mergeTeacherUiSettings(res.settings);
+        setUiSettings(merged);
+        localStorage.setItem("teacherUiSettings", JSON.stringify(merged));
+      } catch {
+        const cached = localStorage.getItem("teacherUiSettings");
+        if (cached) {
+          try {
+            setUiSettings(mergeTeacherUiSettings(JSON.parse(cached)));
+          } catch {
+            setUiSettings(DEFAULT_TEACHER_UI_SETTINGS);
+          }
+        }
+      }
+    };
+
+    loadSettings();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key === "teacherUiSettingsUpdatedAt") {
+        const cached = localStorage.getItem("teacherUiSettings");
+        if (cached) {
+          try {
+            setUiSettings(mergeTeacherUiSettings(JSON.parse(cached)));
+          } catch {
+            setUiSettings(DEFAULT_TEACHER_UI_SETTINGS);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("sidebarCollapsed", JSON.stringify(collapsed));
@@ -112,6 +155,8 @@ export default function Sidebar() {
     
   ];
 
+  const { notesEnabled, uploadEnabled, testsEnabled } = uiSettings.teacherVisibility;
+
   return (
     <>
       {/* Overlay */}
@@ -160,13 +205,14 @@ export default function Sidebar() {
             }
             title={collapsed ? "Dashboard" : ""}
           >
-            <span className="flex-shrink-0 flex items-center justify-center">
+            <span className="shrink-0 flex items-center justify-center">
               <LayoutDashboard size={18} />
             </span>
             <span className={textHidden}>Dashboard</span>
           </NavLink>
 
           {/* Upload Content Dropdown */}
+          {uploadEnabled && (
           <div className="space-y-2">
             <button
               onClick={() => setOpenUpload(!openUpload)}
@@ -203,7 +249,7 @@ export default function Sidebar() {
                       title={collapsed ? subitem.label : disabled ? "Complete previous step to unlock" : ""}
                       aria-disabled={disabled}
                     >
-                      <span className="flex-shrink-0">{subitem.icon}</span>
+                      <span className="shrink-0">{subitem.icon}</span>
                       <span className={textHidden}>{subitem.label}</span>
                     </NavLink>
                   );
@@ -211,8 +257,10 @@ export default function Sidebar() {
               </div>
             )}
           </div>
+          )}
 
           {/* Notes */}
+          {notesEnabled && (
           <NavLink
             to="/teacher/notes"
             onClick={handleNavClick}
@@ -221,14 +269,15 @@ export default function Sidebar() {
             }
             title={collapsed ? "Notes" : ""}
           >
-            <span className="flex-shrink-0 flex items-center justify-center">
+            <span className="shrink-0 flex items-center justify-center">
               <NotepadText size={18} />
             </span>
             <span className={textHidden}>Notes</span>
           </NavLink>
+          )}
 
           {/* Tests Dropdown */}
-
+{testsEnabled && (
 <div className="space-y-2">
   <button
     onClick={() => setOpenTests((prev) => !prev)}
@@ -261,13 +310,14 @@ export default function Sidebar() {
           }
           title={collapsed ? item.label : ""}
         >
-          <span className="flex-shrink-0">{item.icon}</span>
+          <span className="shrink-0">{item.icon}</span>
           <span className={textHidden}>{item.label}</span>
         </NavLink>
       ))}
     </div>
   )}
 </div>
+)}
         </nav>
 
         {/* Bottom Section - Profile & Logout */}

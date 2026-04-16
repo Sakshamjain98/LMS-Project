@@ -9,6 +9,15 @@ export const getTeacherDashboard = async () => {
   }
 };
 
+export const getTeacherUiSettings = async () => {
+  try {
+    const response = await api.get("/teacher/ui-settings");
+    return response.data;
+  } catch (error) {
+    throw error?.response?.data || { message: "Unable to load UI settings" };
+  }
+};
+
 export const createCourse = async (formData) => {
   try {
     const res = await api.post("/teacher/courses", formData, {
@@ -219,9 +228,9 @@ export const deleteNote = async (id) => {
 };
 
 // ================= TESTS =================
-export const getTeacherTests = async () => {
+export const getTeacherTests = async (params = {}) => {
   try {
-    const res = await api.get("/teacher/tests");
+    const res = await api.get("/teacher/tests", { params });
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Fetch tests failed" };

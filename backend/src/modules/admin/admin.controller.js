@@ -18,6 +18,37 @@ export const createAdmin = asyncHandler(async (req, res) => {
   });
 });
 
+export const getAdmins = asyncHandler(async (req, res) => {
+  const result = await service.getAdmins(req.query);
+  res.json({ success: true, ...result });
+});
+
+export const updateAdmin = asyncHandler(async (req, res) => {
+  const admin = await service.updateAdminInfo(req.params.id, req.body);
+  res.json({ success: true, message: "Admin updated successfully", admin });
+});
+
+export const deleteAdmin = asyncHandler(async (req, res) => {
+  await service.deleteAdminById(req.params.id, req.user._id);
+  res.json({ success: true, message: "Admin deleted successfully" });
+});
+
+export const getAdminProfile = asyncHandler(async (req, res) => {
+  const profile = await service.getAdminProfile(req.user._id);
+  res.json({ success: true, profile });
+});
+
+export const updateAdminProfile = asyncHandler(async (req, res) => {
+  const profile = await service.updateAdminProfile(req.user._id, req.body || {});
+  res.json({ success: true, message: "Profile updated successfully", profile });
+});
+
+export const changeAdminPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  await service.changeAdminPassword(req.user._id, { currentPassword, newPassword });
+  res.json({ success: true, message: "Password changed successfully" });
+});
+
 // -------------------- Dashboard --------------------
 export const dashboard = asyncHandler(async (req, res) => {
   const data = await service.getAdminDashboard();
@@ -26,8 +57,8 @@ export const dashboard = asyncHandler(async (req, res) => {
 
 // -------------------- User Management --------------------
 export const users = asyncHandler(async (req, res) => {
-  const users = await service.getAllUsers(req.query);
-  res.json({ success: true, users });
+  const result = await service.getAllUsers(req.query);
+  res.json({ success: true, ...result });
 });
 
 export const updateRole = asyncHandler(async (req, res) => {
@@ -42,8 +73,8 @@ export const removeUser = asyncHandler(async (req, res) => {
 
 // -------------------- Pending Content --------------------
 export const pendingContent = asyncHandler(async (req, res) => {
-  const content = await service.getPendingContent();
-  res.json({ success: true, content });
+  const result = await service.getPendingContent(req.query);
+  res.json({ success: true, ...result });
 });
 
 // -------------------- Course Approval / Rejection --------------------
@@ -59,8 +90,8 @@ export const rejectCourse = asyncHandler(async (req, res) => {
 
 // -------------------- Payment Management --------------------
 export const payments = asyncHandler(async (req, res) => {
-  const payments = await service.getAllPayments();
-  res.json({ success: true, payments });
+  const result = await service.getAllPayments(req.query);
+  res.json({ success: true, ...result });
 });
 
 export const refund = asyncHandler(async (req, res) => {
@@ -74,6 +105,11 @@ export const createBlog = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Blog created", blog });
 });
 
+export const updateBlog = asyncHandler(async (req, res) => {
+  const blog = await service.updateBlog(req.params.id, req.body);
+  res.json({ success: true, message: "Blog updated", blog });
+});
+
 export const deleteBlog = asyncHandler(async (req, res) => {
   await service.deleteBlog(req.params.id);
   res.json({ success: true, message: "Blog deleted" });
@@ -81,8 +117,8 @@ export const deleteBlog = asyncHandler(async (req, res) => {
 
 // -------------------- Teacher Approval --------------------
 export const pendingTeachers = asyncHandler(async (req, res) => {
-  const teachers = await service.getPendingTeachers();
-  res.json({ success: true, teachers });
+  const result = await service.getPendingTeachers(req.query);
+  res.json({ success: true, ...result });
 });
 
 export const approveTeacher = asyncHandler(async (req, res) => {
@@ -107,8 +143,8 @@ export const deleteNews = asyncHandler(async (req, res) => {
 });
 
 export const getAllNews = asyncHandler(async (req, res) => {
-  const news = await service.getAllNews(req.query);
-  res.json({ success: true, news });
+  const result = await service.getAllNews(req.query);
+  res.json({ success: true, ...result });
 });
 
 export const getNewsById = asyncHandler(async (req, res) => {
@@ -180,21 +216,24 @@ export const getCourseAnalytics = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+export const getTeacherSettings = asyncHandler(async (req, res) => {
+  const settings = await service.getTeacherSettings();
+  res.json({ success: true, settings });
+});
+
+export const updateTeacherSettings = asyncHandler(async (req, res) => {
+  const settings = await service.updateTeacherSettings(req.body || {});
+  res.json({ success: true, message: "Teacher settings updated", settings });
+});
+
 
 
 export const getBlogs = asyncHandler(async (req, res) => {
-  const { published } = req.query; // Optional filter for published blogs
-  const filter = {};
-
-  if (published !== undefined) {
-    filter.published = published === "true";
-  }
-
-  const blogs = await service.getBlogs(filter);
+  const result = await service.getBlogs(req.query);
 
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: "Blogs fetched successfully",
-    blogs,
+    ...result,
   });
 });

@@ -20,6 +20,7 @@ import TestAnalyticsOverview from "./pages/teacher/TestAnalyticsOverview";
 import QuestionAnalytics from "./pages/teacher/QuestionAnalytics";
 import AddQuestion from "./pages/teacher/AddQuestion";
 import EditCourseCurriculum from "./pages/teacher/EditCourseCurriculum";
+import TeacherProfile from "./pages/teacher/Profile";
 
 /* Upload Content Pages */
 import CourseBasics from "./pages/teacher/upload/CourseBasics";
@@ -27,6 +28,7 @@ import Curriculum from "./pages/teacher/upload/Curriculum";
 import Finalize from "./pages/teacher/upload/Finalize";
 import Success from "./pages/teacher/upload/Success";
 import UploadContextProvider from "./pages/teacher/upload/UploadContextProvider";
+import TeacherFeatureGate from "./components/teacher/TeacherFeatureGate";
 
 /* Student Pages */
 import StudentDashboard from "./pages/student/StudentDashboard";
@@ -54,6 +56,8 @@ import TeacherApproval from "./pages/admin/TeacherApproval";
 import Analytics from "./pages/admin/Analytics";
 import Blogs from "./pages/admin/Blog";
 import CreateAdmin from "./pages/admin/CreateAdmin"
+import TeacherVisibilitySettings from "./pages/admin/TeacherVisibilitySettings";
+import AdminProfile from "./pages/admin/Profile";
 import UploadTestCsv from "./pages/teacher/UploadTestCsv"
 
 // Simple admin route guard using localStorage
@@ -87,26 +91,29 @@ function App() {
         <Route path="/teacher/courses/:courseId/edit-curriculum" element={<UploadContextProvider><DashboardLayout><EditCourseCurriculum /></DashboardLayout></UploadContextProvider>} />
 
         {/* Upload Content */}
-        <Route path="/teacher/upload/basics" element={<UploadContextProvider><DashboardLayout><CourseBasics /></DashboardLayout></UploadContextProvider>} />
-        <Route path="/teacher/upload/curriculum" element={<UploadContextProvider><DashboardLayout><Curriculum /></DashboardLayout></UploadContextProvider>} />
-        <Route path="/teacher/upload/finalize" element={<UploadContextProvider><DashboardLayout><Finalize /></DashboardLayout></UploadContextProvider>} />
-        <Route path="/teacher/upload/success" element={<UploadContextProvider><DashboardLayout><Success /></DashboardLayout></UploadContextProvider>} />
+        <Route path="/teacher/upload/basics" element={<TeacherFeatureGate featureKey="uploadEnabled"><UploadContextProvider><DashboardLayout><CourseBasics /></DashboardLayout></UploadContextProvider></TeacherFeatureGate>} />
+        <Route path="/teacher/upload/curriculum" element={<TeacherFeatureGate featureKey="uploadEnabled"><UploadContextProvider><DashboardLayout><Curriculum /></DashboardLayout></UploadContextProvider></TeacherFeatureGate>} />
+        <Route path="/teacher/upload/finalize" element={<TeacherFeatureGate featureKey="uploadEnabled"><UploadContextProvider><DashboardLayout><Finalize /></DashboardLayout></UploadContextProvider></TeacherFeatureGate>} />
+        <Route path="/teacher/upload/success" element={<TeacherFeatureGate featureKey="uploadEnabled"><UploadContextProvider><DashboardLayout><Success /></DashboardLayout></UploadContextProvider></TeacherFeatureGate>} />
 
         {/* Add Section to Existing Course */}
-        <Route path="/teacher/courses/:courseId/add-section" element={<UploadContextProvider><DashboardLayout><Curriculum /></DashboardLayout></UploadContextProvider>} />
+        <Route path="/teacher/courses/:courseId/add-section" element={<TeacherFeatureGate featureKey="uploadEnabled"><UploadContextProvider><DashboardLayout><Curriculum /></DashboardLayout></UploadContextProvider></TeacherFeatureGate>} />
 
         {/* Notes */}
-        <Route path="/teacher/notes" element={<DashboardLayout><Notes /></DashboardLayout>} />
+        <Route path="/teacher/notes" element={<TeacherFeatureGate featureKey="notesEnabled"><DashboardLayout><Notes /></DashboardLayout></TeacherFeatureGate>} />
+
+        {/* Teacher Profile */}
+        <Route path="/teacher/profile" element={<DashboardLayout><TeacherProfile /></DashboardLayout>} />
 
         {/* Tests */}
-        <Route path="/teacher/tests" element={<DashboardLayout><Tests /></DashboardLayout>} />
-        <Route path="/teacher/tests/create" element={<DashboardLayout><CreateTest /></DashboardLayout>} />
-        <Route path="/teacher/tests/:id" element={<DashboardLayout><TestDetails /></DashboardLayout>} />
-        <Route path="/teacher/tests/:id/analytics" element={<DashboardLayout><TestAnalytics /></DashboardLayout>} />
-        <Route path="/teacher/tests/analytics" element={<DashboardLayout><TestAnalyticsOverview /></DashboardLayout>} />
-        <Route path="/teacher/tests/:id/questions/add" element={<DashboardLayout><AddQuestion /></DashboardLayout>} />
-        <Route path="/teacher/questions/:questionId/analytics" element={<DashboardLayout><QuestionAnalytics /></DashboardLayout>} />
-        <Route path="/teacher/tests/upload-csv" element={<DashboardLayout><UploadTestCsv/></DashboardLayout>} />
+        <Route path="/teacher/tests" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><Tests /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/create" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><CreateTest /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/:id" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><TestDetails /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/:id/analytics" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><TestAnalytics /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/analytics" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><TestAnalyticsOverview /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/:id/questions/add" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><AddQuestion /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/questions/:questionId/analytics" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><QuestionAnalytics /></DashboardLayout></TeacherFeatureGate>} />
+        <Route path="/teacher/tests/upload-csv" element={<TeacherFeatureGate featureKey="testsEnabled"><DashboardLayout><UploadTestCsv/></DashboardLayout></TeacherFeatureGate>} />
 
 
 
@@ -140,7 +147,9 @@ function App() {
           <Route path="news" element={<News />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="blogs" element={<Blogs/>}/>
+          <Route path="profile" element={<AdminProfile />} />
           <Route path="create-admin" element={<CreateAdmin />} />
+          <Route path="educator-controls" element={<TeacherVisibilitySettings />} />
         </Route>
 
         {/* Fallback */}

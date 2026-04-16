@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { uploadTestCSV } from "../../services/teacherService";
 import toast from "react-hot-toast";
-import { Upload, Loader2, ChevronLeft, FileSpreadsheet, AlertCircle, Info, CheckCircle2 } from "lucide-react";
+import { Upload, Loader2, ChevronLeft, FileSpreadsheet, Info, CheckCircle2, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function UploadTestCSV() {
   const navigate = useNavigate();
   const [file, setFile] = useState(null);
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    duration: 60,
+    passingMarks: 0,
+  });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -15,6 +21,10 @@ export default function UploadTestCSV() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("title", form.title.trim() || "CSV Imported Test");
+    formData.append("description", form.description.trim());
+    formData.append("duration", String(form.duration || 60));
+    formData.append("passingMarks", String(form.passingMarks || 0));
 
     try {
       setLoading(true);
@@ -30,8 +40,8 @@ export default function UploadTestCSV() {
   };
 
   return (
-    <div className="min-h-screen bg-dark-300 text-white">
-      <div className="max-w-2xl mx-auto px-4 pb-12 space-y-8 pt-8">
+    <div className="bg-dark-300 text-white">
+      <div className="mx-auto max-w-4xl px-4 pb-6 space-y-5 pt-6">
         {/* Navigation */}
         <div className="flex items-center gap-3">
           <button
@@ -44,7 +54,7 @@ export default function UploadTestCSV() {
         </div>
 
         {/* Page Header */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <h1 className="text-4xl font-extrabold text-white tracking-tight">
             Upload Test CSV
           </h1>
@@ -54,13 +64,67 @@ export default function UploadTestCSV() {
         </div>
 
         {/* Main Form Container */}
-        <div className="bg-dark-200 border border-dark-100 rounded-2xl p-8 shadow-2xl space-y-8">
+        <div className="bg-dark-200 border border-dark-100 rounded-2xl p-6 shadow-2xl space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Test Title
+              </label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g. Physics Unit Test"
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Duration (minutes)
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={form.duration}
+                onChange={(e) => setForm((prev) => ({ ...prev, duration: Number(e.target.value) || 60 }))}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Passing Marks
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.passingMarks}
+                onChange={(e) => setForm((prev) => ({ ...prev, passingMarks: Number(e.target.value) || 0 }))}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Description (optional)
+              </label>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none resize-none"
+                placeholder="A short summary for this test"
+              />
+            </div>
+          </div>
+
           <div className="space-y-4">
             <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1">
               Select Assessment File
             </label>
             
-            <div className={`relative border-2 border-dashed rounded-2xl p-12 transition-all flex flex-col items-center justify-center gap-4 ${
+            <div className={`relative border-2 border-dashed rounded-2xl p-8 transition-all flex flex-col items-center justify-center gap-3 ${
               file ? 'border-brand-primary/40 bg-brand-primary/5' : 'border-dark-100 hover:border-brand-primary/20 bg-dark-400'
             }`}>
               <input
@@ -71,7 +135,7 @@ export default function UploadTestCSV() {
               />
               
               <div className={`p-4 rounded-2xl ${file ? 'bg-brand-primary text-dark-300' : 'bg-dark-300 text-grayCustom-medium'} transition-colors shadow-xl`}>
-                <FileSpreadsheet size={40} />
+                <FileSpreadsheet size={32} />
               </div>
               
               <div className="text-center">
@@ -102,8 +166,16 @@ export default function UploadTestCSV() {
                 CSV Data Structure
               </p>
               <p className="text-blue-300/80 text-[11px] font-medium leading-relaxed font-mono">
-                question, optionA, optionB, optionC, optionD, answer, marks
+                question, optionA, optionB, optionC, optionD, answer, marks, explanation, tags, difficulty, negativeMarks
               </p>
+              <a
+                href="/sample-test-upload.csv"
+                download
+                className="inline-flex items-center gap-2 mt-2 text-xs font-bold text-blue-200 hover:text-white"
+              >
+                <Download size={14} />
+                Download Sample CSV
+              </a>
             </div>
           </div>
 
@@ -136,15 +208,6 @@ export default function UploadTestCSV() {
           </div>
         </div>
 
-        {/* Critical Note Section */}
-        <div className="bg-dark-200 border border-dark-100 rounded-2xl p-5 flex items-start gap-4">
-          <div className="p-2 bg-dark-100 rounded-lg">
-            <AlertCircle size={18} className="text-brand-primary" />
-          </div>
-          <p className="text-grayCustom-medium text-[11px] font-semibold leading-relaxed">
-            Please ensure your CSV is encoded in <span className="text-white">UTF-8</span>. Using symbols like emojis or special math characters may fail if the encoding is incorrect.
-          </p>
-        </div>
       </div>
     </div>
   );

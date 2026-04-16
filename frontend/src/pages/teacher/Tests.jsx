@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList, Clock, CheckCircle2, FileText, Trash2, BarChart3, ExternalLink, Plus, AlertCircle, Loader } from "lucide-react";
+import { ClipboardList, Clock, CheckCircle2, FileText, Trash2, BarChart3, ExternalLink, Plus, AlertCircle, Search } from "lucide-react";
 import { getTeacherTests, deleteTeacherTest } from "../../services/teacherService";
 import TestStatCard from "../../components/teacher/tests/TestStatCard";
 import TestEmptyState from "../../components/teacher/tests/TestEmptyState";
@@ -12,22 +12,61 @@ export default function Tests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, testId: null });
+  const [filters, setFilters] = useState({ search: "", status: "" });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
 
-  const fetchTests = async () => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.status, limit]);
+
+  const fetchTests = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getTeacherTests();
+      const res = await getTeacherTests({
+        search: debouncedSearch,
+        status: filters.status,
+        page,
+        limit,
+      });
       setTests(res.tests || []);
+      setPagination(
+        res.pagination || {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        }
+      );
     } catch (err) {
       setError(err.message || "Failed to load tests");
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, filters.status, page, limit]);
 
   useEffect(() => {
     fetchTests();
-  }, []);
+  }, [fetchTests]);
 
   const stats = useMemo(() => {
     const total = tests.length;
@@ -40,7 +79,9 @@ export default function Tests() {
   const handleDelete = async () => {
     try {
       await deleteTeacherTest(deleteModal.testId);
-      setTests((prev) => prev.filter((t) => t._id !== deleteModal.testId));
+      const shouldGoPrev = tests.length === 1 && pagination.page > 1;
+      setPage((prev) => (shouldGoPrev ? prev - 1 : prev));
+      fetchTests();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -75,10 +116,33 @@ export default function Tests() {
       {/* Error Alert */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
           <p className="text-red-400 text-sm font-medium">{error}</p>
         </div>
       )}
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl flex flex-wrap gap-3 items-center">
+        <div className="relative min-w-70 flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <input
+            value={filters.search}
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            placeholder="Search tests by title or description"
+            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
+          />
+        </div>
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+          className="rounded-xl border border-white/10 bg-dark-300/70 px-4 py-2.5 text-sm text-white focus:outline-none"
+        >
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="published">Published</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -107,7 +171,7 @@ export default function Tests() {
             {tests.map((test) => (
               <div
                 key={test._id}
-                className="group bg-dark-100 border border-white/5 rounded-xl p-6 hover:border-brand-primary/30 hover:bg-white/[0.02] transition-all duration-300"
+                className="group bg-dark-100 border border-white/5 rounded-xl p-6 hover:border-brand-primary/30 hover:bg-white/2 transition-all duration-300"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                   {/* Left Section */}
@@ -151,7 +215,7 @@ export default function Tests() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 lg:flex-shrink-0">
+                  <div className="flex items-center gap-2 lg:shrink-0">
                     <button
                       onClick={() => navigate(`/teacher/tests/${test._id}`)}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-colors"
@@ -172,6 +236,42 @@ export default function Tests() {
             ))}
           </div>
         )}
+
+        <div className="mt-6 border-t border-white/10 pt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-white/60">
+            Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total || 0)}-
+            {Math.min(pagination.page * pagination.limit, pagination.total || 0)} of {pagination.total || 0}
+          </p>
+          <div className="flex items-center gap-2 justify-end">
+            <select
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+              className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+            >
+              <option value={5}>5 / page</option>
+              <option value={10}>10 / page</option>
+              <option value={15}>15 / page</option>
+              <option value={20}>20 / page</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={!pagination.hasPrevPage}
+              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-white/80">{pagination.page}/{pagination.totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => prev + 1)}
+              disabled={!pagination.hasNextPage}
+              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
       <ConfirmationModal

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getPendingContent, approveCourse, rejectCourse } from "../../services/adminService";
 import { 
   CheckCircle, XCircle, BookOpen, FileText, User, IndianRupee, 
-  Loader2, ArrowLeft, Layers, Video, Play, Eye, Unlock, Lock, Info 
+  Loader2, ArrowLeft, Layers, Play, Eye, Unlock, Lock, Info, Search
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -13,22 +13,62 @@ export default function PendingContent() {
   const [selectedCourse, setSelectedCourse] = useState(null); // For Detail View
   const [processingId, setProcessingId] = useState(null);
   const [expandedSection, setExpandedSection] = useState(null);
+  const [filters, setFilters] = useState({ type: "courses", search: "" });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+      setPage(1);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelectedCourse(null);
+  }, [filters.type, limit]);
 
   useEffect(() => {
     fetchContent();
-  }, []);
+  }, [filters.type, debouncedSearch, page, limit]);
 
   const fetchContent = async () => {
     try {
-      const res = await getPendingContent();
+      setLoading(true);
+      const res = await getPendingContent({
+        type: filters.type,
+        search: debouncedSearch,
+        page,
+        limit,
+      });
       setPendingCourses(res.content.pendingCourses || []);
       setPendingBlogs(res.content.pendingBlogs || []);
+      setPagination(res.pagination || pagination);
     } catch (error) {
       toast.error("Failed to load pending content");
     } finally {
       setLoading(false);
     }
   };
+
+  const summaryText = useMemo(() => {
+    if (!pagination.total) return "No records found";
+    const start = (pagination.page - 1) * pagination.limit + 1;
+    const end = Math.min(pagination.page * pagination.limit, pagination.total);
+    return `Showing ${start}-${end} of ${pagination.total}`;
+  }, [pagination]);
 
   const handleApprove = async (courseId) => {
     setProcessingId(courseId);
@@ -163,7 +203,7 @@ export default function PendingContent() {
                       </div>
                       <div>
                         <p className="text-[10px] uppercase text-grayCustom-medium font-bold">Submitted By</p>
-                        <p className="text-white font-bold">{selectedCourse.instructor?.name || "Educator"}</p>
+                        <p className="text-white font-bold">{selectedCourse.educator?.name || selectedCourse.instructor?.name || "Educator"}</p>
                       </div>
                     </div>
 
@@ -202,13 +242,35 @@ export default function PendingContent() {
         <p className="text-grayCustom-medium mt-2">Quality control center for community submissions.</p>
       </header>
 
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex flex-wrap gap-3 items-center">
+        <div className="relative min-w-70 flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grayCustom-medium w-4 h-4" />
+          <input
+            type="text"
+            value={filters.search}
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            placeholder="Search title or description"
+            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-grayCustom-medium/70 focus:outline-none focus:ring-2 focus:ring-brand-primary/60"
+          />
+        </div>
+        <select
+          value={filters.type}
+          onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
+          className="rounded-xl border border-white/10 bg-dark-300/70 px-4 py-2.5 text-sm text-white focus:outline-none"
+        >
+          <option value="courses">Pending Courses</option>
+          <option value="blogs">Pending Blogs</option>
+        </select>
+      </div>
+
+      {filters.type === "courses" ? (
       <section>
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
             <BookOpen className="text-orange-500" /> Pending Courses
           </h2>
           <span className="bg-orange-500/10 text-orange-500 border border-orange-500/20 px-4 py-1 rounded-full text-xs font-black">
-            {pendingCourses.length} TASKS
+            {pagination.total} TASKS
           </span>
         </div>
 
@@ -235,7 +297,7 @@ export default function PendingContent() {
                 <p className="text-grayCustom-medium text-xs mt-2 line-clamp-2 italic">"{course.description}"</p>
                 <div className="mt-6 flex items-center justify-between">
                    <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest flex items-center gap-2">
-                     <User size={12} /> {course.instructor?.name || "Educator"}
+                     <User size={12} /> {course.educator?.name || course.instructor?.name || "Educator"}
                    </span>
                    <button className="text-xs bg-white text-black px-4 py-1.5 rounded-lg font-bold hover:bg-brand-primary transition-colors">
                      Review Details
@@ -246,14 +308,67 @@ export default function PendingContent() {
           ))}
         </div>
       </section>
+      ) : (
+      <section>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <FileText className="text-brand-primary" /> Pending Blogs
+          </h2>
+          <span className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-4 py-1 rounded-full text-xs font-black">
+            {pagination.total} TASKS
+          </span>
+        </div>
 
-      {/* Blogs remain as simpler cards or can follow same pattern */}
-      <section className="pt-12 border-t border-dark-100">
-         <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
-            <FileText className="text-brand-primary" /> Blog Moderation
-         </h2>
-         {/* ... render blog grid similar to your existing code ... */}
+        {pendingBlogs.length === 0 ? (
+          <div className="bg-dark-200 border border-dark-100 rounded-xl p-10 text-center text-grayCustom-medium">
+            No pending blogs found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingBlogs.map((blog) => (
+              <div key={blog._id} className="bg-dark-200 border border-dark-100 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-white">{blog.title}</h3>
+                <p className="text-grayCustom-medium text-sm mt-2 line-clamp-3">{blog.content}</p>
+                <p className="text-xs text-grayCustom-medium mt-3">{new Date(blog.createdAt).toLocaleDateString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
+      )}
+
+      <div className="border border-white/10 px-4 py-3 flex flex-col gap-3 bg-dark-300/30 rounded-xl sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-gray-400">{summaryText}</p>
+        <div className="flex items-center justify-end gap-2">
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+          >
+            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
+            <option value={15}>15 / page</option>
+            <option value={20}>20 / page</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={!pagination.hasPrevPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-white/80">{pagination.page}/{pagination.totalPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={!pagination.hasNextPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

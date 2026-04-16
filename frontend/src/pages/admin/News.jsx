@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAllNews, createNews, updateNews, deleteNews } from "../../services/adminService";
-import { Plus, Edit2, Trash2, X, Search, Filter, Newspaper, Image as ImageIcon, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Search, Filter, Image as ImageIcon, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function News() {
   const [news, setNews] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
+  const [query, setQuery] = useState({ search: "", status: "", page: 1, limit: 10 });
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingNews, setEditingNews] = useState(null);
-  const [filters, setFilters] = useState({ search: "", status: "" });
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -18,13 +20,23 @@ export default function News() {
   });
 
   useEffect(() => {
-    fetchNews();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchNews(query);
+    }, 300);
 
-  const fetchNews = async () => {
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const fetchNews = async (params) => {
     try {
-      const res = await getAllNews();
+      setLoading(true);
+      const req = {
+        ...params,
+        ...(params.status === "" ? {} : { published: params.status === "published" }),
+      };
+      const res = await getAllNews(req);
       setNews(res.news || []);
+      setPagination(res.pagination || { page: 1, limit: params.limit, totalPages: 1, total: 0 });
     } catch (error) {
       toast.error("Failed to load news articles");
     } finally {
@@ -32,16 +44,10 @@ export default function News() {
     }
   };
 
-  const filteredNews = news.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesStatus = filters.status === "" ? true : 
-                         filters.status === "published" ? item.published : !item.published;
-    return matchesSearch && matchesStatus;
-  });
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setSubmitting(true);
       if (editingNews) {
         await updateNews(editingNews._id, formData);
         toast.success("Article updated");
@@ -50,9 +56,11 @@ export default function News() {
         toast.success("Article published");
       }
       closeModal();
-      fetchNews();
+      fetchNews(query);
     } catch (error) {
       toast.error("Operation failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -61,7 +69,8 @@ export default function News() {
       try {
         await deleteNews(newsId);
         toast.success("Article removed");
-        fetchNews();
+        const shouldGoPrev = news.length === 1 && pagination.page > 1;
+        setQuery((prev) => ({ ...prev, page: shouldGoPrev ? prev.page - 1 : prev.page }));
       } catch (error) {
         toast.error("Failed to delete");
       }
@@ -86,16 +95,26 @@ export default function News() {
     setFormData({ title: "", content: "", summary: "", imageUrl: "", published: true });
   };
 
+  const summaryText = useMemo(() => {
+    if (!pagination.total) return "No news found";
+    const start = (pagination.page - 1) * pagination.limit + 1;
+    const end = Math.min(pagination.page * pagination.limit, pagination.total);
+    return `Showing ${start}-${end} of ${pagination.total} articles`;
+  }, [pagination]);
+
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Newsroom</h1>
           <p className="text-grayCustom-medium mt-1 text-sm font-medium">Broadcast updates and announcements to your users.</p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setEditingNews(null);
+            setFormData({ title: "", content: "", summary: "", imageUrl: "", published: true });
+            setShowModal(true);
+          }}
           className="bg-brand-primary hover:bg-brand-primaryDark text-dark-400 font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/10"
         >
           <Plus size={20} />
@@ -103,24 +122,23 @@ export default function News() {
         </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-dark-200 border border-dark-100 rounded-2xl p-4 flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[280px] relative">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl flex flex-wrap gap-4 items-center">
+        <div className="relative min-w-70 flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-grayCustom-medium w-4 h-4" />
           <input
             type="text"
             placeholder="Search by headline..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="w-full bg-dark-300 border border-dark-100 text-white pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all placeholder:text-grayCustom-medium/40"
+            value={query.search}
+            onChange={(e) => setQuery((prev) => ({ ...prev, page: 1, search: e.target.value }))}
+            className="w-full bg-dark-300/70 border border-white/10 text-white pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all placeholder:text-grayCustom-medium/40"
           />
         </div>
         <div className="flex items-center gap-3">
           <Filter className="text-brand-primary w-4 h-4" />
           <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="bg-dark-300 border border-dark-100 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 cursor-pointer text-sm font-bold uppercase tracking-wider"
+            value={query.status}
+            onChange={(e) => setQuery((prev) => ({ ...prev, page: 1, status: e.target.value }))}
+            className="bg-dark-300/70 border border-white/10 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 cursor-pointer text-sm font-bold uppercase tracking-wider"
           >
             <option value="">All Statuses</option>
             <option value="published">Published</option>
@@ -129,64 +147,98 @@ export default function News() {
         </div>
       </div>
 
-      {/* News Grid */}
       {loading ? (
         <div className="h-64 flex flex-col items-center justify-center gap-4">
           <Loader2 className="animate-spin text-brand-primary" size={32} />
           <span className="text-grayCustom-medium font-medium">Syncing newsfeed...</span>
         </div>
-      ) : filteredNews.length === 0 ? (
+      ) : news.length === 0 ? (
         <div className="bg-dark-200 border border-dark-100 border-dashed rounded-2xl p-20 text-center text-grayCustom-medium">
           No articles found matching your filters.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {filteredNews.map((item) => (
-            <div key={item._id} className="bg-dark-200 border border-dark-100 rounded-2xl p-6 hover:bg-dark-100/30 transition-all group">
-              <div className="flex flex-col lg:flex-row justify-between gap-6">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest ${item.published ? "bg-brand-primary/10 text-brand-primary" : "bg-yellow-500/10 text-yellow-500"}`}>
-                      {item.published ? <CheckCircle2 size={12}/> : <Clock size={12}/>}
-                      {item.published ? "Published" : "Draft"}
-                    </span>
-                    <span className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-tighter">
-                      {new Date(item.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-white leading-tight group-hover:text-brand-primary transition-colors">{item.title}</h3>
-                  <p className="text-grayCustom-medium text-sm line-clamp-2 leading-relaxed">
-                    {item.summary || item.content}
-                  </p>
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-dark-300/70 text-grayCustom-medium uppercase tracking-wider text-xs">
+                <tr>
+                  <th className="px-5 py-3 text-left">Headline</th>
+                  <th className="px-5 py-3 text-left">Summary</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-left">Created</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {news.map((item) => (
+                  <tr key={item._id} className="text-white/90 hover:bg-white/5 transition-colors">
+                    <td className="px-5 py-4 font-semibold">{item.title}</td>
+                    <td className="px-5 py-4 max-w-sm truncate text-grayCustom-medium">{item.summary || item.content}</td>
+                    <td className="px-5 py-4">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${item.published ? "bg-emerald-500/15 text-emerald-300" : "bg-yellow-500/15 text-yellow-300"}`}>
+                        {item.published ? "Published" : "Draft"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-grayCustom-medium">{new Date(item.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => handleEdit(item)} className="rounded-lg border border-white/10 p-2 text-grayCustom-medium transition-colors hover:text-white" aria-label="Edit news">
+                          <Pencil size={15} />
+                        </button>
+                        <button onClick={() => handleDelete(item._id)} className="rounded-lg border border-red-500/30 p-2 text-red-300 transition-colors hover:bg-red-500/10" aria-label="Delete news">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-3 text-sm text-grayCustom-medium md:flex-row md:items-center md:justify-between">
+            <span>{summaryText}</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={query.limit}
+                onChange={(e) => setQuery((prev) => ({ ...prev, page: 1, limit: Number(e.target.value) }))}
+                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+              >
+                <option value={5}>5 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={15}>15 / page</option>
+                <option value={20}>20 / page</option>
+              </select>
+              <button
+                disabled={pagination.page <= 1 || loading}
+                onClick={() => setQuery((prev) => ({ ...prev, page: prev.page - 1 }))}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-white/80 disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <span className="text-white/80">Page {pagination.page} / {pagination.totalPages || 1}</span>
+              <button
+                disabled={!pagination.hasNextPage || loading}
+                onClick={() => setQuery((prev) => ({ ...prev, page: prev.page + 1 }))}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-white/80 disabled:opacity-40"
+              >
+                Next
+              </button>
                 </div>
-                <div className="flex items-center gap-2 lg:self-center">
-                  <button onClick={() => handleEdit(item)} className="p-3 text-grayCustom-medium hover:text-white hover:bg-dark-100 rounded-xl transition-all">
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => handleDelete(item._id)} className="p-3 text-grayCustom-medium hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
-                    <Trash2 size={18} />
-                  </button>
                 </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
-      {/* The Dark Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-dark-400/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-dark-200 border border-dark-100 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="flex justify-between items-center p-6 border-b border-dark-100 bg-dark-300/50">
-              <div className="flex items-center gap-3">
-                <Newspaper className="text-brand-primary" size={20} />
-                <h2 className="text-lg font-bold text-white tracking-tight">{editingNews ? "Edit Article" : "Compose News"}</h2>
-              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">{editingNews ? "Edit Article" : "Create Article"}</h2>
               <button onClick={closeModal} className="p-2 text-grayCustom-medium hover:text-white transition-colors">
                 <X size={20} />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto">
               <div className="grid gap-6">
                 <div className="space-y-2">
@@ -205,7 +257,7 @@ export default function News() {
                     type="text"
                     value={formData.summary}
                     onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
-                    className="w-full bg-dark-400 border border-dark-100 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all placeholder:text-gray-700"
+                    className="w-full bg-dark-400 border border-dark-100 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
                     placeholder="Brief hook for the newsfeed..."
                   />
                 </div>
@@ -239,12 +291,13 @@ export default function News() {
                   </div>
                   <span className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">Visibility: {formData.published ? 'Public' : 'Hidden'}</span>
                 </div>
-                
+
                 <div className="flex gap-3">
                   <button type="button" onClick={closeModal} className="px-6 py-3 font-bold text-grayCustom-medium hover:text-white transition-all">
                     Discard
                   </button>
-                  <button type="submit" className="px-8 py-3 bg-brand-primary text-dark-400 font-bold rounded-xl hover:bg-brand-primaryDark transition-all shadow-lg shadow-brand-primary/10">
+                  <button type="submit" disabled={submitting} className="px-8 py-3 bg-brand-primary text-dark-400 font-bold rounded-xl hover:bg-brand-primaryDark transition-all shadow-lg shadow-brand-primary/10 disabled:opacity-60 inline-flex items-center gap-2">
+                    {submitting && <Loader2 size={16} className="animate-spin" />}
                     {editingNews ? "Update Post" : "Publish Post"}
                   </button>
                 </div>

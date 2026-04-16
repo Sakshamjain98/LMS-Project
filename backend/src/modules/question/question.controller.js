@@ -56,6 +56,7 @@ export const getQuestionsByTest = asyncHandler(async (req, res) => {
 
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
+    questions,
     data: {
       count: questions.length,
       questions,

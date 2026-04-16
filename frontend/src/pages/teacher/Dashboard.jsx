@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTeacherDashboard, getTeacherNotes, getTeacherTests, getMyCourses } from "../../services/teacherService";
-import { FaBook, FaClock, FaCheckCircle, FaFileAlt, FaClipboardList, FaDraftingCompass, FaArrowRight, FaUsers, FaEye, FaFire, FaChartLine } from "react-icons/fa";
+import { FaBook, FaClock, FaCheckCircle, FaFileAlt, FaClipboardList, FaDraftingCompass, FaArrowRight, FaEye, FaFire, FaChartLine } from "react-icons/fa";
 import { AlertCircle, TrendingUp, Zap } from "lucide-react";
+import { DEFAULT_TEACHER_UI_SETTINGS, mergeTeacherUiSettings } from "../../constants/teacherUiDefaults";
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function TeacherDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [uiSettings, setUiSettings] = useState(DEFAULT_TEACHER_UI_SETTINGS);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -32,9 +34,13 @@ export default function TeacherDashboard() {
           getMyCourses().catch(() => ({ courses: [] })),
         ]);
 
+        const mergedSettings = mergeTeacherUiSettings(dashRes?.data?.uiSettings || dashRes?.uiSettings);
+        setUiSettings(mergedSettings);
+        localStorage.setItem("teacherUiSettings", JSON.stringify(mergedSettings));
+
         const courseList = coursesRes.courses || [];
-        const noteList = notesRes.notes || [];
-        const testList = testsRes.tests || [];
+        const noteList = mergedSettings.teacherVisibility.notesEnabled ? (notesRes.notes || []) : [];
+        const testList = mergedSettings.teacherVisibility.testsEnabled ? (testsRes.tests || []) : [];
 
         setCourses(courseList);
         setNotes(noteList);
@@ -71,6 +77,19 @@ export default function TeacherDashboard() {
     );
   }
 
+  const visibleStatItems = [
+    { key: "totalCourses", icon: <FaBook />, label: "Total Courses", value: stats.totalCourses, color: "blue" },
+    { key: "pendingApproval", icon: <FaClock />, label: "Pending Approval", value: stats.pendingApproval, color: "yellow" },
+    { key: "publishedCourses", icon: <FaCheckCircle />, label: "Published Courses", value: stats.publishedCourses, color: "green" },
+    { key: "totalNotes", icon: <FaFileAlt />, label: "Total Notes", value: stats.totalNotes, color: "purple" },
+    { key: "totalTests", icon: <FaClipboardList />, label: "Total Tests", value: stats.totalTests, color: "orange" },
+    { key: "draftTests", icon: <FaDraftingCompass />, label: "Draft Tests", value: stats.draftTests, color: "red" },
+    { key: "publishedTests", icon: <FaCheckCircle />, label: "Published Tests", value: stats.publishedTests, color: "emerald" },
+  ].filter((item) => uiSettings.teacherDashboardStats[item.key]);
+
+  const { notesEnabled, uploadEnabled, testsEnabled } = uiSettings.teacherVisibility;
+  const hasVisibleStats = visibleStatItems.length > 0;
+
   return (
     <div className="space-y-8 p-4 md:p-8 bg-dark-400 min-h-screen">
       
@@ -84,36 +103,38 @@ export default function TeacherDashboard() {
             <p className="text-gray-400 mt-2">Manage your courses, tests, and track student progress</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => navigate("/teacher/upload/basics")}
-              className="px-5 py-3 bg-brand-primary text-dark-400 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2"
-            >
-              <FaBook size={16} />
-              New Course
-            </button>
-            <button
-              onClick={() => navigate("/teacher/tests/create")}
-              className="px-5 py-3 bg-white/10 text-white rounded-lg font-bold hover:bg-white/20 transition flex items-center gap-2"
-            >
-              <FaClipboardList size={16} />
-              New Test
-            </button>
+            {uploadEnabled && (
+              <button
+                onClick={() => navigate("/teacher/upload/basics")}
+                className="px-5 py-3 bg-brand-primary text-dark-400 rounded-lg font-bold hover:opacity-90 transition flex items-center gap-2"
+              >
+                <FaBook size={16} />
+                New Course
+              </button>
+            )}
+            {testsEnabled && (
+              <button
+                onClick={() => navigate("/teacher/tests/create")}
+                className="px-5 py-3 bg-white/10 text-white rounded-lg font-bold hover:bg-white/20 transition flex items-center gap-2"
+              >
+                <FaClipboardList size={16} />
+                New Test
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* ─── STATS GRID (7 COLUMNS) ──────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard icon={<FaBook />} label="Total Courses" value={stats.totalCourses} color="blue" />
-          <MetricCard icon={<FaClock />} label="Pending Approval" value={stats.pendingApproval} color="yellow" />
-          <MetricCard icon={<FaCheckCircle />} label="Published Courses" value={stats.publishedCourses} color="green" />
-          <MetricCard icon={<FaFileAlt />} label="Total Notes" value={stats.totalNotes} color="purple" />
-          <MetricCard icon={<FaClipboardList />} label="Total Tests" value={stats.totalTests} color="orange" />
-          <MetricCard icon={<FaDraftingCompass />} label="Draft Tests" value={stats.draftTests} color="red" />
-          <MetricCard icon={<FaCheckCircle />} label="Published Tests" value={stats.publishedTests} color="emerald" />
+      {hasVisibleStats && (
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {visibleStatItems.map((item) => (
+              <MetricCard key={item.key} icon={item.icon} label={item.label} value={item.value} color={item.color} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ─── MAIN CONTENT (2 COLUMNS) ────────────────────────────────── */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -122,6 +143,7 @@ export default function TeacherDashboard() {
         <div className="lg:col-span-2 space-y-6">
           
           {/* RECENT COURSES */}
+          {uploadEnabled && (
           <ContentSection
             icon={<FaBook />}
             title="Recent Courses"
@@ -143,8 +165,10 @@ export default function TeacherDashboard() {
               />
             ))}
           </ContentSection>
+          )}
 
           {/* RECENT TESTS */}
+          {testsEnabled && (
           <ContentSection
             icon={<FaClipboardList />}
             title="Recent Tests"
@@ -165,86 +189,77 @@ export default function TeacherDashboard() {
               />
             ))}
           </ContentSection>
+          )}
+
+          {!uploadEnabled && !testsEnabled && !notesEnabled && (
+            <div className="bg-dark-200 border border-dark-100 rounded-2xl p-8 text-center">
+              <p className="text-white text-lg font-semibold">Your educator sections are currently restricted by admin settings.</p>
+              <p className="text-gray-400 mt-2 text-sm">Contact your admin to enable upload, notes, or test modules.</p>
+            </div>
+          )}
         </div>
 
         {/* RIGHT: Sidebar ────────────────────────────────────────────────── */}
         <div className="space-y-6">
           
           {/* QUICK STATS SUMMARY */}
+          {hasVisibleStats && (
           <div className="bg-dark-200 border border-dark-100 rounded-2xl p-6">
             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
               <FaChartLine className="text-brand-primary" />
               Content Overview
             </h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
-                <span className="text-sm text-gray-400">Courses</span>
-                <span className="text-2xl font-black text-white">{stats.totalCourses}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
-                <span className="text-sm text-gray-400">Tests</span>
-                <span className="text-2xl font-black text-white">{stats.totalTests}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
-                <span className="text-sm text-gray-400">Study Notes</span>
-                <span className="text-2xl font-black text-white">{stats.totalNotes}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
-                <span className="text-sm text-yellow-400">⚠️ Pending</span>
-                <span className="text-2xl font-black text-yellow-400">{stats.pendingApproval}</span>
-              </div>
+              {uiSettings.teacherDashboardStats.totalCourses && (
+                <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
+                  <span className="text-sm text-gray-400">Courses</span>
+                  <span className="text-2xl font-black text-white">{stats.totalCourses}</span>
+                </div>
+              )}
+              {uiSettings.teacherDashboardStats.totalTests && (
+                <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
+                  <span className="text-sm text-gray-400">Tests</span>
+                  <span className="text-2xl font-black text-white">{stats.totalTests}</span>
+                </div>
+              )}
+              {uiSettings.teacherDashboardStats.totalNotes && notesEnabled && (
+                <div className="flex items-center justify-between p-3 bg-dark-100/50 rounded-lg">
+                  <span className="text-sm text-gray-400">Study Notes</span>
+                  <span className="text-2xl font-black text-white">{stats.totalNotes}</span>
+                </div>
+              )}
+              {uiSettings.teacherDashboardStats.pendingApproval && (
+                <div className="flex items-center justify-between p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5">
+                  <span className="text-sm text-yellow-400">⚠️ Pending</span>
+                  <span className="text-2xl font-black text-yellow-400">{stats.pendingApproval}</span>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* QUICK ACTIONS */}
-          <div className="bg-dark-200 border border-dark-100 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <QuickActionBtn
-                icon={<FaBook />}
-                label="View All Courses"
-                href="/teacher/courses"
-                color="blue"
-              />
-              <QuickActionBtn
-                icon={<FaClipboardList />}
-                label="View All Tests"
-                href="/teacher/tests"
-                color="purple"
-              />
-              <QuickActionBtn
-                icon={<FaFileAlt />}
-                label="View All Notes"
-                href="/teacher/notes"
-                color="orange"
-              />
-              <QuickActionBtn
-                icon={<FaUsers />}
-                label="View Performance"
-                href="/teacher/analytics"
-                color="green"
-              />
-            </div>
-          </div>
+          )}
 
           {/* TIPS & NOTIFICATIONS */}
-          <div className="bg-gradient-to-br from-brand-primary/10 to-brand-primary/5 border border-brand-primary/20 rounded-2xl p-6">
+          {testsEnabled && (
+          <div className="bg-linear-to-br from-brand-primary/10 to-brand-primary/5 border border-brand-primary/20 rounded-2xl p-6">
             <div className="flex items-start gap-3">
-              <FaFire className="text-orange-400 text-2xl mt-1 flex-shrink-0" />
+              <FaFire className="text-orange-400 text-2xl mt-1 shrink-0" />
               <div>
                 <h4 className="font-bold text-white mb-2">Pro Tip</h4>
                 <p className="text-sm text-gray-300 mb-4">
                   Publish your first test to start collecting student performance data and analytics
                 </p>
-                <a
-                  href="/teacher/tests/create"
-                  className="text-xs font-bold text-brand-primary hover:text-brand-primary/80 inline-block"
-                >
-                  Create Test →
-                </a>
+                {testsEnabled && (
+                  <a
+                    href="/teacher/tests/create"
+                    className="text-xs font-bold text-brand-primary hover:text-brand-primary/80 inline-block"
+                  >
+                    Create Test →
+                  </a>
+                )}
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -267,7 +282,7 @@ function MetricCard({ icon, label, value, color }) {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} border rounded-xl p-5 hover:shadow-lg transition group`}>
+    <div className={`bg-linear-to-br ${colors[color]} border rounded-xl p-5 hover:shadow-lg transition group`}>
       <div className="flex items-start justify-between mb-3">
         <div className="text-2xl opacity-70 group-hover:opacity-100 transition">{icon}</div>
         <TrendingUp size={16} className="text-gray-500 opacity-0 group-hover:opacity-100 transition" />
@@ -333,25 +348,5 @@ function ContentCard({ icon, title, meta1, meta2, status, statusColor, onClick }
         </span>
       </div>
     </div>
-  );
-}
-
-function QuickActionBtn({ icon, label, href, color }) {
-  const colors = {
-    blue: "from-blue-500/20 to-blue-600/10",
-    purple: "from-purple-500/20 to-purple-600/10",
-    orange: "from-orange-500/20 to-orange-600/10",
-    green: "from-green-500/20 to-green-600/10",
-  };
-
-  return (
-    <a
-      href={href}
-      className={`flex items-center gap-3 p-4 bg-gradient-to-br ${colors[color]} border border-white/5 rounded-lg hover:border-brand-primary/30 transition group`}
-    >
-      <div className="text-xl opacity-70 group-hover:opacity-100">{icon}</div>
-      <span className="text-sm font-semibold text-white group-hover:text-brand-primary transition">{label}</span>
-      <FaArrowRight size={12} className="ml-auto text-gray-500 group-hover:text-brand-primary transition" />
-    </a>
   );
 }

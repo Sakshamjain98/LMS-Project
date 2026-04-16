@@ -13,7 +13,9 @@ import {
   X,
   DollarSign,
   Shield, 
-  UserPlus
+  UserPlus,
+  SlidersHorizontal,
+  UserCircle2
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -25,6 +27,8 @@ const navItems = [
   { path: "/admin/payments", label: "Payments", icon: CreditCard },
   { path: "/admin/news", label: "News", icon: Newspaper },
   { path: "/admin/blogs", label: "Blog Moderation", icon: DollarSign },
+  { path: "/admin/educator-controls", label: "Educator Controls", icon: SlidersHorizontal },
+  { path: "/admin/profile", label: "Profile", icon: UserCircle2 },
   { path: "/admin/create-admin", label: "Create Admin", icon: UserPlus }, 
 ];
 

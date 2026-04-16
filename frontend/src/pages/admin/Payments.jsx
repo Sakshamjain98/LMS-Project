@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAllPayments } from "../../services/adminService";
 import { 
   DollarSign, User, Hash, Calendar, Loader2, 
@@ -10,22 +10,59 @@ export default function Payments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: "", search: "" });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+      setPage(1);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.status, limit]);
 
   useEffect(() => {
     fetchPayments();
-  }, [filters]); // Refetch whenever filters change
+  }, [filters.status, debouncedSearch, page, limit]);
 
   const fetchPayments = async () => {
     try {
       setLoading(true);
-      const res = await getAllPayments(filters);
+      const res = await getAllPayments({
+        status: filters.status,
+        search: debouncedSearch,
+        page,
+        limit,
+      });
       setPayments(res.payments || []);
+      setPagination(res.pagination || pagination);
     } catch (error) {
       toast.error("Failed to load payments");
     } finally {
       setLoading(false);
     }
   };
+
+  const summaryText = useMemo(() => {
+    if (!pagination.total) return "No transactions found";
+    const start = (pagination.page - 1) * pagination.limit + 1;
+    const end = Math.min(pagination.page * pagination.limit, pagination.total);
+    return `Showing ${start}-${end} of ${pagination.total}`;
+  }, [pagination]);
 
   const getStatusStyles = (status) => {
     switch (status) {
@@ -56,14 +93,14 @@ export default function Payments() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-widest leading-none">Total Logs</p>
-            <p className="text-xl font-bold text-white">{payments.length}</p>
+            <p className="text-xl font-bold text-white">{pagination.total || 0}</p>
           </div>
         </div>
       </div>
 
       {/* Filter Bar */}
       <div className="bg-dark-200 border border-dark-100 rounded-2xl p-4 flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[300px] relative">
+        <div className="relative min-w-72 flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-grayCustom-medium w-4 h-4" />
           <input
             type="text"
@@ -87,6 +124,39 @@ export default function Payments() {
             <option value="FAILED">Failed</option>
             <option value="REFUNDED">Refunded</option>
           </select>
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 px-4 py-3 flex flex-col gap-3 bg-dark-300/30 sm:flex-row sm:items-center sm:justify-between rounded-xl">
+        <p className="text-xs text-gray-400">{summaryText}</p>
+        <div className="flex items-center justify-end gap-2">
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
+          >
+            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
+            <option value={15}>15 / page</option>
+            <option value={20}>20 / page</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={!pagination.hasPrevPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-white/80">{pagination.page}/{pagination.totalPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={!pagination.hasNextPage}
+            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -132,11 +202,11 @@ export default function Payments() {
                     <tr key={payment._id} className="hover:bg-dark-100/50 transition-colors group">
                       <td className="px-6 py-5">
                         <span className="font-mono text-[10px] text-brand-primary bg-brand-primary/5 px-2 py-1 rounded border border-brand-primary/10 tracking-wider">
-                          {payment.razorpayOrderId || payment._id.slice(-10).toUpperCase()}
+                          {payment.orderId || payment.paymentId || payment._id.slice(-10).toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="min-w-[150px]">
+                        <div className="min-w-37.5">
                           <div className="text-sm font-bold text-white leading-tight">{payment.userId?.name || "Anonymous User"}</div>
                           <div className="text-[11px] text-grayCustom-medium mt-0.5">{payment.userId?.email || "N/A"}</div>
                         </div>

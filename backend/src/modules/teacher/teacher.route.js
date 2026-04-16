@@ -13,6 +13,7 @@ router.use(authorize("teacher"));
 
 // ========== DASHBOARD & PROFILE ==========
 router.get("/dashboard", controller.dashboard);
+router.get("/ui-settings", controller.getUiSettings);
 router.get("/profile", controller.profile);
 router.put("/profile", controller.updateUserProfile);
 

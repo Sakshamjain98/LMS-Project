@@ -89,7 +89,7 @@ export default function CreateTest() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-12 space-y-8">
+    <div className="mx-auto max-w-4xl px-4 pb-6 space-y-5">
       {/* Back Button */}
       <div className="flex items-center gap-3">
         <button
@@ -102,7 +102,7 @@ export default function CreateTest() {
       </div>
 
       {/* Header */}
-      <div>
+      <div className="space-y-1">
         <h1 className="text-3xl font-bold text-white">Create New Test</h1>
         <p className="text-white/50 mt-2 text-sm font-medium">Set up basic test details</p>
       </div>
@@ -123,9 +123,10 @@ export default function CreateTest() {
       )}
 
       {/* Form */}
-      <div className="bg-dark-200 border border-white/5 rounded-lg p-8 space-y-6">
+      <div className="bg-dark-200 border border-white/5 rounded-lg p-6 space-y-5">
         {/* Title */}
-        <div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div>
           <label className="block text-sm font-semibold text-white mb-2">Title *</label>
           <input
             type="text"
@@ -135,19 +136,20 @@ export default function CreateTest() {
             placeholder="e.g. Biology Final Exam"
             className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white placeholder:text-white/30 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm"
           />
-        </div>
+          </div>
 
-        {/* Description */}
-        <div>
+          {/* Description */}
+          <div>
           <label className="block text-sm font-semibold text-white mb-2">Description</label>
           <textarea
             name="description"
             value={form.description}
             onChange={handleChange}
-            rows="3"
+            rows="2"
             placeholder="Test description and details..."
             className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white placeholder:text-white/30 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none resize-none text-sm"
           />
+          </div>
         </div>
 
         {/* Duration & Passing Marks */}
@@ -185,7 +187,7 @@ export default function CreateTest() {
             name="instructions"
             value={form.instructions}
             onChange={handleChange}
-            rows="3"
+            rows="2"
             placeholder="Any special instructions for students..."
             className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white placeholder:text-white/30 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none resize-none text-sm"
           />
@@ -209,12 +211,6 @@ export default function CreateTest() {
         </div>
       </div>
 
-      {/* Info Box */}
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-        <p className="text-blue-300 text-xs font-medium">
-          After creating the test, you'll be able to add questions, configure settings, and publish it.
-        </p>
-      </div>
     </div>
   );
 }

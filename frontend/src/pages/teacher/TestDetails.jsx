@@ -40,6 +40,8 @@ export default function TestDetails() {
         setTest(testRes.test);
         const questionsArray = Array.isArray(questionsRes.questions) 
           ? questionsRes.questions 
+          : Array.isArray(questionsRes?.data?.questions)
+          ? questionsRes.data.questions
           : Array.isArray(questionsRes.data)
           ? questionsRes.data
           : [];
@@ -223,7 +225,7 @@ export default function TestDetails() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => setEditing(true)}
                   className="p-3 rounded-lg bg-white/5 hover:bg-white/10 text-white transition-colors"
@@ -247,14 +249,14 @@ export default function TestDetails() {
       {/* Alerts */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
           <p className="text-red-400 text-sm font-medium">{error}</p>
         </div>
       )}
 
       {success && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
-          <CheckCircle size={20} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+          <CheckCircle size={20} className="text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-emerald-400 text-sm font-medium">{success}</p>
         </div>
       )}
@@ -343,7 +345,7 @@ export default function TestDetails() {
                         </div>
                         <button
                           onClick={() => setDeleteModal({ isOpen: true, questionId: q._id })}
-                          className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors flex-shrink-0"
+                          className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors shrink-0"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -522,7 +524,7 @@ function TestConfigForm({ initialConfig, onSave }) {
 }
 
 // Publish Form
-function PublishTestForm({ testId, currentStatus, onPublish }) {
+function PublishTestForm({ currentStatus, onPublish }) {
   const [publishType, setPublishType] = useState("now");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -658,7 +660,7 @@ function TestPreviewPanel({ preview }) {
             <div className="space-y-2 ml-4">
               {q.options?.map((opt, optIdx) => (
                 <div key={optIdx} className="flex items-start gap-3">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-white text-xs font-semibold flex-shrink-0">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-white text-xs font-semibold shrink-0">
                     {String.fromCharCode(65 + optIdx)}
                   </span>
                   <span className="text-white/80">{opt.text}</span>

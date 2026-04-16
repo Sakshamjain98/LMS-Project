@@ -23,8 +23,8 @@ export const deleteUser = async (userId) => {
 };
 
 // ==================== PENDING CONTENT ====================
-export const getPendingContent = async () => {
-  const res = await API.get("/admin/content/pending");
+export const getPendingContent = async (params = {}) => {
+  const res = await API.get("/admin/content/pending", { params });
   return res.data;
 };
 
@@ -39,8 +39,8 @@ export const rejectCourse = async (courseId) => {
 };
 
 // ==================== PAYMENT MANAGEMENT ====================
-export const getAllPayments = async () => {
-  const res = await API.get("/admin/payments");
+export const getAllPayments = async (params = {}) => {
+  const res = await API.get("/admin/payments", { params });
   return res.data;
 };
 
@@ -54,6 +54,12 @@ export const createBlog = async (data) => {
   const res = await API.post("/admin/cms/blog", data);
   return res.data;
 };
+
+export const updateBlog = async (blogId, data) => {
+  const res = await API.put(`/admin/cms/blog/${blogId}`, data);
+  return res.data;
+};
+
 export const getBlogs = async (params = {}) => {
   const res = await API.get("/admin/blogs", { params });
   return res.data;
@@ -65,8 +71,8 @@ export const deleteBlog = async (blogId) => {
 };
 
 // ==================== TEACHER APPROVAL ====================
-export const getPendingTeachers = async () => {
-  const res = await API.get("/admin/teachers/pending");
+export const getPendingTeachers = async (params = {}) => {
+  const res = await API.get("/admin/teachers/pending", { params });
   return res.data;
 };
 
@@ -167,5 +173,47 @@ export const getCourseAnalytics = async () => {
 // ==================== CREATE ADMIN (Super Admin) ====================
 export const createAdmin = async (data) => {
   const res = await API.post("/admin/create", data);
+  return res.data;
+};
+
+export const getAdmins = async (params = {}) => {
+  const res = await API.get("/admin/admins", { params });
+  return res.data;
+};
+
+export const updateAdmin = async (adminId, data) => {
+  const res = await API.put(`/admin/admins/${adminId}`, data);
+  return res.data;
+};
+
+export const deleteAdmin = async (adminId) => {
+  const res = await API.delete(`/admin/admins/${adminId}`);
+  return res.data;
+};
+
+// ==================== TEACHER FEATURE SETTINGS ====================
+export const getTeacherFeatureSettings = async () => {
+  const res = await API.get("/admin/settings/teacher");
+  return res.data;
+};
+
+export const updateTeacherFeatureSettings = async (payload) => {
+  const res = await API.put("/admin/settings/teacher", payload);
+  return res.data;
+};
+
+// ==================== ADMIN PROFILE ====================
+export const getAdminProfile = async () => {
+  const res = await API.get("/admin/profile");
+  return res.data;
+};
+
+export const updateAdminProfile = async (data) => {
+  const res = await API.put("/admin/profile", data);
+  return res.data;
+};
+
+export const changeAdminPassword = async (data) => {
+  const res = await API.put("/admin/change-password", data);
   return res.data;
 };
