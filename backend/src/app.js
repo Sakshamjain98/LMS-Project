@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import mongoose from "mongoose";
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -20,6 +19,7 @@ import { apiLimiter } from "./middlewares/rateLimiter.middleware.js";
 import adminRoutes from "./modules/admin/admin.route.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
+import { mongoSanitizeMiddleware } from "./middlewares/mongoSanitize.middleware.js";
 
 const app = express();
 
@@ -40,7 +40,7 @@ app.use(
   })
 );
 app.use(compression());
-app.use(mongoSanitize());
+app.use(mongoSanitizeMiddleware);
 app.use(hpp());
 app.use(cors({
   origin: (origin, callback) => {
