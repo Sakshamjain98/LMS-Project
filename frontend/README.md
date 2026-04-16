@@ -1,16 +1,98 @@
-# React + Vite
+# Frontend Documentation
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the LMS platform.
 
-Currently, two official plugins are available:
+## Configuration
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Use `frontend/.env.example`:
 
-## React Compiler
+```bash
+cp .env.example .env
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Environment variables:
 
-## Expanding the ESLint configuration
+- `VITE_API_BASE_URL`: backend API base URL (default fallback is `/api`)
+- `VITE_GOOGLE_CLIENT_ID`: Google OAuth client ID
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local Development
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Production Build
+
+```bash
+cd frontend
+npm run build
+npm run preview
+```
+
+## Dockerized Frontend
+
+The frontend image is multi-stage:
+
+- Build stage with Node.js
+- Runtime stage with Nginx
+
+Build and run manually:
+
+```bash
+cd frontend
+docker build \
+	--build-arg VITE_API_BASE_URL=/api \
+	--build-arg VITE_GOOGLE_CLIENT_ID=your-google-client-id \
+	-t lms-frontend .
+
+docker run --rm -p 5173:80 lms-frontend
+```
+
+## Nginx Reverse Proxy
+
+Nginx is configured to:
+
+- Serve SPA routes using `try_files`
+- Proxy `/api/*` to backend service
+- Send standard security headers
+- Enable gzip compression for common text assets
+
+Nginx config file: `frontend/docker/nginx.conf`
+
+## Security Improvements Applied
+
+- Removed hardcoded OAuth client ID from source.
+- Moved runtime values to environment-based configuration.
+- Added secure default API base fallback and request timeout in Axios.
+
+## Best Practices
+
+- Use HTTPS in production.
+- Restrict OAuth redirect/origin settings in Google Console.
+- Keep `.env` files out of git and inject env values via CI/CD.
+
+## Deploy on Vercel
+
+Project includes Vercel config: `vercel.json`.
+
+1. Import repository into Vercel.
+2. Set Root Directory to `frontend`.
+3. Framework preset: Vite.
+4. Set environment variables in Vercel:
+
+- `VITE_API_BASE_URL=https://<your-render-backend-domain>`
+- `VITE_GOOGLE_CLIENT_ID=<your-google-client-id>`
+
+5. Deploy and copy the generated Vercel domain.
+
+After deployment, set backend `CORS_ORIGIN` and `FRONTEND_URL` in Render to this Vercel URL.
+
+## SPA Routing on Vercel
+
+`vercel.json` contains a rewrite to `index.html` for client-side routes so direct refresh on nested routes works.
+
+## CI Checks
+
+Root workflow `../.github/workflows/ci.yml` validates frontend install, lint, build, Docker build, compose validation, and secret scanning.

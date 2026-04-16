@@ -8,6 +8,7 @@ import Navbar from "../../components/layout/Navbar";
 
 const Login = () => {
   const navigate = useNavigate();
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -165,7 +166,11 @@ const Login = () => {
             </div>
 
             <div className="flex justify-center">
-              {googleLoading ? <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" /> : (
+              {!googleClientId ? (
+                <p className="text-xs text-gray-500 text-center">Google login is currently unavailable.</p>
+              ) : googleLoading ? (
+                <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+              ) : (
                 <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setStatus({type: "error", message: "Google Auth Failed"})} theme="dark" />
               )}
             </div>
