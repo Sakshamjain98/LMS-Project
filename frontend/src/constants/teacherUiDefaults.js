@@ -16,6 +16,7 @@ export const DEFAULT_TEACHER_UI_SETTINGS = {
   },
 };
 
+
 export const mergeTeacherUiSettings = (settings = {}) => ({
   teacherVisibility: {
     ...DEFAULT_TEACHER_UI_SETTINGS.teacherVisibility,
