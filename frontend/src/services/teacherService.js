@@ -394,8 +394,12 @@ export const updateTeacherProfile = async (data) => {
 
 
 export const uploadTestCSV = async (formData) => {
-  const res = await api.post("/teacher/tests/upload-csv", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return res.data;
+  try {
+    const res = await api.post("/teacher/tests/upload-csv", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to upload CSV" };
+  }
 };

@@ -214,36 +214,51 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   // Auto-evaluate
   const questionMap = new Map(questions.map((q) => [q._id.toString(), q]));
 
-  attempt.answers = answersData.answers.map((answer) => {
-    const question = questionMap.get(answer.questionId);
-    if (!question) {
-      return {
-        questionId: answer.questionId,
-        selectedOptionIndex: null,
-        isCorrect: false,
-        marksObtained: 0,
-        timeTaken: answer.timeTaken || 0,
-      };
-    }
+  // `answersData.answers` can be partial/empty in auto-submit scenarios.
+  // Merge request answers with already saved attempt answers to avoid losing analytics.
+  const requestAnswers = Array.isArray(answersData?.answers) ? answersData.answers : [];
+  const requestAnswerMap = new Map(
+    requestAnswers
+      .filter((answer) => answer?.questionId)
+      .map((answer) => [answer.questionId.toString(), answer])
+  );
+  const savedAnswerMap = new Map(
+    (attempt.answers || [])
+      .filter((answer) => answer?.questionId)
+      .map((answer) => [answer.questionId.toString(), answer])
+  );
 
-    const isCorrect = isAnswerCorrect(question, answer.selectedOptionIndex);
-    const marksObtained = calculateMarksForAnswer(
-      question,
-      answer.selectedOptionIndex
-    );
+  // Build a complete answer list for all questions so skipped count is always accurate.
+  attempt.answers = questions.map((question) => {
+    const questionId = question._id.toString();
+    const requestAnswer = requestAnswerMap.get(questionId);
+    const savedAnswer = savedAnswerMap.get(questionId);
+    const mergedAnswer = requestAnswer || savedAnswer || {};
+
+    const selectedOptionIndex =
+      mergedAnswer.selectedOptionIndex === undefined
+        ? null
+        : mergedAnswer.selectedOptionIndex;
+
+    const isCorrect = isAnswerCorrect(question, selectedOptionIndex);
+    const marksObtained = calculateMarksForAnswer(question, selectedOptionIndex);
 
     return {
-      questionId: answer.questionId,
-      selectedOptionIndex: answer.selectedOptionIndex,
+      questionId: question._id,
+      selectedOptionIndex,
       isCorrect,
       marksObtained,
-      timeTaken: answer.timeTaken || 0,
+      timeTaken: Number(mergedAnswer.timeTaken) || 0,
     };
   });
+
+  // Mark if this submission was triggered automatically (proctoring/time expiry)
+  attempt.autoSubmitted = Boolean(answersData.autoSubmitted);
 
   // Calculate result
   attempt.timeTaken = Math.round((Date.now() - attempt.startedAt) / 1000);
   attempt.submittedAt = new Date();
+  // Keep existing status workflow: evaluated means result is available.
   attempt.status = "evaluated";
 
   const result = calculateTestResult(
@@ -324,6 +339,7 @@ export const getTestResult = async (attemptId, studentId) => {
       percentage: attempt.percentage,
       timeTaken: attempt.timeTaken,
       submittedAt: attempt.submittedAt,
+      isCompleted: ["submitted", "evaluated"].includes(attempt.status) || Boolean(attempt.autoSubmitted),
       rank,
     },
     detailedResult: generateDetailedResult(attempt, questions),
@@ -336,12 +352,18 @@ export const getTestResult = async (attemptId, studentId) => {
 export const getStudentAttempts = async (studentId, limit = 50, skip = 0) => {
   const objStudentId = validateUserId(studentId);
 
-  return TestAttempt.find({ studentId: objStudentId })
+  const docs = await TestAttempt.find({ studentId: objStudentId })
     .populate("testId", "title totalMarks duration")
     .sort({ createdAt: -1 })
     .limit(limit)
     .skip(skip)
     .lean();
+
+  // Add a computed `isCompleted` flag so frontends can consistently display auto-submitted attempts
+  return docs.map((d) => ({
+    ...d,
+    isCompleted: ["submitted", "evaluated"].includes(d.status) || Boolean(d.autoSubmitted),
+  }));
 };
 
 /**
@@ -354,7 +376,7 @@ export const getTestLeaderboard = async (testId, limit = 10) => {
     {
       $match: {
         testId: objTestId,
-        status: { $in: ["submitted", "evaluated"] },
+        $or: [ { status: { $in: ["submitted", "evaluated"] } }, { autoSubmitted: true } ],
       },
     },
     {
@@ -398,7 +420,7 @@ export const getTestLeaderboard = async (testId, limit = 10) => {
 export const getTestAttemptStats = async (testId) => {
   const stats = await TestAttempt.aggregate([
     {
-      $match: { testId, status: "evaluated" },
+      $match: { $or: [ { testId, status: "evaluated" }, { testId, autoSubmitted: true } ] },
     },
     {
       $group: {

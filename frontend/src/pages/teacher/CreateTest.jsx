@@ -14,6 +14,8 @@ export default function CreateTest() {
     description: "",
     duration: 60,
     passingMarks: 0,
+    startTime: "",
+    endTime: "",
     instructions: "",
   });
 
@@ -46,6 +48,16 @@ export default function CreateTest() {
       return false;
     }
 
+    if (!form.endTime) {
+      setError("End date and time is required");
+      return false;
+    }
+
+    if (form.startTime && new Date(form.startTime) >= new Date(form.endTime)) {
+      setError("End date/time must be after start date/time");
+      return false;
+    }
+
     return true;
   };
 
@@ -62,6 +74,8 @@ export default function CreateTest() {
         description: form.description.trim(),
         duration: form.duration,
         passingMarks: form.passingMarks,
+        startTime: form.startTime ? new Date(form.startTime).toISOString() : null,
+        endTime: new Date(form.endTime).toISOString(),
         instructions: form.instructions.trim(),
       };
 
@@ -110,14 +124,14 @@ export default function CreateTest() {
       {/* Alerts */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
           <p className="text-red-400 text-sm font-medium">{error}</p>
         </div>
       )}
 
       {success && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 flex items-start gap-3">
-          <CheckCircle size={18} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+          <CheckCircle size={18} className="text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-emerald-400 text-sm font-medium">{success}</p>
         </div>
       )}
@@ -175,6 +189,30 @@ export default function CreateTest() {
               value={form.passingMarks}
               onChange={handleChange}
               min="0"
+              className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-white mb-2">Start Date & Time (Optional)</label>
+            <input
+              type="datetime-local"
+              name="startTime"
+              value={form.startTime}
+              onChange={handleChange}
+              className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white mb-2">End Date & Time *</label>
+            <input
+              type="datetime-local"
+              name="endTime"
+              value={form.endTime}
+              onChange={handleChange}
               className="w-full bg-dark-100 border border-white/5 rounded-lg px-4 py-2.5 text-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none text-sm"
             />
           </div>

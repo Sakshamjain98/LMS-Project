@@ -51,6 +51,11 @@ const testAttemptSchema = new mongoose.Schema(
     submittedAt: {
       type: Date,
     },
+    autoSubmitted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     // Result fields
     totalQuestions: {
       type: Number,

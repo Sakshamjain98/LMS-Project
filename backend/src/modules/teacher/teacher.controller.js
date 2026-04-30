@@ -369,6 +369,24 @@ export const listTests = asyncHandler(async (req, res) => {
 });
 
 export const createTestController = asyncHandler(async (req, res) => {
+  const { startTime = null, endTime = null } = req.body || {};
+
+  if (!endTime) {
+    throw new ApiError(400, "endTime is required while creating a test");
+  }
+
+  if (startTime && isNaN(new Date(startTime))) {
+    throw new ApiError(400, "Invalid startTime");
+  }
+
+  if (isNaN(new Date(endTime))) {
+    throw new ApiError(400, "Invalid endTime");
+  }
+
+  if (startTime && new Date(startTime) >= new Date(endTime)) {
+    throw new ApiError(400, "Start must be before end");
+  }
+
   const test = await testService.createTest(req.body, req.user._id);
 
   res.status(STATUS_CODES.CREATED).json({
@@ -436,6 +454,10 @@ export const saveConfig = asyncHandler(async (req, res) => {
 // ================= PUBLISH =================
 export const publishTestController = asyncHandler(async (req, res) => {
   const { startTime = null, endTime = null } = req.body;
+
+  if (!endTime) {
+    throw new ApiError(400, "endTime is required to publish a test");
+  }
 
   if (startTime && isNaN(new Date(startTime))) {
     throw new ApiError(400, "Invalid startTime");
@@ -587,11 +609,65 @@ export const createTestFromCSV = async (req, res, next) => {
           return res.status(400).json({ success: false, message: "CSV file is empty." });
         }
 
+        const now = new Date();
+        now.setSeconds(0, 0);
+        const startTimeRaw = req.body.startTime;
+        const endTimeRaw = req.body.endTime;
+
+        // endTime is required for CSV-imported tests; startTime is optional.
+        if (!endTimeRaw) {
+          return res.status(400).json({
+            success: false,
+            message: "endTime is required for CSV test upload.",
+          });
+        }
+
+        let startTime;
+        if (startTimeRaw) {
+          startTime = new Date(startTimeRaw);
+          if (Number.isNaN(startTime.getTime())) {
+            return res.status(400).json({ success: false, message: "Invalid startTime." });
+          }
+        } else {
+          // If teacher didn't provide a startTime, default to now (rounded to minute)
+          startTime = new Date(now);
+        }
+
+        const endTime = new Date(endTimeRaw);
+        if (Number.isNaN(endTime.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid endTime." });
+        }
+
+        const graceMs = 60 * 1000;
+        // If teacher provided a startTime, ensure it is not backdated. Always ensure endTime is not backdated.
+        if (startTimeRaw && startTime.getTime() < now.getTime() - graceMs) {
+          return res.status(400).json({
+            success: false,
+            message: "Start date/time cannot be backdated.",
+          });
+        }
+
+        if (endTime.getTime() < now.getTime() - graceMs) {
+          return res.status(400).json({
+            success: false,
+            message: "End date/time cannot be backdated.",
+          });
+        }
+
+        if (startTime >= endTime) {
+          return res.status(400).json({
+            success: false,
+            message: "Start time must be before end time.",
+          });
+        }
+
         const testPayload = {
           title: (req.body.title || "CSV Imported Test").toString().trim() || "CSV Imported Test",
           description: (req.body.description || "").toString().trim(),
           duration: Number(req.body.duration) > 0 ? Number(req.body.duration) : 60,
           passingMarks: Number(req.body.passingMarks) >= 0 ? Number(req.body.passingMarks) : 0,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
           isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
         };
 

@@ -281,6 +281,8 @@ export const createTest = async (data, teacherId) => {
     description: payload.description?.trim() || "",
     duration: payload.duration || 60,
     passingMarks: payload.passingMarks || 0,
+    startTime: payload.startTime || undefined,
+    endTime: payload.endTime || undefined,
 
     // ✅ FREE / PAID
     isPaid: payload.isPaid ?? false,

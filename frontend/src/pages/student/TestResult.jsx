@@ -8,6 +8,8 @@ export default function TestResult({ attemptId, onBack }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -29,6 +31,10 @@ export default function TestResult({ attemptId, onBack }) {
       }
     };
     fetchAnalytics();
+  }, [attemptId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [attemptId]);
 
   if (loading) {
@@ -53,6 +59,11 @@ export default function TestResult({ attemptId, onBack }) {
   }
 
   const { test, result, detailedResult } = resultData;
+  const totalPages = detailedResult?.length ? Math.ceil(detailedResult.length / pageSize) : 1;
+  const paginatedDetailedResult = detailedResult?.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  ) || [];
 
   // Chart Data format for Recharts
   const pieData = [
@@ -66,7 +77,7 @@ export default function TestResult({ attemptId, onBack }) {
       
       {/* HEADER */}
       <div className="sticky top-0 z-40 border-b border-dark-100 bg-dark-300/90 py-4 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1200px] items-center gap-4 px-4 md:px-6">
+        <div className="mx-auto flex max-w-300 items-center gap-4 px-4 md:px-6">
           <button onClick={onBack} className="rounded-lg p-2 text-gray-400 transition hover:bg-dark-200 hover:text-white">
             <ChevronLeft size={20} />
           </button>
@@ -77,7 +88,7 @@ export default function TestResult({ attemptId, onBack }) {
         </div>
       </div>
 
-      <div className="mx-auto mt-8 grid max-w-[1200px] gap-8 px-4 md:px-6 lg:grid-cols-3">
+      <div className="mx-auto mt-8 grid max-w-300 gap-8 px-4 md:px-6 lg:grid-cols-3">
         
         {/* LEFT COLUMN: Main Stats & Chart */}
         <div className="space-y-6 lg:col-span-2">
@@ -117,17 +128,21 @@ export default function TestResult({ attemptId, onBack }) {
             <div className="rounded-2xl border border-dark-100 bg-dark-300 p-6">
               <h3 className="mb-6 text-xl font-bold text-white">Detailed Solutions</h3>
               <div className="space-y-6">
-                {detailedResult.map((q, idx) => (
+                {paginatedDetailedResult.map((q, idx) => {
+                  const absoluteIndex = (currentPage - 1) * pageSize + idx;
+                  const isSkipped = q.selectedOptionIndex === null || q.selectedOptionIndex === undefined;
+
+                  return (
                   <div key={q.questionId} className="border-b border-dark-100 pb-6 last:border-0">
                     <div className="mb-3 flex items-start gap-3">
-                      <span className="font-bold text-gray-500">Q{idx + 1}.</span>
+                      <span className="font-bold text-gray-500">Q{absoluteIndex + 1}.</span>
                       <p className="font-medium text-white">{q.questionText}</p>
                     </div>
                     <div className="pl-8 text-sm">
                       <p className={`font-semibold ${q.isCorrect ? "text-emerald-400" : "text-red-400"}`}>
-                        Your Answer: {q.options[q.selectedOptionIndex]?.text || "Skipped"}
+                        Your Answer: {isSkipped ? "Not Attempted" : q.options[q.selectedOptionIndex]?.text || "Not Attempted"}
                       </p>
-                      {!q.isCorrect && (
+                      {(isSkipped || !q.isCorrect) && (
                         <p className="mt-1 font-semibold text-emerald-400">
                           Correct Answer: {q.options[q.correctOptionIndex]?.text}
                         </p>
@@ -140,8 +155,31 @@ export default function TestResult({ attemptId, onBack }) {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between border-t border-dark-100 pt-4">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg bg-dark-200 px-4 py-2 text-sm font-semibold text-white transition hover:bg-dark-100 disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <p className="text-sm text-gray-400">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg bg-dark-200 px-4 py-2 text-sm font-semibold text-white transition hover:bg-dark-100 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

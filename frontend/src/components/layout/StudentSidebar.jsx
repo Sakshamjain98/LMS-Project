@@ -57,8 +57,8 @@ export default function StudentSidebar() {
 
   const navItems = [
     { path: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/student/courses", icon: BookOpen, label: "Courses" },
-    { path: "/student/notes", icon: FileText, label: "Notes" },
+    // { path: "/student/courses", icon: BookOpen, label: "Courses" },
+    // { path: "/student/notes", icon: FileText, label: "Notes" },
     { path: "/student/tests", icon: ClipboardList, label: "Tests" },
     // { path: "/student/performance", icon: BarChart3, label: "Analytics" },
     { path: "/student/profile", icon: User, label: "Profile" },

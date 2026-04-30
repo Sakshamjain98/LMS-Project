@@ -7,11 +7,18 @@ import { useNavigate } from "react-router-dom";
 export default function UploadTestCSV() {
   const navigate = useNavigate();
   const [file, setFile] = useState(null);
+  const nowForMin = new Date();
+  nowForMin.setSeconds(0, 0);
+  const nowLocal = new Date(nowForMin.getTime() - nowForMin.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
   const [form, setForm] = useState({
     title: "",
     description: "",
-    duration: 60,
-    passingMarks: 0,
+    duration: "",
+    passingMarks: "",
+    startTime: "",
+    endTime: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -19,12 +26,35 @@ export default function UploadTestCSV() {
     e.preventDefault();
     if (!file) return toast.error("Please select a CSV file");
 
+    if (!form.startTime || !form.endTime) {
+      return toast.error("Start and end date/time are required");
+    }
+
+    const now = new Date();
+    now.setSeconds(0, 0);
+    const startTime = new Date(form.startTime);
+    const endTime = new Date(form.endTime);
+
+    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+      return toast.error("Please provide valid start and end date/time");
+    }
+
+    if (startTime < now || endTime < now) {
+      return toast.error("Start and end date/time cannot be backdated");
+    }
+
+    if (startTime >= endTime) {
+      return toast.error("Start date/time must be before end date/time");
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", form.title.trim() || "CSV Imported Test");
     formData.append("description", form.description.trim());
-    formData.append("duration", String(form.duration || 60));
-    formData.append("passingMarks", String(form.passingMarks || 0));
+    formData.append("duration", String(Number(form.duration) > 0 ? Number(form.duration) : 60));
+    formData.append("passingMarks", String(Number(form.passingMarks) >= 0 ? Number(form.passingMarks) : 0));
+    formData.append("startTime", startTime.toISOString());
+    formData.append("endTime", endTime.toISOString());
 
     try {
       setLoading(true);
@@ -33,7 +63,7 @@ export default function UploadTestCSV() {
       setFile(null);
       setTimeout(() => navigate("/teacher/tests"), 1500);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to upload CSV");
+      toast.error(error?.message || "Failed to upload CSV");
     } finally {
       setLoading(false);
     }
@@ -64,7 +94,7 @@ export default function UploadTestCSV() {
         </div>
 
         {/* Main Form Container */}
-        <div className="bg-dark-200 border border-dark-100 rounded-2xl p-6 shadow-2xl space-y-6">
+        <form onSubmit={handleSubmit} className="bg-dark-200 border border-dark-100 rounded-2xl p-6 shadow-2xl space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
@@ -87,7 +117,8 @@ export default function UploadTestCSV() {
                 type="number"
                 min="1"
                 value={form.duration}
-                onChange={(e) => setForm((prev) => ({ ...prev, duration: Number(e.target.value) || 60 }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, duration: e.target.value }))}
+                placeholder="60"
                 className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
               />
             </div>
@@ -100,9 +131,40 @@ export default function UploadTestCSV() {
                 type="number"
                 min="0"
                 value={form.passingMarks}
-                onChange={(e) => setForm((prev) => ({ ...prev, passingMarks: Number(e.target.value) || 0 }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, passingMarks: e.target.value }))}
+                placeholder="0"
                 className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
               />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Start Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={form.startTime}
+                onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
+                min={nowLocal}
+                style={{ colorScheme: "dark" }}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">Pick full date & time (month/date visible in calendar).</p>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                End Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={form.endTime}
+                onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))}
+                min={nowLocal}
+                style={{ colorScheme: "dark" }}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">End time must be after start time.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -189,7 +251,7 @@ export default function UploadTestCSV() {
             </button>
 
             <button
-              onClick={handleSubmit}
+              type="submit"
               disabled={loading || !file}
               className="flex-1 bg-brand-primary hover:bg-brand-primaryDark text-dark-400 font-extrabold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20 disabled:opacity-20 disabled:cursor-not-allowed group"
             >
@@ -206,7 +268,7 @@ export default function UploadTestCSV() {
               )}
             </button>
           </div>
-        </div>
+        </form>
 
       </div>
     </div>

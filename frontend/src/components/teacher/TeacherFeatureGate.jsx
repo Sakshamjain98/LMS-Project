@@ -4,7 +4,6 @@ import { getTeacherUiSettings } from "../../services/teacherService";
 import { DEFAULT_TEACHER_UI_SETTINGS, mergeTeacherUiSettings } from "../../constants/teacherUiDefaults";
 
 export default function TeacherFeatureGate({ featureKey, children }) {
-  const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -35,17 +34,14 @@ export default function TeacherFeatureGate({ featureKey, children }) {
         setEnabled(!!merged.teacherVisibility?.[featureKey]);
       } catch {
         setEnabled(!!DEFAULT_TEACHER_UI_SETTINGS.teacherVisibility?.[featureKey]);
-      } finally {
-        setLoading(false);
       }
     };
 
     decide();
   }, [featureKey, refreshTick]);
 
-  if (loading) {
-    return <div className="p-6 text-white/70">Checking feature access...</div>;
-  }
+  // Do not block rendering while fetching feature flags; optimistically render children.
+  // If the feature is later determined to be disabled, the component will redirect.
 
   if (!enabled) {
     return <Navigate to="/teacher/dashboard" replace />;

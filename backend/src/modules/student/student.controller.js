@@ -188,7 +188,7 @@ export const paidNotes = asyncHandler(async (req, res) => {
 
 export const getAvailableTests = asyncHandler(async (req, res) => {
   const tests = await Test.find({ status: "published" })
-    .select("_id title description duration totalMarks")
+    .select("_id title description duration totalMarks questions status startTime endTime")
     .lean();
   
   res.status(STATUS_CODES.SUCCESS).json({
