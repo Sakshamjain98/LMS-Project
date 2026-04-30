@@ -37,6 +37,7 @@ export default function Payments() {
 
   useEffect(() => {
     fetchPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.status, debouncedSearch, page, limit]);
 
   const fetchPayments = async () => {
@@ -50,7 +51,7 @@ export default function Payments() {
       });
       setPayments(res.payments || []);
       setPagination(res.pagination || pagination);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load payments");
     } finally {
       setLoading(false);

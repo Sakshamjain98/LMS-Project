@@ -36,7 +36,7 @@ const StatCardSkeleton = () => (
 );
 
 // ================== STAT CARD ==================
-const StatCard = ({ title, value, icon: Icon, color, link, trend }) => (
+const StatCard = ({ title, value, color, link, trend }) => (
   <Link to={link || "#"} className={`block ${link ? 'cursor-pointer' : 'cursor-default'}`}>
     <div className="bg-dark-200 border border-dark-100 rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] hover:bg-dark-100 group">
       <div className="flex items-center justify-between">
@@ -52,7 +52,7 @@ const StatCard = ({ title, value, icon: Icon, color, link, trend }) => (
           )}
         </div>
         <div className={`p-4 rounded-lg bg-dark-300 group-hover:bg-brand-primary/10 transition-colors`}>
-          <Icon className={`w-7 h-7 ${color}`} />
+          <BarChart3 className={`w-7 h-7 ${color}`} />
         </div>
       </div>
     </div>
@@ -60,12 +60,12 @@ const StatCard = ({ title, value, icon: Icon, color, link, trend }) => (
 );
 
 // ================== PENDING ITEM ==================
-const PendingItem = ({ icon: Icon, label, count, link }) => (
+const PendingItem = ({ label, count, link }) => (
   <Link to={link || "#"} className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-300 transition-colors cursor-pointer group">
     <div className="flex items-center gap-3">
-      <div className="p-2 bg-dark-400 rounded group-hover:text-brand-primary">
-        <Icon className="w-5 h-5" />
-      </div>
+        <div className="p-2 bg-dark-400 rounded group-hover:text-brand-primary">
+          <Clock className="w-5 h-5" />
+        </div>
       <span className="text-gray-300">{label}</span>
     </div>
     <span className="bg-brand-primary/20 text-brand-primary px-2 py-1 rounded text-xs font-bold">
@@ -121,8 +121,8 @@ const RecentPaymentItem = ({ payment }) => (
 // ================== MAIN DASHBOARD ==================
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
-  const [revenueData, setRevenueData] = useState([]);
-  const [userGrowthData, setUserGrowthData] = useState([]);
+  const [_revenueData, setRevenueData] = useState([]);
+  const [_userGrowthData, setUserGrowthData] = useState([]);
   const [pendingTeachers, setPendingTeachers] = useState([]);
   const [pendingContent, setPendingContent] = useState([]);
   const [pendingComments, setPendingComments] = useState([]);

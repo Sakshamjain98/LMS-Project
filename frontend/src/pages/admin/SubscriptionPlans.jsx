@@ -25,7 +25,7 @@ export default function SubscriptionPlans() {
     try {
       const res = await getAllPlans();
       setPlans(res.plans);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load plans");
     } finally {
       setLoading(false);
@@ -46,7 +46,7 @@ export default function SubscriptionPlans() {
       setEditingPlan(null);
       setFormData({ name: "", description: "", price: "", durationDays: 30, features: [] });
       fetchPlans();
-    } catch (error) {
+    } catch {
       toast.error(editingPlan ? "Failed to update plan" : "Failed to create plan");
     }
   };
@@ -57,7 +57,7 @@ export default function SubscriptionPlans() {
         await deletePlan(planId);
         toast.success("Plan deleted successfully");
         fetchPlans();
-      } catch (error) {
+      } catch {
         toast.error("Failed to delete plan");
       }
     }

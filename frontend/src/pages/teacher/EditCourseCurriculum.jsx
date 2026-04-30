@@ -1,5 +1,5 @@
-import { useContext, useEffect, useState } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useContext, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { addSection, addVideoToSection, uploadSectionNotes } from "../../services/teacherService";
 import { UploadContext } from "./upload/UploadContextProvider";
 import { ChevronDown, Plus, Trash2, X, Upload, AlertCircle, Loader, FileText, Video, ArrowLeft, Layout } from "lucide-react";
@@ -7,7 +7,6 @@ import { ChevronDown, Plus, Trash2, X, Upload, AlertCircle, Loader, FileText, Vi
 export default function EditCourseCurriculum() {
   const navigate = useNavigate();
   const { courseId } = useParams();
-  const location = useLocation();
   const { formData, updateCurriculum, clearFormData } = useContext(UploadContext);
   
   const [loading, setLoading] = useState(false);

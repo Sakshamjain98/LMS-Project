@@ -58,10 +58,10 @@ const SectionHeading = ({ eyebrow, title, subtitle }) => (
 );
 
 /** Stat card used in About section */
-const StatCard = ({ icon: Icon, iconBg, iconColor, label, value, note }) => (
+const StatCard = ({ iconBg, iconColor, label, value, note }) => (
   <div className="bg-dark-200 border border-dark-100 rounded-xl p-6 hover:border-brand-primary/40 transition-colors">
     <div className={`inline-flex p-2.5 rounded-lg mb-4 ${iconBg}`}>
-      <Icon className={`text-xl ${iconColor}`} />
+      <FaBook className={`text-xl ${iconColor}`} />
     </div>
     <p className="text-sm text-gray-400 mb-1">{label}</p>
     <p className="text-3xl font-black text-white">{value}</p>
@@ -71,9 +71,6 @@ const StatCard = ({ icon: Icon, iconBg, iconColor, label, value, note }) => (
 
 /** Course card */
 const CourseCard = ({ course }) => {
-  const icons = { 1: FaFileAlt, 2: FaFlask, 3: FaHospital };
-  const Icon = icons[course._id] || FaBook;
-
   return (
     <a
       href={`/student/courses/${course._id}`}
@@ -82,7 +79,13 @@ const CourseCard = ({ course }) => {
       {/* Thumbnail */}
       <div className="relative h-44 bg-dark-300 flex items-center justify-center overflow-hidden">
         <div className="p-5 bg-dark-400/60 rounded-full">
-          <Icon className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
+          {course._id === 1 ? (
+            <FaFileAlt className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
+          ) : course._id === 2 ? (
+            <FaFlask className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
+          ) : (
+            <FaHospital className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
+          )}
         </div>
         <span
           className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold ${
@@ -137,10 +140,10 @@ const CourseCard = ({ course }) => {
 };
 
 /** Feature card */
-const FeatureCard = ({ icon: Icon, title, description }) => (
+const FeatureCard = ({ title, description }) => (
   <div className="bg-dark-200 border border-dark-100 rounded-xl p-7 hover:border-brand-primary/40 transition-colors group">
     <div className="inline-flex p-3 bg-brand-primary/10 rounded-lg mb-5 group-hover:bg-brand-primary/20 transition-colors">
-      <Icon className="text-xl text-brand-primary" />
+      <FaStar className="text-xl text-brand-primary" />
     </div>
     <h3 className="text-base font-bold text-white mb-2">{title}</h3>
     <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
@@ -176,7 +179,6 @@ const PricingCard = ({
   isAlreadySubscribed,
   isUserCurrentPlan,
   processingPlan,
-  subscriptionStatus,
   onSubscribe,
   onGetStarted,
 }) => {
@@ -434,7 +436,7 @@ const Home = () => {
 
   const [stats, setStats] = useState({ students: 0, courses: 0, success: 0 });
   const [plans, setPlans] = useState([]);
-  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [_loadingPlans, setLoadingPlans] = useState(true);
   const [processingPlan, setProcessingPlan] = useState(null);
   const [error, setError] = useState("");
   const [subscriptionStatus, setSubscriptionStatus] = useState(

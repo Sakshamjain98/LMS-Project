@@ -1,25 +1,34 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, BarChart2, Calendar, FileText } from "lucide-react";
+import { ChevronRight, Calendar, FileText } from "lucide-react";
 import { getTeacherTests } from "../../services/teacherService";
 
 export default function TestAnalyticsOverview() {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchTests = async () => {
       try {
         const res = await getTeacherTests();
         setTests(res.tests || []);
-      } catch (err) { setError(err.message); } 
-      finally { setLoading(false); }
+      } catch {
+        setTests([]);
+      } finally {
+        setLoading(false);
+      }
     };
+
     fetchTests();
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-[#090b10] flex items-center justify-center text-white/50 font-bold uppercase tracking-widest">Loading Repository...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#090b10] flex items-center justify-center text-white/50 font-bold uppercase tracking-widest">
+        Loading analytics...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#090b10] text-white p-8">
@@ -48,8 +57,8 @@ export default function TestAnalyticsOverview() {
                   <div>
                     <h3 className="text-xl font-bold group-hover:text-[#00c885] transition-colors">{test.title}</h3>
                     <div className="flex gap-4 mt-1 text-xs font-bold uppercase tracking-wider text-white/30">
-                       <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(test.createdAt).toLocaleDateString()}</span>
-                       <span className="px-2 bg-white/5 rounded text-[#00c885]">{test.status}</span>
+                      <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(test.createdAt).toLocaleDateString()}</span>
+                      <span className="px-2 bg-white/5 rounded text-[#00c885]">{test.status}</span>
                     </div>
                   </div>
                 </div>

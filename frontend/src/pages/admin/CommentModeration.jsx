@@ -11,6 +11,7 @@ export default function CommentModeration() {
 
   useEffect(() => {
     fetchComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const fetchComments = async () => {
@@ -23,7 +24,7 @@ export default function CommentModeration() {
         const res = await getAllComments({ approved: true });
         setAllComments(res.comments);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load comments");
     } finally {
       setLoading(false);
@@ -35,7 +36,7 @@ export default function CommentModeration() {
       await approveComment(commentId);
       toast.success("Comment approved");
       fetchComments();
-    } catch (error) {
+    } catch {
       toast.error("Failed to approve comment");
     }
   };
@@ -46,7 +47,7 @@ export default function CommentModeration() {
         await deleteComment(commentId);
         toast.success("Comment deleted");
         fetchComments();
-      } catch (error) {
+      } catch {
         toast.error("Failed to delete comment");
       }
     }

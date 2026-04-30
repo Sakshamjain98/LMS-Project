@@ -15,9 +15,42 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
   const tabSwitchCountRef = useRef(0);
   const autoSubmittingRef = useRef(false);
   const lastViolationAtRef = useRef(0);
+  const handleFinalSubmitRef = useRef(() => {});
 
   const currentQuestion = questions[currentIndex];
   const currentAnswer = answers.find(a => a.questionId === currentQuestion._id);
+
+  const handleFinalSubmit = useCallback(async ({ force = false, reason = "" } = {}) => {
+    if (autoSubmittingRef.current) return;
+
+    if (!force) {
+      const confirmed = window.confirm(
+        "Are you sure you want to submit the test? You cannot change your answers after this."
+      );
+      if (!confirmed) return;
+    }
+
+    autoSubmittingRef.current = true;
+    if (reason) {
+      setProctorMessage(reason);
+    }
+
+    setIsSubmitting(true);
+    try {
+      // API requires an array of answers for final submission mapping
+      // Pass an `autoSubmitted` flag when submission is forced (proctoring/time expiry)
+      await submitTest(attempt._id, { answers, autoSubmitted: Boolean(force) });
+      onFinish(attempt._id);
+    } catch {
+      alert("Error submitting test. Please check connection.");
+      setIsSubmitting(false);
+      autoSubmittingRef.current = false;
+    }
+  }, [attempt._id, answers, onFinish]);
+
+  useEffect(() => {
+    handleFinalSubmitRef.current = handleFinalSubmit;
+  }, [handleFinalSubmit]);
 
   // Timer Logic
   useEffect(() => {
@@ -26,8 +59,10 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
     }
 
     if (timeLeft <= 0) {
-      handleFinalSubmit({ force: true, reason: "Time is over. Auto-submitting your test." });
-      return;
+      const timer = setTimeout(() => {
+        handleFinalSubmitRef.current({ force: true, reason: "Time is over. Auto-submitting your test." });
+      }, 0);
+      return () => clearTimeout(timer);
     }
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
@@ -77,7 +112,9 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
       const remaining = 2 - tabSwitchCountRef.current;
 
       if (tabSwitchCountRef.current >= 2) {
-        handleFinalSubmit({ force: true, reason: "Two tab switches detected. Auto-submitting your test." });
+        setTimeout(() => {
+          handleFinalSubmitRef.current({ force: true, reason: "Two tab switches detected. Auto-submitting your test." });
+        }, 0);
         return;
       }
 
@@ -164,35 +201,6 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
       console.error("Failed to sync answer:", err);
     }
   };
-
-  // Final Submit
-  const handleFinalSubmit = useCallback(async ({ force = false, reason = "" } = {}) => {
-    if (autoSubmittingRef.current) return;
-
-    if (!force) {
-      const confirmed = window.confirm(
-        "Are you sure you want to submit the test? You cannot change your answers after this."
-      );
-      if (!confirmed) return;
-    }
-
-    autoSubmittingRef.current = true;
-    if (reason) {
-      setProctorMessage(reason);
-    }
-    
-    setIsSubmitting(true);
-    try {
-      // API requires an array of answers for final submission mapping
-      // Pass an `autoSubmitted` flag when submission is forced (proctoring/time expiry)
-      await submitTest(attempt._id, { answers, autoSubmitted: Boolean(force) });
-      onFinish(attempt._id);
-    } catch (err) {
-      alert("Error submitting test. Please check connection.");
-      setIsSubmitting(false);
-      autoSubmittingRef.current = false;
-    }
-  }, [attempt._id, answers, onFinish]);
 
   const handleResumeFullscreen = async () => {
     try {

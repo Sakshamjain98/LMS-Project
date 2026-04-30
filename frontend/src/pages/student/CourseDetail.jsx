@@ -19,7 +19,7 @@ export default function CourseDetail() {
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [subscriptionStatus, setSubscriptionStatus] = useState(
+  const [_subscriptionStatus, setSubscriptionStatus] = useState(
     localStorage.getItem("subscriptionStatus") || "FREE"
   );
   const [isSubscribed, setIsSubscribed] = useState(false);

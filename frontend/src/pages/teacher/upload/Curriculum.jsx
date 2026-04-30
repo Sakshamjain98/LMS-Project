@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useRef } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Trash2, ChevronDown, Video, FileText, AlertCircle, Layout, X, Upload } from "lucide-react";
 import { UploadContext } from "./UploadContextProvider";
@@ -12,19 +12,13 @@ export default function Curriculum() {
   const [expandedModuleId, setExpandedModuleId] = useState(formData?.curriculum?.modules?.[0]?.id || null);
   const [errors, setErrors] = useState({});
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: null, id: null, parentId: null });
-  const [isEditingExistingCourse, setIsEditingExistingCourse] = useState(false);
+  const isEditingExistingCourse = Boolean(location.state?.course);
 
-  // Check if coming from CourseDetail (adding sections to existing course)
   useEffect(() => {
-    if (location.state?.course) {
-      setIsEditingExistingCourse(true);
-      // Pre-populate with existing course data if needed
-    }
-
     if (!formData?.courseStatus?.basicsCompleted && !isEditingExistingCourse) {
       navigate("/teacher/upload/basics", { replace: true });
     }
-  }, [formData?.courseStatus?.basicsCompleted, navigate, location.state, isEditingExistingCourse]);
+  }, [formData?.courseStatus?.basicsCompleted, isEditingExistingCourse, navigate]);
 
   // Helper to safely get modules array
   const modules = formData?.curriculum?.modules || [];

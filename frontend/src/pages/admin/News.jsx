@@ -37,7 +37,7 @@ export default function News() {
       const res = await getAllNews(req);
       setNews(res.news || []);
       setPagination(res.pagination || { page: 1, limit: params.limit, totalPages: 1, total: 0 });
-    } catch (error) {
+    } catch {
       toast.error("Failed to load news articles");
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ export default function News() {
       }
       closeModal();
       fetchNews(query);
-    } catch (error) {
+    } catch {
       toast.error("Operation failed");
     } finally {
       setSubmitting(false);
@@ -71,7 +71,7 @@ export default function News() {
         toast.success("Article removed");
         const shouldGoPrev = news.length === 1 && pagination.page > 1;
         setQuery((prev) => ({ ...prev, page: shouldGoPrev ? prev.page - 1 : prev.page }));
-      } catch (error) {
+      } catch {
         toast.error("Failed to delete");
       }
     }

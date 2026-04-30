@@ -1,9 +1,6 @@
-import { motion } from "framer-motion";
-
 export default function StatCard({ title, value, icon }) {
   return (
-    <motion.div
-      whileHover={{ scale: 1.05 }}
+    <div
       className="bg-dark-200 p-5 rounded-xl border border-dark-100 flex items-center justify-between"
     >
       <div>
@@ -14,6 +11,6 @@ export default function StatCard({ title, value, icon }) {
       <div className="text-brand-primary text-2xl">
         {icon}
       </div>
-    </motion.div>
+    </div>
   );
 }

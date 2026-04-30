@@ -37,6 +37,7 @@ export default function Users() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.role, debouncedSearch, page, limit]);
 
   const fetchUsers = async () => {
@@ -50,7 +51,7 @@ export default function Users() {
       });
       setUsers(res.users || []);
       setPagination(res.pagination || pagination);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
@@ -63,7 +64,7 @@ export default function Users() {
       toast.success("Role updated successfully");
       fetchUsers();
       setEditingRole(null);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update role");
     }
   };
@@ -74,7 +75,7 @@ export default function Users() {
         await deleteUser(userId);
         toast.success("User deleted successfully");
         fetchUsers();
-      } catch (error) {
+      } catch {
         toast.error("Failed to delete user");
       }
     }

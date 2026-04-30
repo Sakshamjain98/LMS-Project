@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../../assets/icons/logo.png";
-import { registerUser, googleAuth } from "../../services/authService";
+import { registerUser } from "../../services/authService";
 import { GoogleLogin } from "@react-oauth/google";
 import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
 import Navbar from "../../components/layout/Navbar";
@@ -11,7 +11,6 @@ const Register = () => {
   const [role, setRole] = useState("student");
   const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
   const [fieldErrors, setFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);

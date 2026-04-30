@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, X, Loader2, Lock, Unlock } from "lucide-react";
 import { UploadContext } from "./UploadContextProvider";
@@ -165,17 +165,13 @@ const UploadBox = ({ preview, onFileChange, onRemove, error }) => {
 export default function CourseBasics() {
   const navigate = useNavigate();
   const { formData, updateBasics, updatePricing, markBasicsCompleted } = useContext(UploadContext);
-  const [charCount, setCharCount] = useState(formData.basics.description?.length || 0);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setCharCount(formData.basics.description?.length || 0);
-  }, [formData.basics.description]);
+  const charCount = formData.basics.description?.length || 0;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "description") setCharCount(value.length);
     updateBasics({ [name]: value });
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };

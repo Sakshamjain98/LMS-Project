@@ -32,7 +32,7 @@ export default function Sidebar() {
   });
 
   const [openTests, setOpenTests] = useState(true);
-  const [openUpload, setOpenUpload] = useState(() => {
+  const [manualOpenUpload, setManualOpenUpload] = useState(() => {
     try {
       const saved = localStorage.getItem("sidebarOpenUpload");
       return saved ? JSON.parse(saved) : location.pathname.includes("/teacher/upload");
@@ -87,15 +87,11 @@ export default function Sidebar() {
     localStorage.setItem("sidebarCollapsed", JSON.stringify(collapsed));
   }, [collapsed]);
 
-  useEffect(() => {
-    localStorage.setItem("sidebarOpenUpload", JSON.stringify(openUpload));
-  }, [openUpload]);
+  const openUpload = manualOpenUpload || location.pathname.includes("/teacher/upload");
 
   useEffect(() => {
-    if (location.pathname.includes("/teacher/upload")) {
-      setOpenUpload(true);
-    }
-  }, [location.pathname]);
+    localStorage.setItem("sidebarOpenUpload", JSON.stringify(manualOpenUpload));
+  }, [manualOpenUpload]);
 
   const handleNavClick = () => {
     setMobileOpen(false);
@@ -215,7 +211,7 @@ export default function Sidebar() {
           {uploadEnabled && (
           <div className="space-y-2">
             <button
-              onClick={() => setOpenUpload(!openUpload)}
+              onClick={() => setManualOpenUpload((prev) => !prev)}
               className={`${baseClass} ${inactiveClass} justify-between`}
               title={collapsed ? "Upload Content" : ""}
             >

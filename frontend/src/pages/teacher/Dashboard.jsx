@@ -8,7 +8,7 @@ import { DEFAULT_TEACHER_UI_SETTINGS, mergeTeacherUiSettings } from "../../const
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
-  const [notes, setNotes] = useState([]);
+  const [_notes, setNotes] = useState([]);
   const [tests, setTests] = useState([]);
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -20,7 +20,6 @@ export default function TeacherDashboard() {
     publishedTests: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [uiSettings, setUiSettings] = useState(DEFAULT_TEACHER_UI_SETTINGS);
 
   useEffect(() => {
@@ -55,9 +54,8 @@ export default function TeacherDashboard() {
           draftTests: testList.filter(t => t.status === "draft").length,
           publishedTests: testList.filter(t => t.status === "published").length,
         });
-      } catch (err) {
-        console.error("Dashboard error:", err);
-        setError("Failed to load dashboard");
+      } catch (error) {
+        console.error("Dashboard error:", error);
       } finally {
         setLoading(false);
       }
@@ -320,7 +318,7 @@ function ContentSection({ icon, title, subtitle, viewAllLink, isEmpty, emptyMess
   );
 }
 
-function ContentCard({ icon, title, meta1, meta2, status, statusColor, onClick }) {
+function ContentCard({ title, meta1, meta2, status, statusColor, onClick }) {
   const statusBgColor = {
     yellow: "bg-yellow-500/15 text-yellow-400",
     green: "bg-green-500/15 text-green-400",

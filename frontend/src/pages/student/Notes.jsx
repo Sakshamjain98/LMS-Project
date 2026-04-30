@@ -7,7 +7,6 @@ import {
 import { useNavigate } from "react-router-dom";
 
 export default function StudentNotes() {
-  const navigate = useNavigate();
 
   const [notes, setNotes] = useState([]);
   const [filteredNotes, setFilteredNotes] = useState([]);
@@ -18,7 +17,7 @@ export default function StudentNotes() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   
   // Subscription state
-  const [subscriptionStatus, setSubscriptionStatus] = useState(
+  const [_subscriptionStatus, setSubscriptionStatus] = useState(
     localStorage.getItem("subscriptionStatus") || "FREE"
   );
   const [isSubscribed, setIsSubscribed] = useState(false);

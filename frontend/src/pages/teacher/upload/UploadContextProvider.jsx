@@ -1,45 +1,8 @@
-import { createContext, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { UploadContext, defaultState } from "./UploadContext";
 
-export const UploadContext = createContext(null);
-
-const defaultState = {
-  courseId: null,
-  courseStatus: {
-    basicsCompleted: false,
-    curriculumCompleted: false,
-  },
-  basics: {
-    title: "",
-    description: "",
-    tags: [],
-    thumbnail: null,
-    thumbnailPreview: null,
-  },
-  curriculum: {
-    modules: [
-      {
-        id: `module-${Date.now()}`,
-        title: "",
-        description: "",
-        lectures: [ // ✅ Changed from 'lessons' to 'lectures'
-          {
-            id: `lecture-${Date.now()}`,
-            type: "video",
-            title: "",
-            videoUrl: "", // ✅ Matches Finalize.jsx expectation
-            notes: null,
-          },
-        ],
-      },
-    ],
-  },
-  pricing: {
-    isPaid: false,
-    price: 0,
-    category: "",
-    language: "en",
-  },
-};
+// Re-export for backward compatibility
+export { UploadContext };
 
 export default function UploadContextProvider({ children }) {
   const [formData, setFormData] = useState(() => {

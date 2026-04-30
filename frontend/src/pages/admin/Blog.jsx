@@ -31,7 +31,7 @@ export default function Blogs() {
       const res = await getBlogs(req);
       setBlogs(res.blogs || []);
       setPagination(res.pagination || { page: 1, limit: params.limit, totalPages: 1, total: 0 });
-    } catch (error) {
+    } catch {
       toast.error("Failed to load blogs");
     } finally {
       setLoading(false);
@@ -76,8 +76,8 @@ export default function Blogs() {
 
       closeModal();
       fetchBlogs(query);
-    } catch (error) {
-      toast.error(error.message || "Failed to create blog");
+    } catch (err) {
+      toast.error(err.message || "Failed to create blog");
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +90,7 @@ export default function Blogs() {
       toast.success("Blog deleted");
       const shouldGoPrev = blogs.length === 1 && pagination.page > 1;
       setQuery((prev) => ({ ...prev, page: shouldGoPrev ? prev.page - 1 : prev.page }));
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete blog");
     }
   };

@@ -42,6 +42,7 @@ export default function PendingContent() {
 
   useEffect(() => {
     fetchContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.type, debouncedSearch, page, limit]);
 
   const fetchContent = async () => {
@@ -56,7 +57,7 @@ export default function PendingContent() {
       setPendingCourses(res.content.pendingCourses || []);
       setPendingBlogs(res.content.pendingBlogs || []);
       setPagination(res.pagination || pagination);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load pending content");
     } finally {
       setLoading(false);
@@ -77,7 +78,7 @@ export default function PendingContent() {
       toast.success("Course approved successfully");
       setSelectedCourse(null);
       fetchContent();
-    } catch (error) {
+    } catch {
       toast.error("Failed to approve course");
     } finally {
       setProcessingId(null);
@@ -91,7 +92,7 @@ export default function PendingContent() {
       toast.success("Course rejected");
       setSelectedCourse(null);
       fetchContent();
-    } catch (error) {
+    } catch {
       toast.error("Failed to reject course");
     } finally {
       setProcessingId(null);

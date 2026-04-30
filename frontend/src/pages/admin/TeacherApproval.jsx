@@ -34,6 +34,7 @@ export default function TeacherApproval() {
 
   useEffect(() => {
     fetchTeachers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, page, limit]);
 
   const fetchTeachers = async () => {
@@ -42,7 +43,7 @@ export default function TeacherApproval() {
       const res = await getPendingTeachers({ search: debouncedSearch, page, limit });
       setTeachers(res.teachers || []);
       setPagination(res.pagination || pagination);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load pending teachers");
     } finally {
       setLoading(false);
@@ -62,7 +63,7 @@ export default function TeacherApproval() {
       await approveTeacher(teacherId);
       toast.success("Teacher account verified");
       fetchTeachers();
-    } catch (error) {
+    } catch {
       toast.error("Failed to approve teacher");
     } finally {
       setProcessingId(null);

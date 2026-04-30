@@ -10,13 +10,14 @@ export default function Revenue() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const fetchData = async () => {
     try {
       const res = await getRevenueAnalytics(period);
       setData(res.data);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load revenue data");
     } finally {
       setLoading(false);
