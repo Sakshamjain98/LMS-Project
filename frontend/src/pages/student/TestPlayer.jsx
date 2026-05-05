@@ -3,7 +3,7 @@ import { submitAnswer, submitTest } from "../../services/studentService";
 import { Clock, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, X } from "lucide-react";
 
 export default function TestPlayer({ attemptData, onFinish, onExit }) {
-  const { attempt, questions, duration } = attemptData;
+  const { attempt, questions, duration, isProctored } = attemptData;
   
   // State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -69,6 +69,10 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
   }, [timeLeft, isPausedForFullscreen]);
 
   useEffect(() => {
+    if (!isProctored) {
+      return () => {};
+    }
+
     const enterFullscreen = async () => {
       try {
         if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -165,7 +169,7 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
         document.exitFullscreen().catch(() => {});
       }
     };
-  }, []);
+  }, [isProctored]);
 
   // Format Time
   const formatTime = (seconds) => {

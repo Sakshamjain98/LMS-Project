@@ -28,6 +28,7 @@ const navItems = [
   { path: "/admin/news", label: "News", icon: Newspaper },
   { path: "/admin/blogs", label: "Blog Moderation", icon: DollarSign },
   { path: "/admin/educator-controls", label: "Educator Controls", icon: SlidersHorizontal },
+  { path: "/teacher/tests", label: "Test Series", icon: BookOpen },
   { path: "/admin/profile", label: "Profile", icon: UserCircle2 },
   { path: "/admin/create-admin", label: "Create Admin", icon: UserPlus }, 
 ];
@@ -66,7 +67,7 @@ export default function AdminLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-72 bg-dark-300 border-r border-dark-100 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 z-40 h-screen w-72 bg-dark-300/80 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >

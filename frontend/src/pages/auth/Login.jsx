@@ -1,18 +1,15 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../../assets/icons/logo.png";
-import { loginUser, googleAuth } from "../../services/authService";
-import { GoogleLogin } from "@react-oauth/google";
+import { loginUser } from "../../services/authService";
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import Navbar from "../../components/layout/Navbar";
 
 const Login = () => {
   const navigate = useNavigate();
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" }); // {type: 'error' | 'success', message: ''}
   const [fieldErrors, setFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
@@ -72,22 +69,6 @@ const Login = () => {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      setGoogleLoading(true);
-      setStatus({ type: "", message: "" });
-      const res = await googleAuth({
-        token: credentialResponse.credential,
-        role: "student",
-      });
-      if (res.success) handleAuthSuccess(res);
-    } catch (err) {
-      setStatus({ type: "error", message: err.message || "Google login failed" });
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
   return (
     <>
       <Navbar />
@@ -98,7 +79,7 @@ const Login = () => {
           </div>
 
           <h2 className="text-center text-3xl font-black text-white mb-1">Welcome Back</h2>
-          <p className="text-center text-sm text-gray-400 mb-8">Sign in to continue learning</p>
+          <p className="text-center text-sm text-gray-400 mb-8">Student login for learners. Admins can sign in with their assigned credentials.</p>
 
           <div className="bg-dark-200 border border-dark-100 rounded-xl p-8 space-y-6">
             {/* Custom Status Message Box */}
@@ -160,23 +141,11 @@ const Login = () => {
               </button>
             </form>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dark-100" /></div>
-              <div className="relative flex justify-center text-sm"><span className="px-2 bg-dark-200 text-gray-500">or continue with</span></div>
-            </div>
-
-            <div className="flex justify-center">
-              {!googleClientId ? (
-                <p className="text-xs text-gray-500 text-center">Google login is currently unavailable.</p>
-              ) : googleLoading ? (
-                <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
-              ) : (
-                <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setStatus({type: "error", message: "Google Auth Failed"})} theme="dark" />
-              )}
-            </div>
-
             <p className="text-center text-sm text-gray-400">
-              Don't have an account? <Link to="/register" className="text-brand-primary font-semibold">Sign up</Link>
+              New student?{" "}
+              <Link to="/register" className="text-brand-primary font-semibold hover:underline">
+                Sign up
+              </Link>
             </p>
           </div>
         </div>

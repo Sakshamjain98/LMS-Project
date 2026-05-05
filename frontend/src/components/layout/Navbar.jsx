@@ -226,21 +226,12 @@ const Navbar = () => {
                 Logout
               </button>
             ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="px-5 py-2 text-gray-300 hover:text-white transition font-medium"
-                >
-                  Login
-                </Link>
-
-                <Link
-                  to="/register"
-                  className="px-6 py-2.5 bg-brand-primary text-dark-400 rounded-lg text-base font-bold hover:opacity-90 transition"
-                >
-                  Get Started
-                </Link>
-              </>
+              <Link
+                to="/login"
+                className="px-6 py-2.5 bg-brand-primary text-dark-400 rounded-lg text-base font-bold hover:opacity-90 transition"
+              >
+                Student Login
+              </Link>
             )}
           </div>
 
@@ -317,16 +308,9 @@ const Navbar = () => {
               <Link
                 to="/login"
                 onClick={() => setIsOpen(false)}
-                className="block w-full text-center px-4 py-2.5 text-gray-300 hover:text-white"
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
-                onClick={() => setIsOpen(false)}
                 className="block w-full text-center px-4 py-2.5 bg-brand-primary text-dark-400 rounded-lg font-bold"
               >
-                Get Started
+                Student Login
               </Link>
             </>
           )}

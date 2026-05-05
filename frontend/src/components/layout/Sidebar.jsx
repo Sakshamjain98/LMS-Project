@@ -165,14 +165,14 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static top-0 left-0 h-screen ${sidebarWidth} bg-dark-300 flex flex-col border-r border-dark-100 transition-all duration-300 z-30 ${
+        className={`fixed lg:static top-0 left-0 h-screen ${sidebarWidth} bg-dark-300/80 backdrop-blur-xl flex flex-col border-r border-white/10 transition-all duration-300 z-30 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Header */}
         <div className="h-20 px-4 flex items-center justify-between border-b border-dark-100">
           {!collapsed && (
-            <span className="text-white text-lg font-bold tracking-tight">Educator</span>
+            <span className="text-white text-lg font-bold tracking-tight">Admin Workspace</span>
           )}
           <button
             onClick={() => setCollapsed((prev) => !prev)}
@@ -278,11 +278,11 @@ export default function Sidebar() {
   <button
     onClick={() => setOpenTests((prev) => !prev)}
     className={`${baseClass} ${inactiveClass} justify-between`}
-    title={collapsed ? "Tests" : ""}
+            title={collapsed ? "Test Series" : ""}
   >
     <span className="flex items-center gap-3">
       <FileText size={18} />
-      <span className={textHidden}>Tests</span>
+      <span className={textHidden}>Test Series</span>
     </span>
     {!collapsed &&
       (openTests ? (

@@ -8,7 +8,6 @@ import Navbar from "../../components/layout/Navbar";
 
 const Register = () => {
   const navigate = useNavigate();
-  const [role, setRole] = useState("student");
   const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
@@ -43,7 +42,7 @@ const Register = () => {
 
     try {
       setLoading(true);
-      const payload = { ...formData, role: role === "educator" ? "teacher" : "student" };
+      const payload = { ...formData, role: "student" };
       const res = await registerUser(payload);
       if (res.success) {
         setIsSuccess(true);
@@ -72,9 +71,7 @@ const Register = () => {
           </div>
           <h2 className="text-2xl font-bold text-white">Registration Complete!</h2>
           <p className="text-gray-400">
-            {role === "educator" 
-              ? "Your teacher account is pending admin approval. You can try logging in once approved." 
-              : "Your student account is ready. You can now sign in to start learning."}
+            Your student account is ready. You can now sign in to start learning.
           </p>
           <button 
             onClick={() => navigate("/login")}
@@ -107,21 +104,8 @@ const Register = () => {
               </div>
             )}
 
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-gray-300 uppercase">I am a</label>
-              <div className="grid grid-cols-2 gap-3">
-                {["student", "educator"].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setRole(opt)}
-                    className={`py-2 px-4 rounded-lg font-semibold border transition ${
-                      role === opt ? "bg-brand-primary text-dark-400 border-brand-primary" : "bg-dark-300 text-gray-300 border-dark-100"
-                    }`}
-                  >
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  </button>
-                ))}
-              </div>
+            <div className="rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-4 py-2 text-xs text-brand-primary font-semibold">
+              Student registration only. Admin and educator access is managed by the platform administrator.
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>

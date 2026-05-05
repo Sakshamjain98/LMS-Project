@@ -50,8 +50,10 @@ export default function StudentProfile() {
     try {
       setSaving(true);
       setError("");
-      await updateStudentProfile(formData);
-      setUser(formData); // Update displayed user data
+      const res = await updateStudentProfile(formData);
+      const updatedUser = res?.user || formData;
+      setUser(updatedUser);
+      setFormData(updatedUser);
       setSuccessMessage("Profile updated successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {

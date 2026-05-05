@@ -2,6 +2,7 @@ import Course from "../../models/course.model.js";
 import Blog from "../../models/blog.model.js";
 import User from "../../models/user.model.js";
 import Test from "../test/test.model.js";
+import * as testCoreService from "../test/test.service.js";
 import TestConfig from "../../models/testConfig.model.js";
 import QuestionAnalytics from "../../models/questionAnalysis.model.js";
 import PlatformSettings, { DEFAULT_TEACHER_SETTINGS } from "../../models/platformSettings.model.js";
@@ -48,7 +49,21 @@ export const getProfile = async (userId) => {
 };
 
 export const updateProfile = async (userId, data) => {
-  return User.findByIdAndUpdate(userId, { $set: data }, { new: true }).select("-password");
+  const updates = {};
+
+  if (data?.name !== undefined) {
+    updates.name = String(data.name).trim();
+  }
+
+  if (data?.phone !== undefined) {
+    updates.phone = String(data.phone || "").trim();
+  }
+
+  if (data?.avatar !== undefined) {
+    updates.avatar = String(data.avatar || "").trim();
+  }
+
+  return User.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true }).select("-password");
 };
 // ================= COURSES =================
 export const createCourse = async (data, educatorId) => {
@@ -274,22 +289,7 @@ export const updateVideoLink = async (courseId, educatorId, sectionId, videoInde
 
 // ==================== Tests (unchanged) ====================
 export const createTest = async (data, teacherId) => {
-  const payload = data || {};
-
-  return Test.create({
-    title: payload.title?.trim() || "Untitled Test",
-    description: payload.description?.trim() || "",
-    duration: payload.duration || 60,
-    passingMarks: payload.passingMarks || 0,
-    startTime: payload.startTime || undefined,
-    endTime: payload.endTime || undefined,
-
-    // ✅ FREE / PAID
-    isPaid: payload.isPaid ?? false,
-
-    teacherId,
-    status: "draft",
-  });
+  return testCoreService.createTest(data, teacherId);
 };
 
 

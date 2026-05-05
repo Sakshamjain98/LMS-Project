@@ -24,9 +24,23 @@ export const getProfile = async (userId) => {
 };
 
 export const updateProfile = async (userId, data) => {
+  const updates = {};
+
+  if (data?.name !== undefined) {
+    updates.name = String(data.name).trim();
+  }
+
+  if (data?.phone !== undefined) {
+    updates.phone = String(data.phone || "").trim();
+  }
+
+  if (data?.avatar !== undefined) {
+    updates.avatar = String(data.avatar || "").trim();
+  }
+
   return User.findByIdAndUpdate(
     userId,
-    { $set: data },
+    { $set: updates },
     { new: true, runValidators: true } // ✅ important
   ).select("-password");
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getMyAttempts, startTest, getAvailableTests } from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import TestPlayer from "./TestPlayer";
@@ -10,8 +10,9 @@ import {
   BarChart2, 
   AlertCircle,
   FileText,
-  CheckCircle,
-  XCircle
+  Sparkles,
+  ArrowRight,
+  Users
 } from "lucide-react";
 
 export default function StudentTests() {
@@ -21,6 +22,8 @@ export default function StudentTests() {
   // Data State
   const [attempts, setAttempts] = useState([]);
   const [availableTests, setAvailableTests] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [selectedTopicId, setSelectedTopicId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
@@ -41,11 +44,15 @@ export default function StudentTests() {
       
       const [attemptsRes, testsRes] = await Promise.all([
         getMyAttempts().catch(() => ({ data: [] })),
-        getAvailableTests().catch(() => ({ tests: [] }))
+        getAvailableTests().catch(() => ({ topics: [] }))
       ]);
       
       setAttempts(attemptsRes.data || []);
-      setAvailableTests(testsRes.tests || []);
+      const topics = testsRes.topics || [];
+      setTopics(topics);
+      const flattened = flattenSeriesTests(topics);
+      setAvailableTests(flattened);
+      setSelectedTopicId((prev) => prev || topics[0]?._id || null);
       
     } catch {
       setError("Failed to load test center data. Please check your connection.");
@@ -114,43 +121,6 @@ export default function StudentTests() {
     return map;
   }, {});
 
-  const categorizedTests = availableTests.reduce(
-    (groups, test) => {
-      const lastAttempt = latestAttemptByTest[test._id];
-      const hasAttempt = Boolean(lastAttempt);
-      const isCompleted = hasAttempt && (
-        ["submitted", "evaluated"].includes(lastAttempt?.status) ||
-        Boolean(lastAttempt?.autoSubmitted) ||
-        Boolean(lastAttempt?.isCompleted)
-      );
-      const isNotStarted = test.startTime ? new Date(test.startTime).getTime() > Date.now() : false;
-      const isExpired = test.endTime ? new Date(test.endTime).getTime() < Date.now() : false;
-
-      const withMeta = {
-        ...test,
-        latestAttemptId: lastAttempt?._id || null,
-        testState: isCompleted
-          ? "completed"
-          : isNotStarted
-            ? "not-started"
-          : isExpired
-            ? "ended-not-completed"
-            : "not-attempted",
-      };
-
-      if (withMeta.testState === "completed") {
-        groups.completed.push(withMeta);
-      } else if (withMeta.testState === "ended-not-completed") {
-        groups.endedNotCompleted.push(withMeta);
-      } else {
-        groups.notAttempted.push(withMeta);
-      }
-
-      return groups;
-    },
-    { notAttempted: [], completed: [], endedNotCompleted: [] }
-  );
-
   // ─── ROUTER LOGIC ──────────────────────────────────────────────────────────
   if (viewState === "player" && activeAttemptData) {
     return (
@@ -172,16 +142,86 @@ export default function StudentTests() {
   }
 
   // ─── DASHBOARD VIEW ────────────────────────────────────────────────────────
+  const selectedTopic = useMemo(
+    () => topics.find((topic) => topic._id === selectedTopicId) || topics[0] || null,
+    [topics, selectedTopicId]
+  );
+
+  const selectedTests = useMemo(
+    () => (selectedTopic ? flattenTopicTests(selectedTopic) : availableTests),
+    [selectedTopic, availableTests]
+  );
+
+  const selectedSummary = useMemo(
+    () => getSeriesStats(selectedTopic),
+    [selectedTopic]
+  );
+
+  const seriesCards = useMemo(
+    () => topics.map((topic) => ({ topic, stats: getSeriesStats(topic) })),
+    [topics]
+  );
+
+  const categorizedSelectedTests = selectedTests.reduce(
+    (groups, test) => {
+      const lastAttempt = latestAttemptByTest[test._id];
+      const hasAttempt = Boolean(lastAttempt);
+      const isCompleted = hasAttempt && (
+        ["submitted", "evaluated"].includes(lastAttempt?.status) ||
+        Boolean(lastAttempt?.autoSubmitted) ||
+        Boolean(lastAttempt?.isCompleted)
+      );
+      const isNotStarted = test.startTime ? new Date(test.startTime).getTime() > Date.now() : false;
+      const isExpired = test.endTime ? new Date(test.endTime).getTime() < Date.now() : false;
+
+      const withMeta = {
+        ...test,
+        latestAttemptId: lastAttempt?._id || null,
+        testState: isCompleted
+          ? "completed"
+          : isNotStarted
+            ? "not-started"
+            : isExpired
+              ? "ended-not-completed"
+              : "not-attempted",
+      };
+
+      if (withMeta.testState === "completed") {
+        groups.completed.push(withMeta);
+      } else if (withMeta.testState === "ended-not-completed") {
+        groups.endedNotCompleted.push(withMeta);
+      } else {
+        groups.notAttempted.push(withMeta);
+      }
+
+      return groups;
+    },
+    { notAttempted: [], completed: [], endedNotCompleted: [] }
+  );
+
   return (
     <>
       <StudentNavbar />
-      <div className="min-h-screen bg-dark-400 pb-12">
-        
-        {/* HEADER */}
-        <div className="border-b border-dark-100 bg-dark-300">
+      <div className="min-h-screen bg-dark-400 pb-16" style={{ fontFamily: '"Space Grotesk", "DM Sans", sans-serif' }}>
+        {/* HERO */}
+        <div className="relative overflow-hidden border-b border-dark-100 bg-dark-300">
+          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-brand-primary/20 blur-3xl"></div>
+          <div className="absolute -left-10 top-32 h-36 w-36 rounded-full bg-sky-500/10 blur-3xl"></div>
           <div className="mx-auto max-w-350 px-4 py-8 md:px-6 md:py-10">
-            <h1 className="mb-2 text-3xl font-bold text-white md:text-4xl">Test Center</h1>
-            <p className="text-sm text-gray-400 md:text-base">Practice, improve, and track your performance with detailed analytics.</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/60">
+              <Sparkles size={12} className="text-brand-primary" />
+              Mobile-first test series
+            </div>
+            <h1 className="mt-4 text-3xl font-bold text-white md:text-4xl">Test Series Hub</h1>
+            <p className="mt-2 text-sm text-gray-400 md:text-base">
+              Explore live and practice tests, grouped by topic and chapter for quick mobile access.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatPill label="Total Tests" value={availableTests.length} />
+              <StatPill label="Free Tests" value={availableTests.filter((t) => !t.isPaid).length} />
+              <StatPill label="Live Now" value={availableTests.filter((t) => isLiveTest(t)).length} />
+              <StatPill label="Series" value={topics.length} />
+            </div>
           </div>
         </div>
 
@@ -195,28 +235,31 @@ export default function StudentTests() {
         )}
 
         <div className="mx-auto max-w-350 px-4 py-8 md:px-6">
-          
           {/* TABS */}
-          <div className="mb-8 flex gap-4 border-b border-dark-100 pb-px">
+          <div className="mb-8 flex gap-3 rounded-2xl border border-dark-100 bg-dark-200/60 p-2">
             <button
               onClick={() => setActiveTab("take")}
-              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
                 activeTab === "take"
-                  ? "border-brand-primary text-brand-primary"
-                  : "border-transparent text-gray-400 hover:text-white"
+                  ? "bg-brand-primary text-dark-400"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
-              <Play size={16} /> Take a Test
+              <span className="inline-flex items-center justify-center gap-2">
+                <Play size={16} /> Take a Test
+              </span>
             </button>
             <button
               onClick={() => setActiveTab("results")}
-              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
+              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
                 activeTab === "results"
-                  ? "border-brand-primary text-brand-primary"
-                  : "border-transparent text-gray-400 hover:text-white"
+                  ? "bg-brand-primary text-dark-400"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
-              <BarChart2 size={16} /> Results & Analytics
+              <span className="inline-flex items-center justify-center gap-2">
+                <BarChart2 size={16} /> Results
+              </span>
             </button>
           </div>
 
@@ -229,40 +272,114 @@ export default function StudentTests() {
             <>
               {/* TAB 1: TAKE TEST */}
               {activeTab === "take" && (
-                <div>
-                  {availableTests.length === 0 ? (
+                <div className="space-y-10">
+                  {seriesCards.length > 0 && (
+                    <section>
+                      <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-white">Browse Test Series</h2>
+                        <span className="text-xs font-semibold text-white/40">
+                          {seriesCards.length} series
+                        </span>
+                      </div>
+                      <div className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {seriesCards.map(({ topic, stats }) => (
+                          <button
+                            key={topic._id}
+                            onClick={() => setSelectedTopicId(topic._id)}
+                            className={`min-w-60 snap-start rounded-2xl border p-4 text-left transition-all ${
+                              selectedTopicId === topic._id
+                                ? "border-brand-primary/50 bg-brand-primary/10"
+                                : "border-dark-100 bg-dark-200/60 hover:border-brand-primary/30"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-xs uppercase tracking-widest text-white/40">Series</p>
+                                <h3 className="mt-1 text-base font-bold text-white line-clamp-2">
+                                  {topic.title}
+                                </h3>
+                              </div>
+                              <div className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/60">
+                                <Users size={12} />
+                                Popular
+                              </div>
+                            </div>
+                            <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
+                              <span className="font-semibold text-white">{stats.total}</span> Tests
+                              <span>•</span>
+                              <span className="text-brand-primary font-semibold">{stats.free}</span> Free
+                            </div>
+                            <ul className="mt-3 space-y-1 text-xs text-white/40">
+                              <li>• {stats.live} Live now</li>
+                              <li>• {stats.subjects} Subjects</li>
+                              <li>• {stats.chapters} Chapters</li>
+                            </ul>
+                            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand-primary/15 px-3 py-1 text-xs font-semibold text-brand-primary">
+                              View Test Series <ArrowRight size={12} />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {!selectedTopic && availableTests.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/50 py-16 text-center">
                       <FileText className="mx-auto mb-4 text-gray-600 opacity-50" size={48} />
                       <p className="mb-2 text-lg font-medium text-white">No active tests available</p>
                       <p className="text-sm text-gray-500">Check back later when new tests are published.</p>
                     </div>
                   ) : (
-                    <div className="space-y-8">
-                      <TestSection
-                        title="Not Attempted Tests"
-                        tests={categorizedTests.notAttempted}
-                        emptyText="No not-attempted tests available"
+                    <section className="space-y-6">
+                      <div className="rounded-2xl border border-dark-100 bg-dark-200/60 p-5">
+                        <h2 className="text-lg font-bold text-white">
+                          {selectedTopic?.title || "All Tests"}
+                        </h2>
+                        <p className="text-xs text-white/50 mt-1">
+                          {selectedTopic?.description || "Pick a test and start practicing instantly."}
+                        </p>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <MiniStat label="Total Tests" value={selectedSummary.total} />
+                          <MiniStat label="Free Tests" value={selectedSummary.free} />
+                          <MiniStat label="Live Tests" value={selectedSummary.live} />
+                          <MiniStat label="Chapters" value={selectedSummary.chapters} />
+                        </div>
+                      </div>
+
+                      <TestList
+                        title="Start a Test"
+                        tests={categorizedSelectedTests.notAttempted}
+                        emptyText="No tests available right now"
                         onStartTest={handleStartTest}
                         onViewResult={handleViewResult}
                       />
 
-                      <TestSection
+                      <TestList
                         title="Completed Tests"
-                        tests={categorizedTests.completed}
+                        tests={categorizedSelectedTests.completed}
                         emptyText="No completed tests yet"
                         onStartTest={handleStartTest}
                         onViewResult={handleViewResult}
                       />
 
-                      <TestSection
-                        title="Ended but Not Completed"
-                        tests={categorizedTests.endedNotCompleted}
-                        emptyText="No ended incomplete tests"
+                      <TestList
+                        title="Ended Tests"
+                        tests={categorizedSelectedTests.endedNotCompleted}
+                        emptyText="No ended tests"
                         onStartTest={handleStartTest}
                         onViewResult={handleViewResult}
                       />
-                    </div>
+                    </section>
                   )}
+
+                  <section className="rounded-2xl border border-dark-100 bg-dark-300/40 p-6">
+                    <h3 className="text-lg font-bold text-white">Why take this Test Series?</h3>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <FeatureCard title="All India Rank" body="Compete with thousands of learners and track your rank." />
+                      <FeatureCard title="Personal Insights" body="Identify weak areas with chapter-wise analytics." />
+                      <FeatureCard title="Pro Quality" body="Updated tests following the latest exam pattern." />
+                    </div>
+                  </section>
                 </div>
               )}
 
@@ -319,100 +436,189 @@ export default function StudentTests() {
   );
 }
 
-function TestSection({ title, tests, emptyText, onStartTest, onViewResult }) {
+const flattenSeriesTests = (topics) => {
+  const tests = [];
+  topics.forEach((topic) => {
+    topic.subjects?.forEach((subject) => {
+      subject.chapters?.forEach((chapter) => {
+        chapter.tests?.forEach((test) => {
+          tests.push({
+            ...test,
+            topicTitle: topic.title,
+            subjectTitle: subject.title,
+            chapterTitle: chapter.title,
+          });
+        });
+      });
+    });
+  });
+  return tests;
+};
+
+const flattenTopicTests = (topic) => {
+  if (!topic) return [];
+  return flattenSeriesTests([topic]);
+};
+
+const isLiveTest = (test) => {
+  const now = Date.now();
+  const startOk = !test.startTime || new Date(test.startTime).getTime() <= now;
+  const endOk = !test.endTime || new Date(test.endTime).getTime() >= now;
+  return startOk && endOk;
+};
+
+const getSeriesStats = (topic) => {
+  if (!topic) {
+    return { total: 0, free: 0, live: 0, subjects: 0, chapters: 0 };
+  }
+  let total = 0;
+  let free = 0;
+  let live = 0;
+  let chapters = 0;
+  const subjects = topic.subjects?.length || 0;
+
+  topic.subjects?.forEach((subject) => {
+    chapters += subject.chapters?.length || 0;
+    subject.chapters?.forEach((chapter) => {
+      chapter.tests?.forEach((test) => {
+        total += 1;
+        if (!test.isPaid) free += 1;
+        if (isLiveTest(test)) live += 1;
+      });
+    });
+  });
+
+  return { total, free, live, subjects, chapters };
+};
+
+function StatPill({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <p className="text-[10px] uppercase tracking-widest text-white/50">{label}</p>
+      <p className="mt-1 text-lg font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-dark-300/40 p-3">
+      <p className="text-[10px] uppercase tracking-widest text-white/40">{label}</p>
+      <p className="text-sm font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+function FeatureCard({ title, body }) {
+  return (
+    <div className="rounded-2xl border border-dark-100 bg-dark-200/60 p-4">
+      <p className="text-sm font-semibold text-white">{title}</p>
+      <p className="mt-2 text-xs text-white/50">{body}</p>
+    </div>
+  );
+}
+
+function TestList({ title, tests, emptyText, onStartTest, onViewResult }) {
   return (
     <section>
-      <h2 className="mb-4 text-xl font-bold text-white">{title}</h2>
-
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-base font-bold text-white">{title}</h3>
+        <span className="text-xs font-semibold text-white/40">{tests.length}</span>
+      </div>
       {tests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-10 text-center">
-          <p className="text-sm text-gray-500">{emptyText}</p>
+        <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-8 text-center">
+          <p className="text-xs text-gray-500">{emptyText}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {tests.map((test) => {
-            const isCompleted = test.testState === "completed";
-            const isEndedNotCompleted = test.testState === "ended-not-completed";
-            const isNotStarted = test.testState === "not-started";
-
-            return (
-              <div key={test._id} className="group flex flex-col rounded-2xl border border-dark-100 bg-dark-200 p-5 transition-all hover:-translate-y-1 hover:border-brand-primary/50 hover:shadow-[0_8px_30px_rgba(0,220,130,0.1)]">
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h3 className="line-clamp-2 min-h-12 text-lg font-bold text-white transition-colors group-hover:text-brand-primary">
-                      {test.title}
-                    </h3>
-                    <p className="mt-1 line-clamp-1 text-xs text-gray-500">
-                      {test.description || "Standard assessment format"}
-                    </p>
-                  </div>
-
-                  {isCompleted ? (
-                    <span className="shrink-0 rounded-full bg-blue-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-400">
-                      Completed
-                    </span>
-                  ) : isEndedNotCompleted ? (
-                    <span className="shrink-0 rounded-full bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400">
-                      Ended
-                    </span>
-                  ) : isNotStarted ? (
-                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                      Not Started
-                    </span>
-                  ) : (
-                    <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                      Live
-                    </span>
-                  )}
-                </div>
-
-                <div className="mb-4 space-y-3 border-b border-dark-100 pb-5 pt-2 text-xs font-medium text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-brand-primary/70" />
-                    {test.duration || 0} minutes
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ClipboardList size={14} className="text-brand-primary/70" />
-                    {test.questions?.length || 0} Questions • {test.totalMarks || 0} Marks
-                  </div>
-                </div>
-
-                {test.endTime && (
-                  <div className="mb-4 flex items-center gap-2 rounded-xl bg-dark-300/50 px-3 py-2 text-xs font-medium text-gray-400 border border-dark-100">
-                    <Clock size={14} className="text-gray-500" />
-                    Closes: {new Date(test.endTime).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                )}
-
-                {isCompleted ? (
-                  <button
-                    onClick={() => onViewResult(test.latestAttemptId)}
-                    disabled={!test.latestAttemptId}
-                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500/10 py-3 text-sm font-bold text-blue-400 transition-colors hover:bg-blue-500 hover:text-white disabled:opacity-50"
-                  >
-                    <CheckCircle size={16} /> View Analytics
-                  </button>
-                ) : isEndedNotCompleted ? (
-                  <button disabled className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-dark-300 py-3 text-sm font-bold text-gray-500">
-                    <XCircle size={16} /> Ended
-                  </button>
-                ) : isNotStarted ? (
-                  <button disabled className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-dark-300 py-3 text-sm font-bold text-gray-500">
-                    <Clock size={16} /> Not Started
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onStartTest(test._id)}
-                    className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-brand-primary/10 py-3 text-sm font-bold text-brand-primary transition-colors hover:bg-brand-primary hover:text-dark-400"
-                  >
-                    <Play size={16} /> Start Test
-                  </button>
-                )}
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {tests.map((test) => (
+            <TestRow
+              key={test._id}
+              test={test}
+              onStartTest={onStartTest}
+              onViewResult={onViewResult}
+            />
+          ))}
         </div>
       )}
     </section>
+  );
+}
+
+function TestRow({ test, onStartTest, onViewResult }) {
+  const isCompleted = test.testState === "completed";
+  const isEndedNotCompleted = test.testState === "ended-not-completed";
+  const isNotStarted = test.testState === "not-started";
+
+  return (
+    <div className="rounded-2xl border border-dark-100 bg-dark-200 p-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {isLiveTest(test) && (
+              <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                Live Test
+              </span>
+            )}
+            {!test.isPaid && (
+              <span className="rounded-full bg-brand-primary/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
+                Free
+              </span>
+            )}
+          </div>
+          <h4 className="mt-2 text-base font-semibold text-white">{test.title}</h4>
+          <p className="mt-1 text-xs text-white/50 line-clamp-1">
+            {test.topicTitle || "Topic"} / {test.subjectTitle || "Subject"} / {test.chapterTitle || "Chapter"}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-white/40">
+            <span className="inline-flex items-center gap-2">
+              <ClipboardList size={12} className="text-brand-primary/70" />
+              {test.questions?.length || 0} Questions
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <Clock size={12} className="text-brand-primary/70" />
+              {test.duration || 0} mins
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 md:min-w-35">
+          {isCompleted ? (
+            <button
+              onClick={() => onViewResult(test.latestAttemptId)}
+              disabled={!test.latestAttemptId}
+              className="w-full rounded-xl bg-blue-500/10 py-2.5 text-xs font-bold text-blue-400 hover:bg-blue-500 hover:text-white disabled:opacity-50"
+            >
+              View Result
+            </button>
+          ) : isEndedNotCompleted ? (
+            <button
+              disabled
+              className="w-full rounded-xl bg-dark-300 py-2.5 text-xs font-bold text-gray-500"
+            >
+              Test Over
+            </button>
+          ) : isNotStarted ? (
+            <button
+              disabled
+              className="w-full rounded-xl bg-dark-300 py-2.5 text-xs font-bold text-gray-500"
+            >
+              Starts Soon
+            </button>
+          ) : (
+            <button
+              onClick={() => onStartTest(test._id)}
+              className="w-full rounded-xl bg-brand-primary py-2.5 text-xs font-bold text-dark-400 hover:brightness-110"
+            >
+              Start Now
+            </button>
+          )}
+          {test.endTime && (
+            <p className="text-[10px] text-white/40 text-center">
+              Ends {new Date(test.endTime).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

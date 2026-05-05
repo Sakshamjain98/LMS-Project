@@ -202,6 +202,11 @@ export default function TestDetails() {
                 {test.description && (
                   <p className="text-white/60 text-sm mb-6">{test.description}</p>
                 )}
+                {(test.topicId?.title || test.subjectId?.title || test.chapterId?.title) && (
+                  <p className="text-xs text-white/40 mb-4">
+                    {test.topicId?.title || "Untitled Topic"} / {test.subjectId?.title || "Untitled Subject"} / {test.chapterId?.title || "Untitled Chapter"}
+                  </p>
+                )}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

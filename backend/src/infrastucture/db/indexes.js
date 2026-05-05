@@ -1,12 +1,21 @@
 import Test from "../../models/test.model.js";
 import Question from "../../models/question.model.js";
 import TestAttempt from "../../models/testAttempt.model.js";
+import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
+import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
+import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
 
 export const createIndexes = async () => {
   try {
     // Test indexes
     await Test.collection.createIndex({ teacherId: 1, createdAt: -1 });
     await Test.collection.createIndex({ status: 1 });
+    await Test.collection.createIndex({ topicId: 1, subjectId: 1, chapterId: 1, createdAt: -1 });
+
+    // Test series indexes
+    await TestSeriesTopic.collection.createIndex({ teacherId: 1, createdAt: -1 });
+    await TestSeriesSubject.collection.createIndex({ teacherId: 1, topicId: 1, createdAt: 1 });
+    await TestSeriesChapter.collection.createIndex({ teacherId: 1, subjectId: 1, createdAt: 1 });
 
     // Question indexes
     await Question.collection.createIndex({ testId: 1, createdAt: 1 });

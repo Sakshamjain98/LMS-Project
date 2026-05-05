@@ -4,7 +4,7 @@ import { MESSAGES } from "../../constants/message.js";
 import { activityQueue } from "../../infrastucture/queues/activity.queue.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { ApiError } from "../../shared/error/ApiError.js";
-import Test from "../test/test.model.js";
+import * as testSeriesService from "../testSeries/testSeries.service.js";
 
 export const dashboard = asyncHandler(async (req, res) => {
   // 1. Fetch dashboard data
@@ -187,13 +187,11 @@ export const paidNotes = asyncHandler(async (req, res) => {
 });
 
 export const getAvailableTests = asyncHandler(async (req, res) => {
-  const tests = await Test.find({ status: "published" })
-    .select("_id title description duration totalMarks questions status startTime endTime")
-    .lean();
-  
+  const topics = await testSeriesService.getStudentSeriesTree();
+
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
-    tests,
+    topics,
   });
 });
 

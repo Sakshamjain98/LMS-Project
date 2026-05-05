@@ -512,7 +512,7 @@ const Home = () => {
       else if (userRole === "admin") navigate("/admin/dashboard");
       else navigate("/student/dashboard");
     } else {
-      navigate("/register");
+      navigate("/login");
     }
   };
 
@@ -681,7 +681,7 @@ const Home = () => {
                 onClick={handleGetStarted}
                 className="px-7 py-3.5 bg-brand-primary text-dark-400 rounded-lg font-bold text-sm hover:opacity-90 transition inline-flex items-center justify-center gap-2 group"
               >
-                Get Started Free
+                Student Login
                 <FaArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
               <a

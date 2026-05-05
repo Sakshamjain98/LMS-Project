@@ -1,286 +1,876 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ClipboardList, Clock, CheckCircle2, FileText, Trash2, BarChart3, ExternalLink, Plus, AlertCircle, Search } from "lucide-react";
-import { getTeacherTests, deleteTeacherTest } from "../../services/teacherService";
-import TestStatCard from "../../components/teacher/tests/TestStatCard";
-import TestEmptyState from "../../components/teacher/tests/TestEmptyState";
+import {
+  createTestSeriesChapter,
+  createTestSeriesSubject,
+  createTestSeriesTest,
+  createTestSeriesTopic,
+  deleteTeacherTest,
+  deleteTestSeriesChapter,
+  deleteTestSeriesSubject,
+  deleteTestSeriesTopic,
+  getTeacherTestSeries,
+  updateTeacherTest,
+  updateTestSeriesChapter,
+  updateTestSeriesSubject,
+  updateTestSeriesTopic,
+  uploadTestCSV,
+} from "../../services/teacherService";
+import {
+  ChevronRight,
+  FileText,
+  Folder,
+  Layers,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 
+const emptyEntityForm = { title: "", description: "" };
+const emptyTestForm = {
+  title: "",
+  description: "",
+  duration: 60,
+  passingMarks: 0,
+  instructions: "",
+  isPaid: false,
+  attemptLimit: 0,
+  isProctored: false,
+  isOpenTest: true,
+  startTime: "",
+  endTime: "",
+};
+
+const emptyCsvForm = {
+  title: "",
+  description: "",
+  duration: 60,
+  passingMarks: 0,
+  attemptLimit: 0,
+  isProctored: false,
+  isOpenTest: false,
+  startTime: "",
+  endTime: "",
+  file: null,
+};
+
 export default function Tests() {
-  const navigate = useNavigate();
-  const [tests, setTests] = useState([]);
+  const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, testId: null });
-  const [filters, setFilters] = useState({ search: "", status: "" });
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPrevPage: false,
-  });
+  const [filters, setFilters] = useState({ search: "" });
+  const [level, setLevel] = useState("topics");
+  const [selectedTopicId, setSelectedTopicId] = useState(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedChapterId, setSelectedChapterId] = useState(null);
+  const [modalState, setModalState] = useState({ isOpen: false, type: null, mode: "create" });
+  const [editingTestId, setEditingTestId] = useState(null);
+  const [entityForm, setEntityForm] = useState(emptyEntityForm);
+  const [testForm, setTestForm] = useState(emptyTestForm);
+  const [csvForm, setCsvForm] = useState(emptyCsvForm);
+  const [confirmState, setConfirmState] = useState({ isOpen: false, type: null, id: null });
+  const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(filters.search.trim());
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [filters.search]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filters.status, limit]);
-
-  const fetchTests = useCallback(async () => {
+  const fetchSeries = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getTeacherTests({
-        search: debouncedSearch,
-        status: filters.status,
-        page,
-        limit,
-      });
-      setTests(res.tests || []);
-      setPagination(
-        res.pagination || {
-          page: 1,
-          limit,
-          total: 0,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPrevPage: false,
-        }
-      );
-    } catch (err) {
-      setError(err.message || "Failed to load tests");
+      const res = await getTeacherTestSeries();
+      const list = res.topics || [];
+      setTopics(list);
+      setSelectedTopicId((prev) => prev || list[0]?._id || null);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, filters.status, page, limit]);
+  }, []);
 
   useEffect(() => {
-    fetchTests();
-  }, [fetchTests]);
+    fetchSeries();
+  }, [fetchSeries]);
 
-  const stats = useMemo(() => {
-    const total = tests.length;
-    const draft = tests.filter((t) => t.status === "draft").length;
-    const published = tests.filter((t) => t.status === "published").length;
-    const totalQuestions = tests.reduce((sum, test) => sum + (test.questions?.length || 0), 0);
-    return { total, draft, published, totalQuestions };
-  }, [tests]);
+  const selectedTopic = useMemo(
+    () => topics.find((topic) => topic._id === selectedTopicId) || null,
+    [topics, selectedTopicId]
+  );
 
-  const handleDelete = async () => {
+  const selectedSubject = useMemo(
+    () => selectedTopic?.subjects?.find((subject) => subject._id === selectedSubjectId) || null,
+    [selectedTopic, selectedSubjectId]
+  );
+
+  const selectedChapter = useMemo(
+    () => selectedSubject?.chapters?.find((chapter) => chapter._id === selectedChapterId) || null,
+    [selectedSubject, selectedChapterId]
+  );
+
+  const hierarchyPath = useMemo(
+    () => [selectedTopic?.title, selectedSubject?.title, selectedChapter?.title].filter(Boolean),
+    [selectedTopic, selectedSubject, selectedChapter]
+  );
+
+  const filteredRows = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+    if (level === "topics") {
+      const rows = topics || [];
+      return search ? rows.filter((row) => row.title.toLowerCase().includes(search)) : rows;
+    }
+    if (level === "subjects") {
+      const rows = selectedTopic?.subjects || [];
+      return search ? rows.filter((row) => row.title.toLowerCase().includes(search)) : rows;
+    }
+    if (level === "chapters") {
+      const rows = selectedSubject?.chapters || [];
+      return search ? rows.filter((row) => row.title.toLowerCase().includes(search)) : rows;
+    }
+    const rows = selectedChapter?.tests || [];
+    return search ? rows.filter((row) => row.title.toLowerCase().includes(search)) : rows;
+  }, [filters.search, level, topics, selectedTopic, selectedSubject, selectedChapter]);
+
+  const openModal = (type, mode, data = null) => {
+    setModalState({ isOpen: true, type, mode });
+    if (type === "test") {
+      if (mode === "edit" && data) {
+        setEditingTestId(data._id);
+        setTestForm({
+          title: data.title || "",
+          description: data.description || "",
+          duration: data.duration || 60,
+          passingMarks: data.passingMarks || 0,
+          instructions: data.instructions || "",
+          isPaid: Boolean(data.isPaid),
+          attemptLimit: data.attemptLimit || 0,
+          isProctored: Boolean(data.isProctored),
+          isOpenTest: !(data.startTime || data.endTime),
+          startTime: data.startTime ? toLocalDateTime(data.startTime) : "",
+          endTime: data.endTime ? toLocalDateTime(data.endTime) : "",
+        });
+      } else {
+        setEditingTestId(null);
+        setTestForm(emptyTestForm);
+      }
+      return;
+    }
+    if (type === "csv") {
+      setCsvForm(emptyCsvForm);
+      return;
+    }
+    if (mode === "edit" && data) {
+      setEntityForm({
+        title: data.title || "",
+        description: data.description || "",
+      });
+      return;
+    }
+    setEntityForm(emptyEntityForm);
+  };
+
+  const closeModal = () => {
+    setModalState({ isOpen: false, type: null, mode: "create" });
+    setEntityForm(emptyEntityForm);
+    setTestForm(emptyTestForm);
+    setCsvForm(emptyCsvForm);
+    setEditingTestId(null);
+  };
+
+  const handleCreateEntity = async () => {
+    if (!entityForm.title.trim()) return;
+    setActionLoading(true);
     try {
-      await deleteTeacherTest(deleteModal.testId);
-      const shouldGoPrev = tests.length === 1 && pagination.page > 1;
-      setPage((prev) => (shouldGoPrev ? prev - 1 : prev));
-      fetchTests();
-    } catch (err) {
-      setError(err.message);
+      if (level === "topics") {
+        await createTestSeriesTopic(entityForm);
+      }
+      if (level === "subjects" && selectedTopicId) {
+        await createTestSeriesSubject(selectedTopicId, entityForm);
+      }
+      if (level === "chapters" && selectedSubjectId) {
+        await createTestSeriesChapter(selectedSubjectId, entityForm);
+      }
+      await fetchSeries();
+      closeModal();
     } finally {
-      setDeleteModal({ isOpen: false, testId: null });
+      setActionLoading(false);
     }
   };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center py-24 space-y-4">
-      <div className="w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-white/60 font-medium">Loading assessments...</p>
-    </div>
-  );
+  const handleUpdateEntity = async () => {
+    if (!entityForm.title.trim()) return;
+    setActionLoading(true);
+    try {
+      if (level === "topics" && selectedTopicId) {
+        await updateTestSeriesTopic(selectedTopicId, entityForm);
+      }
+      if (level === "subjects" && selectedSubjectId) {
+        await updateTestSeriesSubject(selectedSubjectId, entityForm);
+      }
+      if (level === "chapters" && selectedChapterId) {
+        await updateTestSeriesChapter(selectedChapterId, entityForm);
+      }
+      await fetchSeries();
+      closeModal();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateTest = async () => {
+    if (!selectedChapterId || !testForm.title.trim()) return;
+    setActionLoading(true);
+    try {
+      const payload = buildTestPayload(testForm);
+      if (modalState.mode === "edit" && editingTestId) {
+        await updateTeacherTest(editingTestId, payload);
+      } else {
+        await createTestSeriesTest(selectedChapterId, payload);
+      }
+      await fetchSeries();
+      closeModal();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUploadCsv = async () => {
+    if (!selectedChapterId || !csvForm.file) return;
+    setActionLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvForm.file);
+      formData.append("title", csvForm.title.trim() || "CSV Imported Test");
+      formData.append("description", csvForm.description.trim());
+      formData.append("duration", String(Number(csvForm.duration) || 60));
+      formData.append("passingMarks", String(Number(csvForm.passingMarks) || 0));
+      formData.append("chapterId", selectedChapterId);
+      formData.append("attemptLimit", String(Number(csvForm.attemptLimit) || 0));
+      formData.append("isProctored", String(Boolean(csvForm.isProctored)));
+      formData.append("isOpenTest", String(Boolean(csvForm.isOpenTest)));
+
+      if (!csvForm.isOpenTest) {
+        if (csvForm.startTime) {
+          formData.append("startTime", new Date(csvForm.startTime).toISOString());
+        }
+        if (csvForm.endTime) {
+          formData.append("endTime", new Date(csvForm.endTime).toISOString());
+        }
+      }
+
+      await uploadTestCSV(formData);
+      await fetchSeries();
+      closeModal();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActionLoading(true);
+    try {
+      if (confirmState.type === "topic" && confirmState.id) {
+        await deleteTestSeriesTopic(confirmState.id);
+        setSelectedTopicId(null);
+        setSelectedSubjectId(null);
+        setSelectedChapterId(null);
+      }
+      if (confirmState.type === "subject" && confirmState.id) {
+        await deleteTestSeriesSubject(confirmState.id);
+        setSelectedSubjectId(null);
+        setSelectedChapterId(null);
+      }
+      if (confirmState.type === "chapter" && confirmState.id) {
+        await deleteTestSeriesChapter(confirmState.id);
+        setSelectedChapterId(null);
+      }
+      if (confirmState.type === "test" && confirmState.id) {
+        await deleteTeacherTest(confirmState.id);
+      }
+      await fetchSeries();
+    } finally {
+      setActionLoading(false);
+      setConfirmState({ isOpen: false, type: null, id: null });
+    }
+  };
+
+  const handleRowSelect = (row) => {
+    if (level === "topics") {
+      setSelectedTopicId(row._id);
+      setSelectedSubjectId(null);
+      setSelectedChapterId(null);
+      setLevel("subjects");
+    } else if (level === "subjects") {
+      setSelectedSubjectId(row._id);
+      setSelectedChapterId(null);
+      setLevel("chapters");
+    } else if (level === "chapters") {
+      setSelectedChapterId(row._id);
+      setLevel("tests");
+    }
+  };
+
+  const headerTitle =
+    level === "topics"
+      ? "Test Series"
+      : level === "subjects"
+        ? "Subjects"
+        : level === "chapters"
+          ? "Chapters"
+          : "Tests";
+
+  const actionLabel =
+    level === "topics"
+      ? "Create Test Series"
+      : level === "subjects"
+        ? "Create Subject"
+        : level === "chapters"
+          ? "Create Chapter"
+          : "Create Test";
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pb-12 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Test Management</h1>
-          <p className="text-white/50 mt-2 text-sm font-medium">Create and manage assessments</p>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px,1fr]">
+      {/* Hierarchy Panel */}
+      <aside className="rounded-2xl border border-white/10 bg-dark-200 p-5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <Layers size={16} className="text-brand-primary" />
+          Hierarchy
         </div>
-        <button
-          onClick={() => navigate("/teacher/tests/create")}
-          className="flex items-center justify-center gap-2 bg-brand-primary text-black px-6 py-3 rounded-xl font-semibold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-brand-primary/20"
-        >
-          <Plus size={20} strokeWidth={2.5} />
-          Create Test
-        </button>
-      </div>
-
-      {/* Error Alert */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
-          <p className="text-red-400 text-sm font-medium">{error}</p>
+        <div className="mt-4 space-y-3 text-xs text-white/50">
+          <p className="uppercase tracking-widest">Path</p>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-white">
+            {hierarchyPath.length === 0 ? (
+              <span className="text-white/40">Select a test series</span>
+            ) : (
+              hierarchyPath.map((label, index) => (
+                <span key={`${label}-${index}`} className="inline-flex items-center gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
+                    {label}
+                  </span>
+                  {index < hierarchyPath.length - 1 && <ChevronRight size={12} />}
+                </span>
+              ))
+            )}
+          </div>
         </div>
-      )}
-
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl flex flex-wrap gap-3 items-center">
-        <div className="relative min-w-70 flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-          <input
-            value={filters.search}
-            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-            placeholder="Search tests by title or description"
-            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
-          />
-        </div>
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-          className="rounded-xl border border-white/10 bg-dark-300/70 px-4 py-2.5 text-sm text-white focus:outline-none"
-        >
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="published">Published</option>
-          <option value="closed">Closed</option>
-        </select>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <TestStatCard icon={<FileText className="text-blue-400" size={22} />} title="Total Tests" value={stats.total} />
-        <TestStatCard icon={<Clock className="text-amber-400" size={22} />} title="Drafts" value={stats.draft} />
-        <TestStatCard icon={<CheckCircle2 className="text-emerald-400" size={22} />} title="Published" value={stats.published} />
-        <TestStatCard icon={<ClipboardList className="text-purple-400" size={22} />} title="Questions" value={stats.totalQuestions} />
-      </div>
-
-      {/* Tests List */}
-      <div className="bg-dark-200 border border-white/5 rounded-2xl p-8 shadow-2xl">
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-white flex items-center gap-3">
-            <BarChart3 className="text-brand-primary" size={24} />
-            All Tests
-          </h2>
-        </div>
-
-        {tests.length === 0 ? (
-          <TestEmptyState 
-            title="No tests created yet" 
-            subtitle="Start by creating your first assessment to evaluate student knowledge."
-          />
-        ) : (
-          <div className="grid gap-4">
-            {tests.map((test) => (
-              <div
-                key={test._id}
-                className="group bg-dark-100 border border-white/5 rounded-xl p-6 hover:border-brand-primary/30 hover:bg-white/2 transition-all duration-300"
+        <div className="mt-6">
+          <p className="text-xs uppercase tracking-widest text-white/50">Series</p>
+          <div className="mt-3 space-y-2">
+            {topics.map((topic) => (
+              <button
+                key={topic._id}
+                onClick={() => {
+                  setSelectedTopicId(topic._id);
+                  setSelectedSubjectId(null);
+                  setSelectedChapterId(null);
+                  setLevel("subjects");
+                }}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${
+                  selectedTopicId === topic._id
+                    ? "bg-brand-primary/15 text-brand-primary"
+                    : "bg-dark-300/40 text-white/70 hover:bg-dark-300"
+                }`}
               >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  {/* Left Section */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-lg font-semibold text-white group-hover:text-brand-primary transition-colors">
-                        {test.title}
-                      </h3>
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide ${
-                        test.status === "published" 
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" 
-                          : test.status === "scheduled"
-                          ? "bg-blue-500/15 text-blue-400 border border-blue-500/20"
-                          : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                      }`}>
-                        {test.status}
-                      </span>
-                    </div>
-
-                    {test.description && (
-                      <p className="text-sm text-white/50 mb-4 line-clamp-1">
-                        {test.description}
-                      </p>
-                    )}
-
-                    {/* Metadata */}
-                    <div className="flex flex-wrap items-center gap-6 text-sm">
-                      <div className="flex items-center gap-2 text-white/60">
-                        <ClipboardList size={16} className="text-blue-400/70" />
-                        <span>{test.questions?.length || 0} Questions</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-white/60">
-                        <Clock size={16} className="text-amber-400/70" />
-                        <span>{test.duration || 0} min</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-white/60">
-                        <FileText size={16} className="text-purple-400/70" />
-                        <span className="font-medium text-brand-primary">{test.totalMarks || 0} marks</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 lg:shrink-0">
-                    <button
-                      onClick={() => navigate(`/teacher/tests/${test._id}`)}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-colors"
-                    >
-                      <ExternalLink size={16} />
-                      <span className="hidden sm:inline">Open</span>
-                    </button>
-                    <button
-                      onClick={() => setDeleteModal({ isOpen: true, testId: test._id })}
-                      className="p-2.5 rounded-lg bg-red-500/5 hover:bg-red-500/15 text-red-400/60 hover:text-red-400 transition-colors"
-                      title="Delete test"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                {topic.title}
+              </button>
             ))}
+            {topics.length === 0 && (
+              <p className="text-xs text-white/40">No test series yet.</p>
+            )}
           </div>
-        )}
+        </div>
+      </aside>
 
-        <div className="mt-6 border-t border-white/10 pt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-white/60">
-            Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total || 0)}-
-            {Math.min(pagination.page * pagination.limit, pagination.total || 0)} of {pagination.total || 0}
-          </p>
-          <div className="flex items-center gap-2 justify-end">
-            <select
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-              className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white focus:outline-none"
-            >
-              <option value={5}>5 / page</option>
-              <option value={10}>10 / page</option>
-              <option value={15}>15 / page</option>
-              <option value={20}>20 / page</option>
-            </select>
+      {/* Main Table */}
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{headerTitle}</h1>
+            <p className="text-sm text-white/50">Manage your test series hierarchy with quick CRUD actions.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {level !== "topics" && (
+              <button
+                onClick={() => {
+                  if (level === "subjects") {
+                    setLevel("topics");
+                  } else if (level === "chapters") {
+                    setLevel("subjects");
+                  } else {
+                    setLevel("chapters");
+                  }
+                }}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70"
+              >
+                Back
+              </button>
+            )}
             <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={!pagination.hasPrevPage}
-              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+              onClick={() => openModal(level === "tests" ? "test" : "entity", "create")}
+              className="flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-semibold text-dark-400"
             >
-              Prev
+              <Plus size={16} /> {actionLabel}
             </button>
-            <span className="text-xs text-white/80">{pagination.page}/{pagination.totalPages}</span>
+            {level === "tests" && (
+              <button
+                onClick={() => openModal("csv", "create")}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70"
+              >
+                <UploadCloud size={16} /> Upload CSV
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="relative min-w-70 flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+            <input
+              value={filters.search}
+              onChange={(e) => setFilters({ search: e.target.value })}
+              placeholder={`Search ${headerTitle.toLowerCase()}...`}
+              className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-dark-300/50 border-b border-dark-100">
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/40">Name</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/40">Description</th>
+                  {level === "tests" && (
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/40">Status</th>
+                  )}
+                  <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest text-white/40">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-16 text-center text-sm text-white/40">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-16 text-center text-sm text-white/40">
+                      No records found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr
+                      key={row._id}
+                      className="hover:bg-dark-100/50 transition-colors"
+                    >
+                      <td
+                        className="px-6 py-4 text-sm font-semibold text-white cursor-pointer"
+                        onClick={() => handleRowSelect(row)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {level === "topics" && <Layers size={14} className="text-brand-primary" />}
+                          {level === "subjects" && <Folder size={14} className="text-sky-400" />}
+                          {level === "chapters" && <Folder size={14} className="text-amber-400" />}
+                          {level === "tests" && <FileText size={14} className="text-brand-primary" />}
+                          {row.title}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-white/50">
+                        {row.description || "-"}
+                      </td>
+                      {level === "tests" && (
+                        <td className="px-6 py-4 text-xs text-white/60">
+                          {row.status || "draft"}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {level !== "tests" && (
+                            <button
+                              onClick={() => {
+                                if (level === "topics") {
+                                  setSelectedTopicId(row._id);
+                                  setLevel("subjects");
+                                } else if (level === "subjects") {
+                                  setSelectedSubjectId(row._id);
+                                  setLevel("chapters");
+                                } else {
+                                  setSelectedChapterId(row._id);
+                                  setLevel("tests");
+                                }
+                              }}
+                              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/70"
+                            >
+                              View
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (level === "topics") {
+                                setSelectedTopicId(row._id);
+                              }
+                              if (level === "subjects") {
+                                setSelectedSubjectId(row._id);
+                              }
+                              if (level === "chapters") {
+                                setSelectedChapterId(row._id);
+                              }
+                              openModal(level === "tests" ? "test" : "entity", "edit", row);
+                            }}
+                            className="rounded-lg bg-white/5 p-2 text-white/70 hover:text-white"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setConfirmState({
+                                isOpen: true,
+                                type:
+                                  level === "topics"
+                                    ? "topic"
+                                    : level === "subjects"
+                                      ? "subject"
+                                      : level === "chapters"
+                                        ? "chapter"
+                                        : "test",
+                                id: row._id,
+                              })
+                            }
+                            className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <Modal
+        isOpen={modalState.isOpen && modalState.type === "entity"}
+        title={modalState.mode === "edit" ? "Edit" : "Create"}
+        onClose={closeModal}
+      >
+        <div className="space-y-4">
+          <input
+            value={entityForm.title}
+            onChange={(e) => setEntityForm({ ...entityForm, title: e.target.value })}
+            placeholder="Title"
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+          />
+          <textarea
+            value={entityForm.description}
+            onChange={(e) => setEntityForm({ ...entityForm, description: e.target.value })}
+            placeholder="Description"
+            rows={3}
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white resize-none"
+          />
+          <div className="flex justify-end gap-2">
             <button
-              type="button"
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={!pagination.hasNextPage}
-              className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs text-white disabled:opacity-40"
+              onClick={closeModal}
+              className="rounded-lg bg-white/5 px-4 py-2 text-sm text-white/70"
             >
-              Next
+              Cancel
+            </button>
+            <button
+              onClick={modalState.mode === "edit" ? handleUpdateEntity : handleCreateEntity}
+              disabled={actionLoading}
+              className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-dark-400"
+            >
+              {actionLoading ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
-      </div>
+      </Modal>
+
+      <Modal
+        isOpen={modalState.isOpen && modalState.type === "test"}
+        title={modalState.mode === "edit" ? "Edit Test" : "Create Test"}
+        onClose={closeModal}
+      >
+        <TestForm form={testForm} onChange={setTestForm} />
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            onClick={closeModal}
+            className="rounded-lg bg-white/5 px-4 py-2 text-sm text-white/70"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreateTest}
+            disabled={actionLoading}
+            className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-dark-400"
+          >
+            {actionLoading ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={modalState.isOpen && modalState.type === "csv"}
+        title="Upload CSV Test"
+        onClose={closeModal}
+      >
+        <CsvForm form={csvForm} onChange={setCsvForm} />
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            onClick={closeModal}
+            className="rounded-lg bg-white/5 px-4 py-2 text-sm text-white/70"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUploadCsv}
+            disabled={actionLoading}
+            className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-dark-400"
+          >
+            {actionLoading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+      </Modal>
 
       <ConfirmationModal
-        isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, testId: null })}
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState({ isOpen: false, type: null, id: null })}
         onConfirm={handleDelete}
-        title="Delete Test"
-        message="This will permanently delete the test and all associated data. This action cannot be undone."
+        title="Delete item"
+        message="This action will remove all nested data. Continue?"
       />
     </div>
   );
 }
+
+function Modal({ isOpen, title, onClose, children }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-dark-200 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-white/60">Close</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TestForm({ form, onChange }) {
+  return (
+    <div className="space-y-4">
+      <input
+        value={form.title}
+        onChange={(e) => onChange({ ...form, title: e.target.value })}
+        placeholder="Test title"
+        className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+      />
+      <textarea
+        value={form.description}
+        onChange={(e) => onChange({ ...form, description: e.target.value })}
+        placeholder="Description"
+        rows={2}
+        className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white resize-none"
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input
+          type="number"
+          min="1"
+          value={form.duration}
+          onChange={(e) => onChange({ ...form, duration: e.target.value })}
+          placeholder="Duration (minutes)"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+        <input
+          type="number"
+          min="0"
+          value={form.passingMarks}
+          onChange={(e) => onChange({ ...form, passingMarks: e.target.value })}
+          placeholder="Passing marks"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+      </div>
+      <textarea
+        value={form.instructions}
+        onChange={(e) => onChange({ ...form, instructions: e.target.value })}
+        placeholder="Instructions (optional)"
+        rows={2}
+        className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white resize-none"
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex items-center gap-2 text-sm text-white/70">
+          <input
+            type="checkbox"
+            checked={form.isPaid}
+            onChange={(e) => onChange({ ...form, isPaid: e.target.checked })}
+          />
+          Paid test
+        </div>
+        <div className="flex items-center gap-2 text-sm text-white/70">
+          <input
+            type="checkbox"
+            checked={form.isProctored}
+            onChange={(e) => onChange({ ...form, isProctored: e.target.checked })}
+          />
+          Proctored test
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input
+          type="number"
+          min="0"
+          value={form.attemptLimit}
+          onChange={(e) => onChange({ ...form, attemptLimit: e.target.value })}
+          placeholder="Attempt limit (0 = unlimited)"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+        <div className="flex items-center gap-2 text-sm text-white/70">
+          <input
+            type="checkbox"
+            checked={form.isOpenTest}
+            onChange={(e) => onChange({ ...form, isOpenTest: e.target.checked })}
+          />
+          Open test (no dates)
+        </div>
+      </div>
+      {!form.isOpenTest && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <input
+            type="datetime-local"
+            value={form.startTime}
+            onChange={(e) => onChange({ ...form, startTime: e.target.value })}
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+          />
+          <input
+            type="datetime-local"
+            value={form.endTime}
+            onChange={(e) => onChange({ ...form, endTime: e.target.value })}
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CsvForm({ form, onChange }) {
+  return (
+    <div className="space-y-4">
+      <input
+        value={form.title}
+        onChange={(e) => onChange({ ...form, title: e.target.value })}
+        placeholder="Test title"
+        className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+      />
+      <textarea
+        value={form.description}
+        onChange={(e) => onChange({ ...form, description: e.target.value })}
+        placeholder="Description"
+        rows={2}
+        className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white resize-none"
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input
+          type="number"
+          min="1"
+          value={form.duration}
+          onChange={(e) => onChange({ ...form, duration: e.target.value })}
+          placeholder="Duration (minutes)"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+        <input
+          type="number"
+          min="0"
+          value={form.passingMarks}
+          onChange={(e) => onChange({ ...form, passingMarks: e.target.value })}
+          placeholder="Passing marks"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input
+          type="number"
+          min="0"
+          value={form.attemptLimit}
+          onChange={(e) => onChange({ ...form, attemptLimit: e.target.value })}
+          placeholder="Attempt limit (0 = unlimited)"
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+        <div className="flex items-center gap-2 text-sm text-white/70">
+          <input
+            type="checkbox"
+            checked={form.isProctored}
+            onChange={(e) => onChange({ ...form, isProctored: e.target.checked })}
+          />
+          Proctored test
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-white/70">
+        <input
+          type="checkbox"
+          checked={form.isOpenTest}
+          onChange={(e) => onChange({ ...form, isOpenTest: e.target.checked })}
+        />
+        Open test (no dates)
+      </div>
+      {!form.isOpenTest && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <input
+            type="datetime-local"
+            value={form.startTime}
+            onChange={(e) => onChange({ ...form, startTime: e.target.value })}
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+          />
+          <input
+            type="datetime-local"
+            value={form.endTime}
+            onChange={(e) => onChange({ ...form, endTime: e.target.value })}
+            className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+          />
+        </div>
+      )}
+      <label className="flex flex-col gap-2 text-xs text-white/60">
+        Upload CSV
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => onChange({ ...form, file: e.target.files?.[0] || null })}
+          className="w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white"
+        />
+      </label>
+    </div>
+  );
+}
+
+const buildTestPayload = (form) => {
+  const payload = {
+    title: form.title.trim(),
+    description: form.description.trim(),
+    duration: Number(form.duration) || 60,
+    passingMarks: Number(form.passingMarks) || 0,
+    instructions: form.instructions.trim(),
+    isPaid: Boolean(form.isPaid),
+    attemptLimit: Number(form.attemptLimit) || 0,
+    isProctored: Boolean(form.isProctored),
+  };
+
+  if (!form.isOpenTest) {
+    if (form.startTime) {
+      payload.startTime = new Date(form.startTime).toISOString();
+    }
+    if (form.endTime) {
+      payload.endTime = new Date(form.endTime).toISOString();
+    }
+  }
+
+  return payload;
+};
+
+const toLocalDateTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};

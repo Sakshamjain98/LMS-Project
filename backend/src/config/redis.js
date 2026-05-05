@@ -25,3 +25,4 @@ redisClient.connect().catch((err) => {
 });
 
 export default redisClient;
+export const isRedisReady = () => redisClient?.isReady && redisClient?.isOpen;

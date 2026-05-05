@@ -84,22 +84,25 @@ export const startTest = async (testId, studentId) => {
       attempt: existingAttempt,
       questions: sanitizeQuestionsForStudent(questions),
       duration: test.duration,
+      isProctored: Boolean(test.isProctored),
+      testTitle: test.title,
       resuming: true,
     };
   }
 
-  // Check if already submitted
-  const submittedAttempt = await TestAttempt.findOne({
-    testId: objTestId,
-    studentId: objStudentId,
-    status: { $in: ["submitted", "evaluated"] },
-  }).lean();
+  const attemptLimit = Number(test.attemptLimit) || 0;
+  if (attemptLimit > 0) {
+    const attemptCount = await TestAttempt.countDocuments({
+      testId: objTestId,
+      studentId: objStudentId,
+    });
 
-  if (submittedAttempt) {
-    throw new ApiError(
-      STATUS_CODES.CONFLICT,
-      "Test already submitted. Retake not allowed."
-    );
+    if (attemptCount >= attemptLimit) {
+      throw new ApiError(
+        STATUS_CODES.CONFLICT,
+        "Attempt limit reached for this test."
+      );
+    }
   }
 
   // Get questions
@@ -120,6 +123,8 @@ export const startTest = async (testId, studentId) => {
     attempt: attempt.toObject(),
     questions: sanitizeQuestionsForStudent(questions),
     duration: test.duration,
+    isProctored: Boolean(test.isProctored),
+    testTitle: test.title,
     resuming: false,
   };
 };

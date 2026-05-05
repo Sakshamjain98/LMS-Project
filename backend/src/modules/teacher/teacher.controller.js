@@ -20,8 +20,7 @@ import {
   createTest, bulkCreateQuestions
 } from "../teacher/teacher.service.js";
 import csv from "csv-parser"
-import fs from "fs";
-import https from "https";
+import { Readable } from "stream";
 
 import * as testService from "../test/test.service.js";
 import * as noteService from "../teacher/note.service.js";
@@ -29,8 +28,6 @@ import * as noteService from "../teacher/note.service.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { ApiError } from "../../shared/error/ApiError.js";
-
-import axios from 'axios';
 
 // ================= DASHBOARD =================
 export const dashboard = asyncHandler(async (req, res) => {
@@ -63,7 +60,12 @@ export const profile = asyncHandler(async (req, res) => {
 });
 
 export const updateUserProfile = asyncHandler(async (req, res) => {
-  const updated = await updateProfile(req.user._id, req.body);
+  const payload = { ...req.body };
+  if (req.file?.path) {
+    payload.avatar = req.file.path;
+  }
+
+  const updated = await updateProfile(req.user._id, payload);
 
   res.json({
     success: true,
@@ -371,19 +373,19 @@ export const listTests = asyncHandler(async (req, res) => {
 export const createTestController = asyncHandler(async (req, res) => {
   const { startTime = null, endTime = null } = req.body || {};
 
-  if (!endTime) {
-    throw new ApiError(400, "endTime is required while creating a test");
+  if (!req.body?.chapterId) {
+    throw new ApiError(400, "chapterId is required to create a test");
   }
 
   if (startTime && isNaN(new Date(startTime))) {
     throw new ApiError(400, "Invalid startTime");
   }
 
-  if (isNaN(new Date(endTime))) {
+  if (endTime && isNaN(new Date(endTime))) {
     throw new ApiError(400, "Invalid endTime");
   }
 
-  if (startTime && new Date(startTime) >= new Date(endTime)) {
+  if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
     throw new ApiError(400, "Start must be before end");
   }
 
@@ -520,9 +522,16 @@ export const studentPerformance = asyncHandler(async (req, res) => {
 export const createTestFromCSV = async (req, res, next) => {
   try {
     if (!req.file) throw new ApiError(400, "No CSV file uploaded");
+    if (!req.body?.chapterId) {
+      throw new ApiError(400, "chapterId is required for CSV test upload");
+    }
 
     const parsedQuestions = [];
-    const response = await axios.get(req.file.path, { responseType: 'stream' });
+    const response = await fetch(req.file.path);
+    if (!response.ok || !response.body) {
+      throw new ApiError(400, "Unable to fetch uploaded CSV file.");
+    }
+    const csvStream = Readable.fromWeb(response.body);
 
     // Core required headers, while other fields are optional.
     const requiredHeaders = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'answer'];
@@ -552,7 +561,7 @@ export const createTestFromCSV = async (req, res, next) => {
       return -1;
     };
 
-    response.data
+    csvStream
       .pipe(csv())
       .on('data', (row) => {
         const normalized = Object.fromEntries(
@@ -564,7 +573,7 @@ export const createTestFromCSV = async (req, res, next) => {
         );
 
         if (!isValid) {
-          response.data.destroy(new Error("Invalid CSV format. Please ensure all columns (question, optionA, etc.) are present and not empty."));
+          csvStream.destroy(new Error("Invalid CSV format. Please ensure all columns (question, optionA, etc.) are present and not empty."));
         } else {
           const options = [
             { text: normalized.optionA, isCorrect: false },
@@ -576,7 +585,7 @@ export const createTestFromCSV = async (req, res, next) => {
           const correctOptionIndex = parseCorrectOptionIndex(normalized.answer, options);
 
           if (correctOptionIndex < 0) {
-            response.data.destroy(new Error(`Invalid answer value '${normalized.answer}'. Use 1-4, A-D, or exact option text.`));
+            csvStream.destroy(new Error(`Invalid answer value '${normalized.answer}'. Use 1-4, A-D, or exact option text.`));
             return;
           }
 
@@ -614,51 +623,56 @@ export const createTestFromCSV = async (req, res, next) => {
         const startTimeRaw = req.body.startTime;
         const endTimeRaw = req.body.endTime;
 
-        // endTime is required for CSV-imported tests; startTime is optional.
-        if (!endTimeRaw) {
+        const isOpenTest = req.body.isOpenTest === "true" || req.body.isOpenTest === true;
+
+        // If test is open, skip schedule validation entirely.
+        if (!isOpenTest && !endTimeRaw) {
           return res.status(400).json({
             success: false,
-            message: "endTime is required for CSV test upload.",
+            message: "endTime is required for scheduled tests.",
           });
         }
 
         let startTime;
-        if (startTimeRaw) {
-          startTime = new Date(startTimeRaw);
-          if (Number.isNaN(startTime.getTime())) {
-            return res.status(400).json({ success: false, message: "Invalid startTime." });
+        let endTime;
+        if (!isOpenTest) {
+          if (startTimeRaw) {
+            startTime = new Date(startTimeRaw);
+            if (Number.isNaN(startTime.getTime())) {
+              return res.status(400).json({ success: false, message: "Invalid startTime." });
+            }
+          } else {
+            // If teacher didn't provide a startTime, default to now (rounded to minute)
+            startTime = new Date(now);
           }
-        } else {
-          // If teacher didn't provide a startTime, default to now (rounded to minute)
-          startTime = new Date(now);
-        }
 
-        const endTime = new Date(endTimeRaw);
-        if (Number.isNaN(endTime.getTime())) {
-          return res.status(400).json({ success: false, message: "Invalid endTime." });
-        }
+          endTime = new Date(endTimeRaw);
+          if (Number.isNaN(endTime.getTime())) {
+            return res.status(400).json({ success: false, message: "Invalid endTime." });
+          }
 
-        const graceMs = 60 * 1000;
-        // If teacher provided a startTime, ensure it is not backdated. Always ensure endTime is not backdated.
-        if (startTimeRaw && startTime.getTime() < now.getTime() - graceMs) {
-          return res.status(400).json({
-            success: false,
-            message: "Start date/time cannot be backdated.",
-          });
-        }
+          const graceMs = 60 * 1000;
+          // If teacher provided a startTime, ensure it is not backdated. Always ensure endTime is not backdated.
+          if (startTimeRaw && startTime.getTime() < now.getTime() - graceMs) {
+            return res.status(400).json({
+              success: false,
+              message: "Start date/time cannot be backdated.",
+            });
+          }
 
-        if (endTime.getTime() < now.getTime() - graceMs) {
-          return res.status(400).json({
-            success: false,
-            message: "End date/time cannot be backdated.",
-          });
-        }
+          if (endTime.getTime() < now.getTime() - graceMs) {
+            return res.status(400).json({
+              success: false,
+              message: "End date/time cannot be backdated.",
+            });
+          }
 
-        if (startTime >= endTime) {
-          return res.status(400).json({
-            success: false,
-            message: "Start time must be before end time.",
-          });
+          if (startTime >= endTime) {
+            return res.status(400).json({
+              success: false,
+              message: "Start time must be before end time.",
+            });
+          }
         }
 
         const testPayload = {
@@ -666,9 +680,12 @@ export const createTestFromCSV = async (req, res, next) => {
           description: (req.body.description || "").toString().trim(),
           duration: Number(req.body.duration) > 0 ? Number(req.body.duration) : 60,
           passingMarks: Number(req.body.passingMarks) >= 0 ? Number(req.body.passingMarks) : 0,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
+          startTime: startTime ? startTime.toISOString() : undefined,
+          endTime: endTime ? endTime.toISOString() : undefined,
+          chapterId: req.body.chapterId,
           isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
+          attemptLimit: Number.isFinite(Number(req.body.attemptLimit)) ? Number(req.body.attemptLimit) : 0,
+          isProctored: req.body.isProctored === "true" || req.body.isProctored === true,
         };
 
         const createdTest = await createTest(testPayload, req.user._id);

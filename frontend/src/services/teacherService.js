@@ -237,6 +237,105 @@ export const getTeacherTests = async (params = {}) => {
   }
 };
 
+export const getTeacherTestSeries = async () => {
+  try {
+    const res = await api.get("/teacher/test-series");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch test series failed" };
+  }
+};
+
+export const createTestSeriesTopic = async (payload) => {
+  try {
+    const res = await api.post("/teacher/test-series/topics", payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create topic failed" };
+  }
+};
+
+export const updateTestSeriesTopic = async (topicId, payload) => {
+  try {
+    const res = await api.put(`/teacher/test-series/topics/${topicId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update topic failed" };
+  }
+};
+
+export const deleteTestSeriesTopic = async (topicId) => {
+  try {
+    const res = await api.delete(`/teacher/test-series/topics/${topicId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete topic failed" };
+  }
+};
+
+export const createTestSeriesSubject = async (topicId, payload) => {
+  try {
+    const res = await api.post(`/teacher/test-series/topics/${topicId}/subjects`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create subject failed" };
+  }
+};
+
+export const updateTestSeriesSubject = async (subjectId, payload) => {
+  try {
+    const res = await api.put(`/teacher/test-series/subjects/${subjectId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update subject failed" };
+  }
+};
+
+export const deleteTestSeriesSubject = async (subjectId) => {
+  try {
+    const res = await api.delete(`/teacher/test-series/subjects/${subjectId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete subject failed" };
+  }
+};
+
+export const createTestSeriesChapter = async (subjectId, payload) => {
+  try {
+    const res = await api.post(`/teacher/test-series/subjects/${subjectId}/chapters`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create chapter failed" };
+  }
+};
+
+export const updateTestSeriesChapter = async (chapterId, payload) => {
+  try {
+    const res = await api.put(`/teacher/test-series/chapters/${chapterId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update chapter failed" };
+  }
+};
+
+export const deleteTestSeriesChapter = async (chapterId) => {
+  try {
+    const res = await api.delete(`/teacher/test-series/chapters/${chapterId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete chapter failed" };
+  }
+};
+
+export const createTestSeriesTest = async (chapterId, payload) => {
+  try {
+    const res = await api.post(`/teacher/test-series/chapters/${chapterId}/tests`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create test failed" };
+  }
+};
+
 export const createTeacherTest = async (payload) => {
   try {
     const res = await api.post("/teacher/tests", payload);

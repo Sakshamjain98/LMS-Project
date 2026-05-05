@@ -10,6 +10,9 @@ const testSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    topicId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesTopic", index: true },
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesSubject", index: true },
+    chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesChapter", index: true },
     questions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Question" }],
     status: {
       type: String,
@@ -22,6 +25,12 @@ const testSchema = new mongoose.Schema(
     totalMarks: { type: Number, default: 0 },
     passingMarks: { type: Number, default: 0 },
     instructions: { type: String, trim: true },
+    attemptLimit: { type: Number, default: 0 },
+    isProctored: { type: Boolean, default: false },
+    isPaid: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

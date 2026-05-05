@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { uploadTestCSV } from "../../services/teacherService";
+import { useEffect, useState } from "react";
+import { uploadTestCSV, getTeacherTestSeries } from "../../services/teacherService";
 import toast from "react-hot-toast";
 import { Upload, Loader2, ChevronLeft, FileSpreadsheet, Info, CheckCircle2, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -20,11 +20,33 @@ export default function UploadTestCSV() {
     startTime: "",
     endTime: "",
   });
+  const [topics, setTopics] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [seriesSelection, setSeriesSelection] = useState({
+    topicId: "",
+    subjectId: "",
+    chapterId: "",
+  });
   const [loading, setLoading] = useState(false);
+
+  const loadSeries = async () => {
+    try {
+      const res = await getTeacherTestSeries();
+      setTopics(res.topics || []);
+    } catch {
+      setTopics([]);
+    }
+  };
+
+  useEffect(() => {
+    loadSeries();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) return toast.error("Please select a CSV file");
+    if (!seriesSelection.chapterId) return toast.error("Please select a chapter for this test");
 
     if (!form.startTime || !form.endTime) {
       return toast.error("Start and end date/time are required");
@@ -55,6 +77,7 @@ export default function UploadTestCSV() {
     formData.append("passingMarks", String(Number(form.passingMarks) >= 0 ? Number(form.passingMarks) : 0));
     formData.append("startTime", startTime.toISOString());
     formData.append("endTime", endTime.toISOString());
+    formData.append("chapterId", seriesSelection.chapterId);
 
     try {
       setLoading(true);
@@ -96,6 +119,75 @@ export default function UploadTestCSV() {
         {/* Main Form Container */}
         <form onSubmit={handleSubmit} className="bg-dark-200 border border-dark-100 rounded-2xl p-6 shadow-2xl space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Topic
+              </label>
+              <select
+                value={seriesSelection.topicId}
+                onChange={(e) => {
+                  const selectedTopic = topics.find((topic) => topic._id === e.target.value);
+                  setSeriesSelection({ topicId: e.target.value, subjectId: "", chapterId: "" });
+                  setSubjects(selectedTopic?.subjects || []);
+                  setChapters([]);
+                }}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              >
+                <option value="">Select Topic</option>
+                {topics.map((topic) => (
+                  <option key={topic._id} value={topic._id}>
+                    {topic.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Subject
+              </label>
+              <select
+                value={seriesSelection.subjectId}
+                onChange={(e) => {
+                  const selectedSubject = subjects.find((subject) => subject._id === e.target.value);
+                  setSeriesSelection((prev) => ({
+                    ...prev,
+                    subjectId: e.target.value,
+                    chapterId: "",
+                  }));
+                  setChapters(selectedSubject?.chapters || []);
+                }}
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              >
+                <option value="">Select Subject</option>
+                {subjects.map((subject) => (
+                  <option key={subject._id} value={subject._id}>
+                    {subject.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
+                Chapter
+              </label>
+              <select
+                value={seriesSelection.chapterId}
+                onChange={(e) =>
+                  setSeriesSelection((prev) => ({ ...prev, chapterId: e.target.value }))
+                }
+                className="w-full px-4 py-3 rounded-xl bg-dark-300 border border-dark-100 text-white focus:border-brand-primary outline-none"
+              >
+                <option value="">Select Chapter</option>
+                {chapters.map((chapter) => (
+                  <option key={chapter._id} value={chapter._id}>
+                    {chapter.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="md:col-span-2">
               <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-[0.2em] ml-1 mb-2 block">
                 Test Title

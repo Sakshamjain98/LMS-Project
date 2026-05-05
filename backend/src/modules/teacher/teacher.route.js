@@ -5,17 +5,18 @@ import { authorize } from "../../middlewares/authorize.middleware.js";
 import { upload } from "../../middlewares/upload.middleware.js";
 
 import * as analyticsController from "../analytics/analytics.controller.js";
+import * as testSeriesController from "../testSeries/testSeries.controller.js";
 
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(authorize("teacher"));
+router.use(authorize("teacher", "admin"));
 
 // ========== DASHBOARD & PROFILE ==========
 router.get("/dashboard", controller.dashboard);
 router.get("/ui-settings", controller.getUiSettings);
 router.get("/profile", controller.profile);
-router.put("/profile", controller.updateUserProfile);
+router.put("/profile", upload.single("avatar"), controller.updateUserProfile);
 
 // ========== COURSES ==========
 router.post(
@@ -93,8 +94,8 @@ router.delete("/notes/:id", controller.deleteNote);
 
 // ========== TESTS ==========
 router.get("/tests", (req, res, next) => {
-  // Allow both teacher and student roles
-  if (!["teacher", "student"].includes(req.user.role)) {
+  // Allow teacher/admin to use the full tests module.
+  if (!["teacher", "admin"].includes(req.user.role)) {
     return res.status(403).json({
       success: false,
       message: "You do not have permission to access this resource"
@@ -127,6 +128,22 @@ router.get(
   "/tests/:testId/questions/:questionId/analytics",
   analyticsController.getQuestionAnalytics
 );
+
+// ========== TEST SERIES ==========
+router.get("/test-series", testSeriesController.getSeriesTree);
+router.post("/test-series/topics", testSeriesController.createTopic);
+router.put("/test-series/topics/:topicId", testSeriesController.updateTopic);
+router.delete("/test-series/topics/:topicId", testSeriesController.deleteTopic);
+
+router.post("/test-series/topics/:topicId/subjects", testSeriesController.createSubject);
+router.put("/test-series/subjects/:subjectId", testSeriesController.updateSubject);
+router.delete("/test-series/subjects/:subjectId", testSeriesController.deleteSubject);
+
+router.post("/test-series/subjects/:subjectId/chapters", testSeriesController.createChapter);
+router.put("/test-series/chapters/:chapterId", testSeriesController.updateChapter);
+router.delete("/test-series/chapters/:chapterId", testSeriesController.deleteChapter);
+
+router.post("/test-series/chapters/:chapterId/tests", testSeriesController.createTestInChapter);
 
 // ========== PERFORMANCE ==========
 router.get("/performance", controller.studentPerformance);
