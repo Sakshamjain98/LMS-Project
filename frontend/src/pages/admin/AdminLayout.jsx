@@ -126,8 +126,8 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        {/* Nav — NOT scrollable; sidebar stays fixed */}
-        <nav className="flex-1 space-y-1 px-3 py-3">
+        {/* Nav — NOT scrollable; sidebar stays fixed. Long names truncate. */}
+        <nav className="flex-1 min-w-0 space-y-1 px-3 py-3">
           {navTop.map((item) => (
             <NavItem key={item.path} item={item} collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           ))}
@@ -172,60 +172,60 @@ export default function AdminLayout() {
                   <p className="px-3 py-1.5 text-[11px] text-white/40">No series yet — create one →</p>
                 ) : (
                   seriesTree.map((topic) => (
-                    <div key={topic._id}>
-                      <div className="flex items-center">
+                    <div key={topic._id} className="min-w-0">
+                      <div className="flex items-center min-w-0">
                         <button
                           onClick={() => setOpenTopic((v) => (v === topic._id ? null : topic._id))}
-                          className="rounded-md p-1 text-white/40 hover:text-white"
+                          className="shrink-0 rounded-md p-1 text-white/40 hover:text-white"
                         >
                           <ChevronRight size={12} className={`transition-transform ${openTopic === topic._id ? "rotate-90" : ""}`} />
                         </button>
                         <Link
                           to={`/admin/test-series?level=subjects&topicId=${topic._id}`}
                           onClick={() => setMobileOpen(false)}
-                          className="flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                          className="flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/70 hover:bg-white/5 hover:text-white"
                         >
-                          <Layers size={12} className="text-brand-primary" />
-                          <span className="truncate">{topic.title}</span>
-                          <span className="ml-auto rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
+                          <Layers size={12} className="text-brand-primary shrink-0" />
+                          <span className="truncate flex-1 min-w-0">{topic.title}</span>
+                          <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
                             {topic.subjects?.length || 0}
                           </span>
                         </Link>
                       </div>
 
                       {openTopic === topic._id && (
-                        <div className="mb-1 ml-5 space-y-0.5 border-l border-white/5 pl-2">
+                        <div className="mb-1 ml-5 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
                           {(topic.subjects || []).map((subj) => (
-                            <div key={subj._id}>
-                              <div className="flex items-center">
+                            <div key={subj._id} className="min-w-0">
+                              <div className="flex items-center min-w-0">
                                 <button
                                   onClick={() => setOpenSubject((v) => (v === subj._id ? null : subj._id))}
-                                  className="rounded-md p-1 text-white/30 hover:text-white"
+                                  className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
                                 >
                                   <ChevronRight size={11} className={`transition-transform ${openSubject === subj._id ? "rotate-90" : ""}`} />
                                 </button>
                                 <Link
                                   to={`/admin/test-series?level=chapters&topicId=${topic._id}&subjectId=${subj._id}`}
                                   onClick={() => setMobileOpen(false)}
-                                  className="flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
+                                  className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
                                 >
-                                  <Folder size={11} className="text-sky-400" />
-                                  <span className="truncate">{subj.title}</span>
+                                  <Folder size={11} className="text-sky-400 shrink-0" />
+                                  <span className="truncate flex-1 min-w-0">{subj.title}</span>
                                 </Link>
                               </div>
 
                               {openSubject === subj._id && (
-                                <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2">
+                                <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
                                   {(subj.chapters || []).map((ch) => (
                                     <Link
                                       key={ch._id}
                                       to={`/admin/test-series?level=tests&topicId=${topic._id}&subjectId=${subj._id}&chapterId=${ch._id}`}
                                       onClick={() => setMobileOpen(false)}
-                                      className="flex items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
+                                      className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
                                     >
-                                      <FileText size={10} className="text-amber-400" />
-                                      <span className="truncate">{ch.title}</span>
-                                      <span className="ml-auto text-[9px] text-white/30">{ch.tests?.length || 0}</span>
+                                      <FileText size={10} className="text-amber-400 shrink-0" />
+                                      <span className="truncate flex-1 min-w-0">{ch.title}</span>
+                                      <span className="ml-auto shrink-0 text-[9px] text-white/30">{ch.tests?.length || 0}</span>
                                     </Link>
                                   ))}
                                   {(subj.chapters || []).length === 0 && (
@@ -281,8 +281,8 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main — scrolls naturally; sidebar stays fixed */}
-      <main className={`relative z-10 min-h-screen ${mainOffset} transition-all duration-300`}>
-        <div className="mx-auto max-w-7xl p-6 lg:p-10">
+      <main className={`relative z-10 min-h-screen min-w-0 ${mainOffset} transition-all duration-300`}>
+        <div className="mx-auto max-w-7xl min-w-0 p-6 lg:p-10">
           <Outlet />
         </div>
       </main>

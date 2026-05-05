@@ -19,10 +19,10 @@ export default function Blogs() {
   const fetchBlogs = async (params) => {
     try {
       setLoading(true);
-      const req = {
-        ...params,
-        ...(params.published !== "" ? { published: params.published } : {}),
-      };
+      // Only include `published` when an actual filter is set — passing the
+      // empty string would coerce on the backend to `published: false`.
+      const { published, ...rest } = params;
+      const req = published === "" ? rest : { ...rest, published };
       const res = await getBlogs(req);
       setBlogs(res.blogs || []);
       setPagination(res.pagination || { page: 1, limit: params.limit, totalPages: 1, total: 0 });

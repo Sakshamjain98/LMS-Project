@@ -61,12 +61,16 @@ export default function SeriesDetail() {
 
   const tests = useMemo(() => flattenTopicTests(topic), [topic]);
 
-  const latestAttemptByTest = useMemo(() => attempts.reduce((map, attempt) => {
+  // Map of testId → { latestAttempt, count } so we can show re-attempt CTA correctly.
+  const attemptsByTest = useMemo(() => attempts.reduce((map, attempt) => {
     const tid = typeof attempt?.testId === "object" ? attempt?.testId?._id : attempt?.testId;
     if (!tid) return map;
-    const cur = new Date(attempt?.submittedAt || attempt?.updatedAt || attempt?.createdAt || 0).getTime();
-    const prev = map[tid] ? new Date(map[tid]?.submittedAt || map[tid]?.updatedAt || map[tid]?.createdAt || 0).getTime() : -1;
-    if (!map[tid] || cur >= prev) map[tid] = attempt;
+    const entry = map[tid] || { latest: null, count: 0 };
+    entry.count += 1;
+    const curT = new Date(attempt?.submittedAt || attempt?.updatedAt || attempt?.createdAt || 0).getTime();
+    const prevT = entry.latest ? new Date(entry.latest?.submittedAt || entry.latest?.updatedAt || entry.latest?.createdAt || 0).getTime() : -1;
+    if (!entry.latest || curT >= prevT) entry.latest = attempt;
+    map[tid] = entry;
     return map;
   }, {}), [attempts]);
 
@@ -204,7 +208,7 @@ export default function SeriesDetail() {
                                 key={test._id}
                                 test={test}
                                 isUnlocked={isUnlocked}
-                                latestAttempt={latestAttemptByTest[test._id]}
+                                attemptInfo={attemptsByTest[test._id]}
                                 onStartTest={handleStartTest}
                                 onViewResult={handleViewResult}
                               />
@@ -253,12 +257,20 @@ function Pill({ label, value }) {
   );
 }
 
-function TestRow({ test, isUnlocked, latestAttempt, onStartTest, onViewResult }) {
+function TestRow({ test, isUnlocked, attemptInfo, onStartTest, onViewResult }) {
+  const latestAttempt = attemptInfo?.latest;
+  const attemptCount = attemptInfo?.count || 0;
+  const attemptLimit = Number(test.attemptLimit) || 0; // 0 = unlimited
+  const limitReached = attemptLimit > 0 && attemptCount >= attemptLimit;
+
   const isCompleted = latestAttempt && (
     ["submitted", "evaluated"].includes(latestAttempt?.status) ||
     Boolean(latestAttempt?.autoSubmitted) ||
     Boolean(latestAttempt?.isCompleted)
   );
+  // Re-attempt is allowed when the latest attempt is finished AND the student
+  // hasn't hit the attempt limit (or the limit is 0/unlimited).
+  const canRetake = isCompleted && !limitReached && isUnlocked;
 
   return (
     <div className="rounded-xl border border-white/10 bg-dark-300/40 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -274,6 +286,15 @@ function TestRow({ test, isUnlocked, latestAttempt, onStartTest, onViewResult })
             <Clock size={11} className="text-brand-primary/70" />
             {test.duration || 0} min
           </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="text-white/30">·</span>
+            {attemptLimit === 0 ? "Unlimited attempts" : `${attemptCount}/${attemptLimit} used`}
+          </span>
+          {test.isProctored && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+              Proctored
+            </span>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -281,20 +302,36 @@ function TestRow({ test, isUnlocked, latestAttempt, onStartTest, onViewResult })
           <button disabled className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-xs font-bold text-white/40 cursor-not-allowed">
             <Lock size={12} /> Locked
           </button>
-        ) : isCompleted ? (
-          <button
-            onClick={() => onViewResult(latestAttempt._id)}
-            className="rounded-lg bg-blue-500/15 px-3 py-2 text-xs font-bold text-blue-300 hover:bg-blue-500/25"
-          >
-            View Result
-          </button>
         ) : (
-          <button
-            onClick={() => onStartTest(test._id)}
-            className="rounded-lg btn-gradient px-3 py-2 text-xs font-bold"
-          >
-            Start Test
-          </button>
+          <>
+            {isCompleted && (
+              <button
+                onClick={() => onViewResult(latestAttempt._id)}
+                className="rounded-lg bg-blue-500/15 px-3 py-2 text-xs font-bold text-blue-300 hover:bg-blue-500/25"
+              >
+                View Result
+              </button>
+            )}
+            {canRetake ? (
+              <button
+                onClick={() => onStartTest(test._id)}
+                className="rounded-lg btn-gradient px-3 py-2 text-xs font-bold"
+              >
+                Retake
+              </button>
+            ) : !isCompleted ? (
+              <button
+                onClick={() => onStartTest(test._id)}
+                className="rounded-lg btn-gradient px-3 py-2 text-xs font-bold"
+              >
+                Start Test
+              </button>
+            ) : limitReached ? (
+              <span className="rounded-lg bg-white/5 px-3 py-2 text-xs font-bold text-white/40">
+                Limit reached
+              </span>
+            ) : null}
+          </>
         )}
       </div>
     </div>

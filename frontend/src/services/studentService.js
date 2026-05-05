@@ -156,3 +156,21 @@ export const getPublicSiteContent = async () => {
     throw err?.response?.data || { message: "Failed to fetch site content" };
   }
 };
+
+export const getPublicArticleById = async (id) => {
+  try {
+    const res = await api.get(`/public/blogs/${id}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch article" };
+  }
+};
+
+export const getPublicTestSeries = async (limit = 6) => {
+  try {
+    const res = await api.get("/public/test-series", { params: { limit } });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch test series" };
+  }
+};

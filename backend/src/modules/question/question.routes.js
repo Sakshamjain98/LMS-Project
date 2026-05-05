@@ -12,7 +12,8 @@ import {
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(authorize("teacher"));
+// Both admins and teachers can author questions in the admin test-series panel.
+router.use(authorize("teacher", "admin"));
 
 // Single question CRUD
 router.post(

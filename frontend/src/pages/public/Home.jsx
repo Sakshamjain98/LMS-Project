@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
 import {
   getPaymentPlans,
@@ -10,6 +10,7 @@ import {
   getPublicArticles,
   getPublicNews,
   getPublicSiteContent,
+  getPublicTestSeries,
 } from "../../services/studentService";
 import { motion } from "framer-motion";
 import {
@@ -349,6 +350,7 @@ const Home = () => {
   const [articles, setArticles] = useState([]);
   const [news, setNews] = useState([]);
   const [cms, setCms] = useState(null);
+  const [seriesList, setSeriesList] = useState([]);
   const [plans, setPlans] = useState([]);
   const [_loadingPlans, setLoadingPlans] = useState(true);
   const [processingPlan, setProcessingPlan] = useState(null);
@@ -398,6 +400,9 @@ const Home = () => {
     getPublicSiteContent()
       .then((res) => setCms(res?.data || null))
       .catch(() => setCms(null));
+    getPublicTestSeries(6)
+      .then((res) => setSeriesList(res?.topics || []))
+      .catch(() => setSeriesList([]));
   }, []);
 
   /* CMS-driven content with static fallbacks. */
@@ -420,7 +425,6 @@ const Home = () => {
   };
   const featuresCms      = cms?.features?.length              ? cms.features              : FEATURES.map((f) => ({ title: f.title, description: f.description }));
   const testimonialsCms  = cms?.testimonials?.length          ? cms.testimonials          : TESTIMONIALS;
-  const highlightsCms    = cms?.testSeriesHighlights?.length  ? cms.testSeriesHighlights  : TEST_SERIES_HIGHLIGHTS;
   const faqCms           = cms?.faq?.length                   ? cms.faq                   : [];
   const footerCms = {
     brand: cms?.footer?.brand ?? "Pharmacist Academy",
@@ -782,55 +786,66 @@ const Home = () => {
           subtitle="Mock exams with All India Rank, chapter-wise analytics, and real-exam pacing — built by pharmacy faculty."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {highlightsCms.map((s, i) => {
-            const Icon = s.icon || FaMedal;
-            return (
-            <div
-              key={i}
-              className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              {s.badge && (
-                <span className="absolute right-4 top-4 rounded-full bg-brand-primary/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
-                  {s.badge}
-                </span>
-              )}
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
-                <Icon size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
-                  {s.tag}
-                </p>
-                <h3 className="mt-1 text-lg font-bold text-white">{s.title}</h3>
-                <p className="mt-1.5 text-sm text-gray-400 leading-relaxed">{s.subtitle}</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-                <div>
-                  <p className="text-base font-bold text-white">{s.tests}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
-                </div>
-                <div>
-                  <p className="text-base font-bold text-white">{s.duration}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Length</p>
-                </div>
-                <div>
-                  <p className="text-base font-bold text-brand-primary">{s.takers}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Takers</p>
-                </div>
-              </div>
-              <button
-                onClick={handleGetStarted}
-                className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+        {seriesList.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-16 text-center text-sm text-gray-400 mb-12">
+            No test series published yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {seriesList.map((s, i) => (
+              <div
+                key={s._id}
+                className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
+                style={{ animationDelay: `${i * 80}ms` }}
               >
-                Attempt Free Test
-                <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
-              </button>
-            </div>
-            );
-          })}
-        </div>
+                <span
+                  className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                    s.isPaid
+                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
+                      : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                  }`}
+                >
+                  {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
+                </span>
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
+                  <FaMedal size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
+                    Test Series
+                  </p>
+                  <h3 className="mt-1 text-lg font-bold text-white break-words">{s.title}</h3>
+                  {s.description && (
+                    <p className="mt-1.5 text-sm text-gray-400 leading-relaxed line-clamp-2 break-words">
+                      {s.description}
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+                  <div>
+                    <p className="text-base font-bold text-white">{s.testsCount}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-white">{s.subjectsCount}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Subjects</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-brand-primary">{s.chaptersCount}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Chapters</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleGetStarted}
+                  className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+                >
+                  {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Attempt Free Test"}
+                  <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="text-center">
           <button
@@ -913,8 +928,9 @@ const Home = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {articles.map((post, idx) => (
-              <article
+              <Link
                 key={post._id}
+                to={`/articles/${post._id}`}
                 className="group glass-card glass-card-hover rounded-2xl flex flex-col h-full p-6 animate-fade-up"
                 style={{ animationDelay: `${idx * 80}ms` }}
               >
@@ -945,7 +961,7 @@ const Home = () => {
                     Read More <FaArrowRight size={11} />
                   </span>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}

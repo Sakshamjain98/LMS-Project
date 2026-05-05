@@ -6,10 +6,12 @@ import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Home from "./pages/public/Home";
+import ArticleDetail from "./pages/public/ArticleDetail";
 
 /* Student Pages */
 import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentTests from "./pages/student/StudentTest";
+import StudentSeriesDetail from "./pages/student/SeriesDetail";
 import StudentProfile from "./pages/student/StudentProfile";
 
 /* Layouts */
@@ -46,6 +48,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/articles/:id" element={<ArticleDetail />} />
 
         {/* Legacy redirects — old links should still resolve */}
         <Route path="/teacher/*" element={<Navigate to="/admin/test-series" replace />} />
@@ -57,6 +60,7 @@ function App() {
         <Route path="/student" element={<StudentLayout />}>
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="tests" element={<StudentTests />} />
+          <Route path="tests/:topicId" element={<StudentSeriesDetail />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 

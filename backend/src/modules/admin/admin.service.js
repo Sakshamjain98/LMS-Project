@@ -696,8 +696,12 @@ export const getBlogs = async (query = {}) => {
   const search = query.search?.trim();
 
   const filter = {};
-  if (query.published !== undefined) {
-    filter.published = query.published === true || query.published === "true";
+  // Only filter on `published` when explicitly set to "true" or "false"; empty
+  // string from a "All statuses" dropdown means "no filter".
+  if (query.published === true || query.published === "true") {
+    filter.published = true;
+  } else if (query.published === false || query.published === "false") {
+    filter.published = false;
   }
 
   if (search) {

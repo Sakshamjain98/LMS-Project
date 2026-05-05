@@ -123,10 +123,14 @@ const buildQuestionsFromCsv = (text) => {
     if (Number.isNaN(correctOption)) {
       correctOption = { A: 0, B: 1, C: 2, D: 3 }[correctRaw] ?? 0;
     }
-    const options = [a, b, c, d].filter(Boolean).map((t, i) => ({ text: t, isCorrect: i === correctOption }));
+    const filledOptions = [a, b, c, d].filter(Boolean);
+    if (filledOptions.length < 2) continue;
+    const safeCorrect = Math.min(Math.max(correctOption, 0), filledOptions.length - 1);
     questions.push({
       questionText: text,
-      options,
+      questionType: "MCQ",
+      options: filledOptions.map((t) => ({ text: t })),
+      correctOptionIndex: safeCorrect,
       marks: Number(row[marksIdx]) || 1,
     });
   }
@@ -215,13 +219,17 @@ export default function TestEditor() {
 
   const handleAddQuestion = async () => {
     if (!newQ.questionText.trim()) return toast.error("Enter a question");
-    if (newQ.options.filter((o) => o.text.trim()).length < 2) return toast.error("At least 2 options required");
-    if (!newQ.options.some((o) => o.isCorrect)) return toast.error("Mark one option as correct");
+    const filledOptions = newQ.options.filter((o) => o.text.trim());
+    if (filledOptions.length < 2) return toast.error("At least 2 options required");
+    const correctOptionIndex = filledOptions.findIndex((o) => o.isCorrect);
+    if (correctOptionIndex < 0) return toast.error("Mark one option as correct");
     setAddingQ(true);
     try {
       await addQuestionToTest(testId, {
         questionText: newQ.questionText.trim(),
-        options: newQ.options.filter((o) => o.text.trim()).map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+        questionType: "MCQ",
+        options: filledOptions.map((o) => ({ text: o.text.trim() })),
+        correctOptionIndex,
         marks: Number(newQ.marks) || 1,
       });
       toast.success("Question added");

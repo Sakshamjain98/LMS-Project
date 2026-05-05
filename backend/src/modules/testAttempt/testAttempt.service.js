@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import TestAttempt from "../../models/testAttempt.model.js";
 import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
+import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
+import Subscription from "../../models/subscription.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import {
@@ -13,6 +15,16 @@ import {
   hasExceededTimeLimit,
   generateDetailedResult,
 } from "../../shared/utils/evaluation.utils.js";
+
+// True when the student has an active paid subscription that unlocks paid topics.
+const hasActivePaidSubscription = async (studentId) => {
+  const sub = await Subscription.findOne({ userId: studentId }).lean();
+  if (!sub) return false;
+  if (sub.status !== "ACTIVE") return false;
+  if (!sub.plan || sub.plan === "FREE") return false;
+  if (sub.expiresAt && new Date(sub.expiresAt) < new Date()) return false;
+  return true;
+};
 
 /**
  * Validate and convert testId to ObjectId
@@ -65,6 +77,20 @@ export const startTest = async (testId, studentId) => {
   // Check if test is published
   if (test.status !== "published") {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test is not available");
+  }
+
+  // Paid-topic gating — pricing lives on the parent test series (topic).
+  if (test.topicId) {
+    const topic = await TestSeriesTopic.findById(test.topicId).lean();
+    if (topic?.isPaid) {
+      const ok = await hasActivePaidSubscription(objStudentId);
+      if (!ok) {
+        throw new ApiError(
+          STATUS_CODES.FORBIDDEN,
+          `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to start.`
+        );
+      }
+    }
   }
 
   // Check for existing in-progress attempt

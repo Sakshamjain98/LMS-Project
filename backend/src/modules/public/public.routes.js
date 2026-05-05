@@ -2,6 +2,13 @@ import express from "express";
 import * as adminService from "../admin/admin.service.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import News from "../../models/news.model.js";
+import Blog from "../../models/blog.model.js";
+import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
+import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
+import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
+import Test from "../../models/test.model.js";
+import { ApiError } from "../../shared/error/ApiError.js";
+import { STATUS_CODES } from "../../constants/statusCode.js";
 
 const router = express.Router();
 
@@ -11,6 +18,63 @@ router.get(
   asyncHandler(async (_req, res) => {
     const data = await adminService.getSiteContent();
     res.json({ success: true, data });
+  })
+);
+
+// Public single-article page used by the "Read More" route.
+router.get(
+  "/blogs/:id",
+  asyncHandler(async (req, res) => {
+    const blog = await Blog.findOne({ _id: req.params.id, published: true }).lean();
+    if (!blog) throw new ApiError(STATUS_CODES.NOT_FOUND, "Article not found");
+    res.json({ success: true, blog });
+  })
+);
+
+// Public list of test series (topics) for the landing-page highlights — actual DB content.
+router.get(
+  "/test-series",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 6, 24);
+    const topics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    if (topics.length === 0) {
+      return res.json({ success: true, topics: [] });
+    }
+    const topicIds = topics.map((t) => t._id);
+    const subjects = await TestSeriesSubject.find({ topicId: { $in: topicIds } }).lean();
+    const subjectIds = subjects.map((s) => s._id);
+    const chapters = subjectIds.length
+      ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds } }).lean()
+      : [];
+    const chapterIds = chapters.map((c) => c._id);
+    const tests = chapterIds.length
+      ? await Test.find({ chapterId: { $in: chapterIds }, status: "published" })
+          .select("chapterId duration")
+          .lean()
+      : [];
+
+    // Flatten counts by topic for the landing UI.
+    const out = topics.map((topic) => {
+      const topicSubjects = subjects.filter((s) => String(s.topicId) === String(topic._id));
+      const topicSubjectIds = new Set(topicSubjects.map((s) => String(s._id)));
+      const topicChapters = chapters.filter((c) => topicSubjectIds.has(String(c.subjectId)));
+      const topicChapterIds = new Set(topicChapters.map((c) => String(c._id)));
+      const topicTests = tests.filter((t) => topicChapterIds.has(String(t.chapterId)));
+      const totalDurationMin = topicTests.reduce((sum, t) => sum + (t.duration || 0), 0);
+      return {
+        _id: topic._id,
+        title: topic.title,
+        description: topic.description,
+        isPaid: Boolean(topic.isPaid),
+        price: Number(topic.price) || 0,
+        subjectsCount: topicSubjects.length,
+        chaptersCount: topicChapters.length,
+        testsCount: topicTests.length,
+        totalDurationMin,
+      };
+    });
+
+    res.json({ success: true, topics: out });
   })
 );
 
