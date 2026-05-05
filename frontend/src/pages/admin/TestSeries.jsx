@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   createTestSeriesChapter,
   createTestSeriesSubject,
@@ -28,7 +28,6 @@ import {
   UploadCloud,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
-import TestEditor from "./TestEditor";
 
 const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0 };
 const emptyTestForm = {
@@ -60,6 +59,7 @@ const emptyCsvForm = {
 
 export default function AdminTestSeries() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +75,6 @@ export default function AdminTestSeries() {
   const [csvForm, setCsvForm] = useState(emptyCsvForm);
   const [confirmState, setConfirmState] = useState({ isOpen: false, type: null, id: null });
   const [actionLoading, setActionLoading] = useState(false);
-  const [editingTestPanelId, setEditingTestPanelId] = useState(null);
 
   const fetchSeries = useCallback(async () => {
     try {
@@ -292,7 +291,7 @@ export default function AdminTestSeries() {
     } else if (level === "chapters") {
       updateUrl({ level: "tests", chapterId: row._id });
     } else if (level === "tests") {
-      setEditingTestPanelId(row._id);
+      navigate(`/admin/test-series/test/${row._id}`);
     }
   };
 
@@ -427,7 +426,7 @@ export default function AdminTestSeries() {
                         )}
                         <button
                           onClick={() => {
-                            if (level === "tests") setEditingTestPanelId(row._id);
+                            if (level === "tests") navigate(`/admin/test-series/test/${row._id}`);
                             else openModal("entity", "edit", row);
                           }}
                           className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
@@ -558,13 +557,6 @@ export default function AdminTestSeries() {
         message="This action will remove all nested data. Continue?"
       />
 
-      {editingTestPanelId && (
-        <TestEditor
-          testId={editingTestPanelId}
-          onClose={() => setEditingTestPanelId(null)}
-          onSaved={fetchSeries}
-        />
-      )}
     </div>
   );
 }

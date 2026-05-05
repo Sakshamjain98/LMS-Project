@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
-  X,
+  ArrowLeft,
   FileText,
   ListChecks,
+  Settings2,
   UploadCloud,
   Plus,
   Trash2,
   Loader2,
   CheckCircle2,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import {
   getTeacherTestById,
   updateTeacherTest,
@@ -25,7 +28,7 @@ const fieldChk = "h-4 w-4 rounded border-white/20 bg-dark-300 accent-brand-prima
 
 function FieldLabel({ label, hint, required, children }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 min-w-0">
       <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70">
         {label}
         {required && <span className="text-red-400">*</span>}
@@ -51,9 +54,13 @@ const buildTestPayload = (form) => {
     duration: Number(form.duration) || 60,
     passingMarks: Number(form.passingMarks) || 0,
     instructions: form.instructions.trim(),
-    isPaid: Boolean(form.isPaid),
     attemptLimit: Number(form.attemptLimit) || 0,
     isProctored: Boolean(form.isProctored),
+    shuffleQuestions: Boolean(form.shuffleQuestions),
+    shuffleOptions: Boolean(form.shuffleOptions),
+    showSolution: form.showSolution !== false,
+    allowReview: form.allowReview !== false,
+    negativeMarking: Math.max(0, Number(form.negativeMarking) || 0),
   };
   if (!form.isOpenTest) {
     if (form.startTime) payload.startTime = new Date(form.startTime).toISOString();
@@ -65,7 +72,7 @@ const buildTestPayload = (form) => {
   return payload;
 };
 
-// Minimal CSV parser — handles quoted fields and commas inside quotes.
+// CSV parser — handles quoted fields and embedded commas.
 const parseCsv = (text) => {
   const rows = [];
   let cur = [""];
@@ -132,7 +139,10 @@ const emptyQuestion = {
   marks: 1,
 };
 
-export default function TestEditor({ testId, onClose, onSaved }) {
+export default function TestEditor() {
+  const { testId } = useParams();
+  const navigate = useNavigate();
+
   const [tab, setTab] = useState("details");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -157,19 +167,24 @@ export default function TestEditor({ testId, onClose, onSaved }) {
         duration: t.duration || 60,
         passingMarks: t.passingMarks || 0,
         instructions: t.instructions || "",
-        isPaid: Boolean(t.isPaid),
         attemptLimit: t.attemptLimit || 0,
         isProctored: Boolean(t.isProctored),
         isOpenTest: !(t.startTime || t.endTime),
         startTime: t.startTime ? toLocalDateTime(t.startTime) : "",
         endTime: t.endTime ? toLocalDateTime(t.endTime) : "",
+        shuffleQuestions: Boolean(t.shuffleQuestions),
+        shuffleOptions:   Boolean(t.shuffleOptions),
+        showSolution:     t.showSolution !== false,
+        allowReview:      t.allowReview !== false,
+        negativeMarking:  Number(t.negativeMarking) || 0,
       });
     } catch (err) {
       toast.error(err.message || "Failed to load test");
+      navigate("/admin/test-series");
     } finally {
       setLoading(false);
     }
-  }, [testId]);
+  }, [testId, navigate]);
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -185,13 +200,12 @@ export default function TestEditor({ testId, onClose, onSaved }) {
 
   useEffect(() => { fetchTest(); fetchQuestions(); }, [fetchTest, fetchQuestions]);
 
-  const handleSaveDetails = async () => {
+  const handleSave = async () => {
     if (!form?.title?.trim()) return toast.error("Title is required");
     setSaving(true);
     try {
       await updateTeacherTest(testId, buildTestPayload(form));
-      toast.success("Test updated");
-      onSaved?.();
+      toast.success("Test saved");
     } catch (err) {
       toast.error(err.message || "Failed to update");
     } finally {
@@ -252,58 +266,84 @@ export default function TestEditor({ testId, onClose, onSaved }) {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-white/60">
+        <Loader2 size={20} className="animate-spin mr-2" /> Loading test…
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-black/70 backdrop-blur-sm">
-      <div className="flex flex-1 flex-col bg-dark-400 animate-fade-up">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-6 py-4">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="space-y-6 min-w-0"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
+          <Link
+            to="/admin/test-series"
+            className="rounded-xl glass-pill p-2.5 text-white/70 hover:text-white shrink-0"
+            title="Back to test series"
+          >
+            <ArrowLeft size={18} />
+          </Link>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Editing Test</p>
-            <h2 className="truncate text-lg font-bold text-white">{test?.title || "—"}</h2>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-white/60 hover:bg-white/5 hover:text-white">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-white/10 bg-dark-400 px-6">
-          <div className="flex gap-1">
-            <TabBtn icon={FileText} active={tab === "details"}   onClick={() => setTab("details")}>Details &amp; Configuration</TabBtn>
-            <TabBtn icon={ListChecks} active={tab === "questions"} onClick={() => setTab("questions")}>
-              Questions <span className="ml-1.5 rounded-full bg-white/10 px-2 text-[10px] font-bold">{questions.length}</span>
-            </TabBtn>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="mx-auto max-w-4xl px-6 py-8">
-            {loading ? (
-              <div className="flex h-64 items-center justify-center text-white/60">
-                <Loader2 size={20} className="animate-spin mr-2" /> Loading test…
-              </div>
-            ) : tab === "details" ? (
-              <DetailsTab form={form} onChange={setForm} onSave={handleSaveDetails} saving={saving} />
-            ) : (
-              <QuestionsTab
-                questions={questions}
-                loading={questionsLoading}
-                newQ={newQ}
-                onNewQChange={setNewQ}
-                onAdd={handleAddQuestion}
-                addingQ={addingQ}
-                onDelete={handleDeleteQuestion}
-                csvFile={csvFile}
-                onCsvFileChange={setCsvFile}
-                onCsvUpload={handleCsvUpload}
-                csvUploading={csvUploading}
-              />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Editing Test</p>
+            <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl break-words">
+              {test?.title || "—"}
+            </h1>
+            {test?.topicId?.title && (
+              <p className="mt-1 text-xs text-white/50 break-words">
+                {test.topicId.title}
+                {test.subjectId?.title && <> &nbsp;/&nbsp; {test.subjectId.title}</>}
+                {test.chapterId?.title && <> &nbsp;/&nbsp; {test.chapterId.title}</>}
+              </p>
             )}
           </div>
         </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-xl btn-gradient px-5 py-2.5 text-sm font-bold whitespace-nowrap disabled:opacity-50"
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
       </div>
-    </div>
+
+      {/* Tabs */}
+      <div className="border-b border-white/10 overflow-x-auto custom-scrollbar">
+        <div className="flex gap-1 min-w-max">
+          <TabBtn icon={FileText} active={tab === "details"} onClick={() => setTab("details")}>Details</TabBtn>
+          <TabBtn icon={Settings2} active={tab === "config"} onClick={() => setTab("config")}>Configuration</TabBtn>
+          <TabBtn icon={ListChecks} active={tab === "questions"} onClick={() => setTab("questions")}>
+            Questions <span className="ml-1.5 rounded-full bg-white/10 px-2 text-[10px] font-bold">{questions.length}</span>
+          </TabBtn>
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        {tab === "details"   && <DetailsTab   form={form} onChange={setForm} />}
+        {tab === "config"    && <ConfigTab    form={form} onChange={setForm} />}
+        {tab === "questions" && (
+          <QuestionsTab
+            questions={questions}
+            loading={questionsLoading}
+            newQ={newQ}
+            onNewQChange={setNewQ}
+            onAdd={handleAddQuestion}
+            addingQ={addingQ}
+            onDelete={handleDeleteQuestion}
+            csvFile={csvFile}
+            onCsvFileChange={setCsvFile}
+            onCsvUpload={handleCsvUpload}
+            csvUploading={csvUploading}
+          />
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -311,7 +351,7 @@ function TabBtn({ icon: Icon, active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold transition ${
+      className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap transition ${
         active ? "text-brand-primary" : "text-white/60 hover:text-white"
       }`}
     >
@@ -322,10 +362,10 @@ function TabBtn({ icon: Icon, active, onClick, children }) {
   );
 }
 
-function DetailsTab({ form, onChange, onSave, saving }) {
+function DetailsTab({ form, onChange }) {
   if (!form) return null;
   return (
-    <div className="space-y-6">
+    <div className="rounded-2xl glass-card p-5 md:p-6 space-y-5">
       <FieldLabel label="Test Title" required>
         <input value={form.title} onChange={(e) => onChange({ ...form, title: e.target.value })} placeholder="e.g. GPAT Mock 1 — Pharmacology" className={fieldInput} />
       </FieldLabel>
@@ -347,19 +387,11 @@ function DetailsTab({ form, onChange, onSave, saving }) {
         <textarea value={form.instructions} onChange={(e) => onChange({ ...form, instructions: e.target.value })} placeholder="Read carefully — there is negative marking..." rows={3} className={`${fieldInput} resize-none`} />
       </FieldLabel>
 
-      <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 cursor-pointer">
-        <input type="checkbox" className={fieldChk} checked={form.isProctored} onChange={(e) => onChange({ ...form, isProctored: e.target.checked })} />
-        <span>Proctored <span className="block text-[10px] text-white/40">Forces fullscreen + tab-switch detection.</span></span>
-      </label>
-      <p className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-[11px] text-white/40">
-        Tip: pricing is set on the parent <strong className="text-white/70">Test Series</strong>, not on individual tests.
-      </p>
-
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <FieldLabel label="Attempt Limit" hint="0 = unlimited attempts.">
           <input type="number" min="0" value={form.attemptLimit} onChange={(e) => onChange({ ...form, attemptLimit: e.target.value })} className={fieldInput} />
         </FieldLabel>
-        <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 cursor-pointer self-end h-[46px]">
+        <label className="flex items-center gap-2 self-end rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 cursor-pointer h-[46px]">
           <input type="checkbox" className={fieldChk} checked={form.isOpenTest} onChange={(e) => onChange({ ...form, isOpenTest: e.target.checked })} />
           <span>Open Test <span className="block text-[10px] text-white/40">Available anytime — no schedule.</span></span>
         </label>
@@ -376,11 +408,85 @@ function DetailsTab({ form, onChange, onSave, saving }) {
         </div>
       )}
 
-      <div className="flex justify-end pt-2 border-t border-white/5">
-        <button onClick={onSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl btn-gradient px-5 py-2.5 text-sm font-bold">
-          {saving && <Loader2 size={14} className="animate-spin" />}
-          {saving ? "Saving…" : "Save Changes"}
-        </button>
+      <p className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-[11px] text-white/40">
+        Tip: pricing is set on the parent <strong className="text-white/70">Test Series</strong>, not on individual tests.
+      </p>
+    </div>
+  );
+}
+
+function ConfigTab({ form, onChange }) {
+  if (!form) return null;
+  const Toggle = ({ id, value, onToggle, label, hint }) => (
+    <label htmlFor={id} className="flex items-start gap-3 rounded-xl border border-white/10 bg-dark-300 p-4 cursor-pointer hover:border-white/20 transition-colors">
+      <input
+        id={id}
+        type="checkbox"
+        className={`${fieldChk} mt-0.5`}
+        checked={Boolean(value)}
+        onChange={(e) => onToggle(e.target.checked)}
+      />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-white">{label}</p>
+        {hint && <p className="mt-0.5 text-[11px] text-white/40">{hint}</p>}
+      </div>
+    </label>
+  );
+  return (
+    <div className="rounded-2xl glass-card p-5 md:p-6 space-y-5">
+      <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
+        <Settings2 size={16} className="text-brand-primary" /> Behaviour during the test
+      </h3>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Toggle
+          id="cfg-shuffleQ"
+          value={form.shuffleQuestions}
+          onToggle={(v) => onChange({ ...form, shuffleQuestions: v })}
+          label="Shuffle Questions"
+          hint="Each student sees the questions in a different order."
+        />
+        <Toggle
+          id="cfg-shuffleO"
+          value={form.shuffleOptions}
+          onToggle={(v) => onChange({ ...form, shuffleOptions: v })}
+          label="Shuffle Options"
+          hint="The four options of every MCQ are randomly ordered per attempt."
+        />
+        <Toggle
+          id="cfg-proctored"
+          value={form.isProctored}
+          onToggle={(v) => onChange({ ...form, isProctored: v })}
+          label="Proctored Mode"
+          hint="Forces fullscreen, blocks copy/paste, detects tab-switches."
+        />
+        <Toggle
+          id="cfg-showSol"
+          value={form.showSolution}
+          onToggle={(v) => onChange({ ...form, showSolution: v })}
+          label="Show Solutions After Submit"
+          hint="Reveal correct answers and explanations on the result page."
+        />
+        <Toggle
+          id="cfg-review"
+          value={form.allowReview}
+          onToggle={(v) => onChange({ ...form, allowReview: v })}
+          label="Allow Review Of Answers"
+          hint="Student can revisit questions before final submission."
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <FieldLabel label="Negative Marking (per wrong answer)" hint="0 = no negative marking. 0.25 means −¼ for each wrong answer.">
+          <input
+            type="number"
+            min="0"
+            step="0.25"
+            value={form.negativeMarking}
+            onChange={(e) => onChange({ ...form, negativeMarking: Number(e.target.value) })}
+            className={fieldInput}
+          />
+        </FieldLabel>
       </div>
     </div>
   );
@@ -388,8 +494,7 @@ function DetailsTab({ form, onChange, onSave, saving }) {
 
 function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, onDelete, csvFile, onCsvFileChange, onCsvUpload, csvUploading }) {
   return (
-    <div className="space-y-8">
-      {/* CSV upload */}
+    <div className="space-y-6">
       <section className="rounded-2xl glass-card p-5">
         <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
           <UploadCloud size={16} className="text-brand-primary" /> Bulk import via CSV
@@ -402,12 +507,12 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
             type="file"
             accept=".csv"
             onChange={(e) => onCsvFileChange(e.target.files?.[0] || null)}
-            className="flex-1 rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-white"
+            className="flex-1 min-w-0 rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-white"
           />
           <button
             onClick={onCsvUpload}
             disabled={!csvFile || csvUploading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl btn-gradient px-4 py-2.5 text-sm font-bold whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 rounded-xl btn-gradient px-4 py-2.5 text-sm font-bold whitespace-nowrap disabled:opacity-50"
           >
             {csvUploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
             {csvUploading ? "Importing…" : "Import CSV"}
@@ -415,7 +520,6 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
         </div>
       </section>
 
-      {/* Manual add */}
       <section className="rounded-2xl glass-card p-5">
         <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
           <Plus size={16} className="text-brand-primary" /> Add a question manually
@@ -449,14 +553,14 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <FieldLabel label="Marks">
               <input type="number" min="0" value={newQ.marks} onChange={(e) => onNewQChange({ ...newQ, marks: e.target.value })} className={`${fieldInput} max-w-32`} />
             </FieldLabel>
             <button
               onClick={onAdd}
               disabled={addingQ}
-              className="inline-flex items-center gap-2 rounded-xl btn-gradient px-4 py-2.5 text-sm font-bold self-end"
+              className="inline-flex items-center gap-2 rounded-xl btn-gradient px-4 py-2.5 text-sm font-bold disabled:opacity-50"
             >
               {addingQ ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               {addingQ ? "Adding…" : "Add Question"}
@@ -465,7 +569,6 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
         </div>
       </section>
 
-      {/* List */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
@@ -486,16 +589,16 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
         ) : (
           <div className="space-y-3">
             {questions.map((q, idx) => (
-              <article key={q._id} className="rounded-2xl glass-card p-5 animate-fade-up" style={{ animationDelay: `${idx * 30}ms` }}>
+              <article key={q._id} className="rounded-2xl glass-card p-5 animate-fade-up min-w-0" style={{ animationDelay: `${idx * 30}ms` }}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-white break-words">
                       <span className="mr-2 text-white/40">{idx + 1}.</span>
                       {q.questionText}
                     </p>
                     <ul className="mt-3 space-y-1.5">
                       {(q.options || []).map((o, i) => (
-                        <li key={i} className={`flex items-start gap-2 text-xs ${o.isCorrect ? "text-emerald-300" : "text-white/60"}`}>
+                        <li key={i} className={`flex items-start gap-2 text-xs break-words ${o.isCorrect ? "text-emerald-300" : "text-white/60"}`}>
                           <span className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${o.isCorrect ? "border-emerald-400 bg-emerald-500/15" : "border-white/15"}`}>
                             {o.isCorrect && <CheckCircle2 size={10} />}
                           </span>
@@ -507,7 +610,7 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
                   </div>
                   <button
                     onClick={() => onDelete(q._id)}
-                    className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
+                    className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20 shrink-0"
                     title="Delete question"
                   >
                     <Trash2 size={14} />

@@ -25,6 +25,7 @@ import Blogs from "./pages/admin/Blog";
 import CreateAdmin from "./pages/admin/CreateAdmin";
 import AdminProfile from "./pages/admin/Profile";
 import AdminTestSeries from "./pages/admin/TestSeries";
+import AdminTestEditor from "./pages/admin/TestEditor";
 import AdminSiteContent from "./pages/admin/SiteContent";
 import AdminBlogEditor from "./pages/admin/BlogEditor";
 
@@ -77,6 +78,7 @@ function App() {
           <Route path="blogs/new" element={<AdminBlogEditor />} />
           <Route path="blogs/:id/edit" element={<AdminBlogEditor />} />
           <Route path="test-series" element={<AdminTestSeries />} />
+          <Route path="test-series/test/:testId" element={<AdminTestEditor />} />
           <Route path="site-content" element={<AdminSiteContent />} />
           <Route path="create-admin" element={<CreateAdmin />} />
           <Route path="profile" element={<AdminProfile />} />

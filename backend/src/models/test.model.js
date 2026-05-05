@@ -31,6 +31,13 @@ const testSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Test-time behaviour configuration.
+    shuffleQuestions: { type: Boolean, default: false },
+    shuffleOptions:   { type: Boolean, default: false },
+    showSolution:     { type: Boolean, default: true },  // show explanations after submit
+    allowReview:      { type: Boolean, default: true },  // student can review answers post-submit
+    negativeMarking:  { type: Number,  default: 0 },     // marks deducted per wrong answer (0 = none)
   },
   { timestamps: true }
 );

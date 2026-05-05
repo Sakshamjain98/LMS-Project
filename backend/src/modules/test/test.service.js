@@ -102,9 +102,13 @@ export const createTest = async (data, teacherId) => {
     instructions: payload.instructions?.trim().slice(0, 1000) || "",
     attemptLimit: Number.isFinite(payload.attemptLimit) ? Math.max(payload.attemptLimit, 0) : 0,
     isProctored: payload.isProctored ?? false,
-
-    // ✅ IMPORTANT FIX
     isPaid: payload.isPaid ?? false,
+
+    shuffleQuestions: Boolean(payload.shuffleQuestions),
+    shuffleOptions:   Boolean(payload.shuffleOptions),
+    showSolution:     payload.showSolution !== false,
+    allowReview:      payload.allowReview !== false,
+    negativeMarking:  Math.max(0, Number(payload.negativeMarking) || 0),
 
     teacherId: objTeacherId,
     topicId: hierarchy.topic._id,
