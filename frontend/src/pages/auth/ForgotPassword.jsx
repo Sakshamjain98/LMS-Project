@@ -85,7 +85,7 @@ const ForgotPassword = () => {
 
             <button
               onClick={() => navigate("/login")}
-              className="w-full bg-brand-primary text-dark-400 py-3 rounded-lg font-bold hover:opacity-90 transition mb-4"
+              className="w-full btn-gradient py-3 rounded-lg font-bold hover:opacity-90 transition mb-4"
             >
               Back to Login
             </button>
@@ -152,7 +152,7 @@ const ForgotPassword = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-brand-primary text-dark-400 py-2.5 rounded-md font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full btn-gradient py-2.5 rounded-md font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

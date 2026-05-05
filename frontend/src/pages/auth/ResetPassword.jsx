@@ -117,7 +117,7 @@ const ResetPassword = () => {
 
             <button
               onClick={() => navigate("/forgot-password")}
-              className="w-full bg-brand-primary text-dark-400 py-3 rounded-lg font-bold hover:opacity-90 transition"
+              className="w-full btn-gradient py-3 rounded-lg font-bold hover:opacity-90 transition"
             >
               Request New Link
             </button>
@@ -158,7 +158,7 @@ const ResetPassword = () => {
 
             <button
               onClick={() => navigate("/login")}
-              className="w-full bg-brand-primary text-dark-400 py-3 rounded-lg font-bold hover:opacity-90 transition"
+              className="w-full btn-gradient py-3 rounded-lg font-bold hover:opacity-90 transition"
             >
               Sign In
             </button>
@@ -259,7 +259,7 @@ const ResetPassword = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-brand-primary text-dark-400 py-2.5 rounded-md font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full btn-gradient py-2.5 rounded-md font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

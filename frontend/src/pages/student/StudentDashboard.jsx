@@ -50,9 +50,9 @@ export default function StudentDashboard() {
     return (
       <>
         <StudentNavbar />
-        <div className="flex min-h-screen items-center justify-center bg-[#0B0D14]">
+        <div className="flex min-h-screen items-center justify-center bg-dark-400">
           <div className="space-y-4 text-center">
-            <div className="mx-auto h-12 w-12 rounded-full border-4 border-[#00DC82] border-t-transparent animate-spin" />
+            <div className="mx-auto h-12 w-12 rounded-full border-4 border-brand-primary border-t-transparent animate-spin" />
             <p className="text-base font-semibold text-white">Loading your workspace...</p>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function StudentDashboard() {
   return (
     <>
       <StudentNavbar />
-      <div className="min-h-screen bg-[#0B0D14] pb-16 text-gray-200 selection:bg-[#00DC82]/30">
+      <div className="min-h-screen bg-dark-400 pb-16 text-gray-200 selection:bg-brand-primary/30">
         <div className="mx-auto flex max-w-400 flex-col gap-8 px-6 py-8 md:px-10 lg:py-10">
           
           {/* Error Banner */}
@@ -107,7 +107,7 @@ export default function StudentDashboard() {
 
           {/* Header */}
           <header className="flex flex-col gap-2">
-            <p className="text-base font-medium text-[#00DC82] uppercase tracking-wider">
+            <p className="text-base font-medium text-brand-primary uppercase tracking-wider">
               {greeting}
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
@@ -152,10 +152,10 @@ export default function StudentDashboard() {
                   {displayContinueTests.map((attempt) => (
                     <div
                       key={attempt._id}
-                      className="flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13161F] p-5 transition-colors hover:bg-[#1A1D27] sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded-xl border border-white/5 bg-dark-200 p-5 transition-colors hover:bg-dark-100 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1A1D27] text-[#00DC82]">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-dark-100 text-brand-primary">
                           <LayoutDashboard size={24} />
                         </div>
                         <div>
@@ -174,7 +174,7 @@ export default function StudentDashboard() {
 
                       <Link
                         to="/student/tests"
-                        className="inline-flex items-center justify-center rounded-lg bg-[#00DC82]/15 px-4 py-2 text-sm font-semibold text-[#00DC82] hover:bg-[#00DC82]/25 transition"
+                        className="inline-flex items-center justify-center rounded-lg bg-brand-primary/15 px-4 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/25 transition"
                       >
                         Continue Test
                       </Link>
@@ -201,10 +201,10 @@ export default function StudentDashboard() {
                     return (
                       <div
                         key={attempt._id}
-                        className="flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13161F] p-5 transition-colors hover:bg-[#1A1D27] sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-4 rounded-xl border border-white/5 bg-dark-200 p-5 transition-colors hover:bg-dark-100 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1A1D27] text-[#00DC82]">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-dark-100 text-brand-primary">
                             <FileText size={24} />
                           </div>
                           <div>
@@ -261,7 +261,7 @@ function DashboardSection({ title, actionLabel, actionTo, children }) {
         {actionLabel && actionTo && (
           <Link
             to={actionTo}
-            className="group flex items-center text-sm font-semibold text-[#00DC82] hover:text-[#00DC82]/80"
+            className="group flex items-center text-sm font-semibold text-brand-primary hover:text-brand-primary/80"
           >
             {actionLabel}
             <ChevronRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
@@ -278,8 +278,8 @@ function MetricCard({ icon, label, value, isPercentage }) {
   const isNegative = String(value).includes('-');
   
   return (
-    <div className="flex items-center gap-5 rounded-2xl border border-white/5 bg-[#13161F] p-6 shadow-sm">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#00DC82]/10 text-[#00DC82]">
+    <div className="flex items-center gap-5 rounded-2xl border border-white/5 bg-dark-200 p-6 shadow-sm">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
         {icon}
       </div>
       <div>
@@ -294,13 +294,13 @@ function MetricCard({ icon, label, value, isPercentage }) {
 
 function EmptyState({ title, actionTo }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#13161F]/50 py-12 text-center">
-      <div className="mb-3 rounded-full bg-[#1A1D27] p-4 text-gray-500">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-dark-200/50 py-12 text-center">
+      <div className="mb-3 rounded-full bg-dark-100 p-4 text-gray-500">
         <LayoutDashboard size={24} />
       </div>
       <p className="text-base font-medium text-gray-300">{title}</p>
       {actionTo && (
-        <Link to={actionTo} className="mt-4 rounded-lg bg-[#00DC82]/10 px-5 py-2 text-sm font-semibold text-[#00DC82] transition-colors hover:bg-[#00DC82]/20">
+        <Link to={actionTo} className="mt-4 rounded-lg bg-brand-primary/10 px-5 py-2 text-sm font-semibold text-brand-primary transition-colors hover:bg-brand-primary/20">
           Browse Catalog
         </Link>
       )}

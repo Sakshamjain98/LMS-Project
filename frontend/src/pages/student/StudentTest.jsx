@@ -206,7 +206,7 @@ export default function StudentTests() {
         {/* HERO */}
         <div className="relative overflow-hidden border-b border-dark-100 bg-dark-300">
           <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-brand-primary/20 blur-3xl"></div>
-          <div className="absolute -left-10 top-32 h-36 w-36 rounded-full bg-sky-500/10 blur-3xl"></div>
+          <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-brand-primary/10 blur-3xl"></div>
           <div className="mx-auto max-w-350 px-4 py-8 md:px-6 md:py-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/60">
               <Sparkles size={12} className="text-brand-primary" />
@@ -241,7 +241,7 @@ export default function StudentTests() {
               onClick={() => setActiveTab("take")}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
                 activeTab === "take"
-                  ? "bg-brand-primary text-dark-400"
+                  ? "btn-gradient"
                   : "text-gray-300 hover:text-white"
               }`}
             >
@@ -253,7 +253,7 @@ export default function StudentTests() {
               onClick={() => setActiveTab("results")}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
                 activeTab === "results"
-                  ? "bg-brand-primary text-dark-400"
+                  ? "btn-gradient"
                   : "text-gray-300 hover:text-white"
               }`}
             >
@@ -299,23 +299,36 @@ export default function StudentTests() {
                                   {topic.title}
                                 </h3>
                               </div>
-                              <div className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/60">
-                                <Users size={12} />
-                                Popular
-                              </div>
+                              {topic.isPaid ? (
+                                <div className="flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                                  ₹{Number(topic.price || 0).toLocaleString()}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                                  Free
+                                </div>
+                              )}
                             </div>
                             <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
                               <span className="font-semibold text-white">{stats.total}</span> Tests
                               <span>•</span>
-                              <span className="text-brand-primary font-semibold">{stats.free}</span> Free
+                              <span className="font-semibold text-white">{stats.subjects}</span> Subjects
+                              <span>•</span>
+                              <span className="font-semibold text-white">{stats.chapters}</span> Chapters
                             </div>
                             <ul className="mt-3 space-y-1 text-xs text-white/40">
                               <li>• {stats.live} Live now</li>
-                              <li>• {stats.subjects} Subjects</li>
-                              <li>• {stats.chapters} Chapters</li>
+                              {topic.isPaid && (
+                                <li className="text-amber-300/80">• Premium series — one-time access</li>
+                              )}
                             </ul>
-                            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand-primary/15 px-3 py-1 text-xs font-semibold text-brand-primary">
-                              View Test Series <ArrowRight size={12} />
+                            <div className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                              topic.isPaid
+                                ? "bg-amber-500/15 text-amber-300"
+                                : "bg-brand-primary/15 text-brand-primary"
+                            }`}>
+                              {topic.isPaid ? `Unlock for ₹${Number(topic.price || 0).toLocaleString()}` : "View Test Series"}
+                              <ArrowRight size={12} />
                             </div>
                           </button>
                         ))}
@@ -445,6 +458,8 @@ const flattenSeriesTests = (topics) => {
           tests.push({
             ...test,
             topicTitle: topic.title,
+            topicIsPaid: Boolean(topic.isPaid),
+            topicPrice: Number(topic.price) || 0,
             subjectTitle: subject.title,
             chapterTitle: chapter.title,
           });
@@ -472,17 +487,18 @@ const getSeriesStats = (topic) => {
     return { total: 0, free: 0, live: 0, subjects: 0, chapters: 0 };
   }
   let total = 0;
-  let free = 0;
   let live = 0;
   let chapters = 0;
   const subjects = topic.subjects?.length || 0;
+
+  // Topic-level pricing — every test in a free topic is free for the student.
+  const free = topic.isPaid ? 0 : 1;
 
   topic.subjects?.forEach((subject) => {
     chapters += subject.chapters?.length || 0;
     subject.chapters?.forEach((chapter) => {
       chapter.tests?.forEach((test) => {
         total += 1;
-        if (!test.isPaid) free += 1;
         if (isLiveTest(test)) live += 1;
       });
     });
@@ -560,7 +576,11 @@ function TestRow({ test, onStartTest, onViewResult }) {
                 Live Test
               </span>
             )}
-            {!test.isPaid && (
+            {test.topicIsPaid ? (
+              <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                Premium · ₹{Number(test.topicPrice || 0).toLocaleString()}
+              </span>
+            ) : (
               <span className="rounded-full bg-brand-primary/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
                 Free
               </span>

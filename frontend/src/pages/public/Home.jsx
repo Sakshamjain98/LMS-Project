@@ -7,7 +7,11 @@ import {
   verifyPayment,
   activateFreeSubscription,
   getStudentSubscription,
+  getPublicArticles,
+  getPublicNews,
+  getPublicSiteContent,
 } from "../../services/studentService";
+import { motion } from "framer-motion";
 import {
   FaArrowRight,
   FaBook,
@@ -68,76 +72,6 @@ const StatCard = ({ iconBg, iconColor, label, value, note }) => (
     {note && <p className="text-xs text-gray-500 mt-1.5">{note}</p>}
   </div>
 );
-
-/** Course card */
-const CourseCard = ({ course }) => {
-  return (
-    <a
-      href={`/student/courses/${course._id}`}
-      className="group bg-dark-200 rounded-xl overflow-hidden border border-dark-100 hover:border-brand-primary/50 hover:shadow-xl hover:shadow-brand-primary/10 transition-all duration-300 flex flex-col h-full"
-    >
-      {/* Thumbnail */}
-      <div className="relative h-44 bg-dark-300 flex items-center justify-center overflow-hidden">
-        <div className="p-5 bg-dark-400/60 rounded-full">
-          {course._id === 1 ? (
-            <FaFileAlt className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
-          ) : course._id === 2 ? (
-            <FaFlask className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
-          ) : (
-            <FaHospital className="text-4xl text-brand-primary/60 group-hover:text-brand-primary transition-colors" />
-          )}
-        </div>
-        <span
-          className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            course.isPaid
-              ? "bg-blue-500/15 text-blue-400 border border-blue-500/20"
-              : "bg-green-500/15 text-green-400 border border-green-500/20"
-          }`}
-        >
-          {course.isPaid ? "Premium" : "Free"}
-        </span>
-      </div>
-
-      {/* Content */}
-      <div className="p-5 flex flex-col flex-1 gap-4">
-        <div>
-          <h3 className="font-bold text-white text-sm leading-snug mb-1.5 group-hover:text-brand-primary transition-colors line-clamp-2">
-            {course.title}
-          </h3>
-          <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">
-            {course.description}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-4 py-3 border-y border-dark-100 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <FaBook size={11} />
-            {course.sections} lessons
-          </span>
-          <span className="flex items-center gap-1.5">
-            <FaUsers size={11} />
-            {course.students.toLocaleString()} students
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {[...Array(5)].map((_, i) => (
-            <FaStar
-              key={i}
-              size={11}
-              className={i < Math.floor(course.rating) ? "text-yellow-400" : "text-dark-100"}
-            />
-          ))}
-          <span className="text-xs font-semibold text-white ml-0.5">{course.rating}</span>
-        </div>
-
-        <button className="mt-auto w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors">
-          View Course
-        </button>
-      </div>
-    </a>
-  );
-};
 
 /** Feature card */
 const FeatureCard = ({ title, description }) => (
@@ -205,7 +139,7 @@ const PricingCard = ({
       }`}
     >
       {isMostPopular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-brand-primary text-dark-400 text-xs font-bold rounded-full tracking-wide">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 btn-gradient text-xs font-bold rounded-full tracking-wide">
           MOST POPULAR
         </div>
       )}
@@ -247,7 +181,7 @@ const PricingCard = ({
           }
           className={`w-full py-3 rounded-lg text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed ${
             isMostPopular
-              ? "bg-brand-primary text-dark-400 hover:opacity-90"
+              ? "btn-gradient hover:opacity-90"
               : "bg-dark-300 text-white border border-dark-100 hover:border-brand-primary/50"
           }`}
         >
@@ -258,67 +192,44 @@ const PricingCard = ({
   );
 };
 
+/* Quill HTML often starts with an empty <p><br></p>; strip it. */
+const stripFirstParagraph = (html = "") =>
+  html.replace(/^<p>(<br>)?<\/p>/, "").trim();
+
 /* ─────────────────────────────────────────────────────────────
    Static data
 ───────────────────────────────────────────────────────────── */
 
-const FEATURED_COURSES = [
-  {
-    _id: "1",
-    title: "Pharmaceutical Jurisprudence",
-    description: "Legal and regulatory framework for pharmacy professionals",
-    sections: 24,
-    students: 3200,
-    rating: 4.8,
-    isPaid: false,
-  },
-  {
-    _id: "2",
-    title: "Advanced Pharmacology",
-    description: "Deep dive into drug mechanisms and therapeutic interactions",
-    sections: 32,
-    students: 2100,
-    rating: 4.9,
-    isPaid: false,
-  },
-  {
-    _id: "3",
-    title: "Clinical Pharmacy Practice",
-    description: "Real-world patient care and clinical decision-making",
-    sections: 28,
-    students: 1800,
-    rating: 4.7,
-    isPaid: true,
-  },
-];
 
-const BLOG_POSTS = [
+const TEST_SERIES_HIGHLIGHTS = [
   {
-    id: "1",
-    title: "Top 10 GPAT Exam Preparation Tips",
-    description:
-      "Master the pharmacist licensing exam with proven strategies and study techniques.",
-    category: "GPAT",
-    readTime: "8 min read",
+    tag: "GPAT",
+    badge: "Most Popular",
+    title: "GPAT Full-Length Mocks",
+    subtitle: "Real-exam pattern with detailed solutions and All India Rank after every test.",
     icon: FaMedal,
+    tests: "40+",
+    duration: "3 hrs",
+    takers: "12k+",
   },
   {
-    id: "2",
-    title: "Career Path in Clinical Pharmacy",
-    description:
-      "Explore lucrative opportunities and specializations in clinical pharmacy practice.",
-    category: "Career",
-    readTime: "6 min read",
-    icon: FaBriefcase,
+    tag: "NIPER",
+    title: "NIPER Topic-Wise",
+    subtitle: "Chapter-wise sectional tests with adaptive difficulty and weakness reports.",
+    icon: FaFlask,
+    tests: "60+",
+    duration: "1 hr",
+    takers: "5.4k",
   },
   {
-    id: "3",
-    title: "Understanding Drug Interactions",
-    description:
-      "A comprehensive guide to identifying and managing potential drug interactions.",
-    category: "Education",
-    readTime: "10 min read",
-    icon: FaPills,
+    tag: "Pharmacist",
+    badge: "New",
+    title: "State Board Pharmacist",
+    subtitle: "State-board pattern mocks for government pharmacist roles across India.",
+    icon: FaShieldAlt,
+    tests: "25+",
+    duration: "2 hrs",
+    takers: "3.2k",
   },
 ];
 
@@ -327,7 +238,7 @@ const FEATURES = [
     icon: FaBook,
     title: "Comprehensive Curriculum",
     description:
-      "Structured courses covering all aspects of pharmaceutical science, from fundamentals to advanced specializations.",
+      "Structured test series covering every chapter of pharmaceutical science — fundamentals to advanced specializations.",
   },
   {
     icon: FaUserTie,
@@ -394,7 +305,7 @@ const FALLBACK_PLANS = [
     name: "Starter",
     price: "Free",
     desc: "Perfect for exploring",
-    features: ["5 free courses", "Basic study materials", "Community access"],
+    features: ["5 free tests / month", "Basic study materials", "Community access"],
   },
   {
     id: "QUARTERLY",
@@ -403,7 +314,7 @@ const FALLBACK_PLANS = [
     period: "/3 months",
     desc: "Most popular choice",
     features: [
-      "All courses unlocked",
+      "All test series unlocked",
       "Premium study materials",
       "Full practice test suite",
       "Email support",
@@ -434,7 +345,10 @@ const FALLBACK_PLANS = [
 const Home = () => {
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState({ students: 0, courses: 0, success: 0 });
+  const [stats, setStats] = useState({ students: 0, tests: 0, success: 0 });
+  const [articles, setArticles] = useState([]);
+  const [news, setNews] = useState([]);
+  const [cms, setCms] = useState(null);
   const [plans, setPlans] = useState([]);
   const [_loadingPlans, setLoadingPlans] = useState(true);
   const [processingPlan, setProcessingPlan] = useState(null);
@@ -473,12 +387,54 @@ const Home = () => {
     fetchPlans();
   }, []);
 
+  /* Fetch published articles + news + site content */
+  useEffect(() => {
+    getPublicArticles(6)
+      .then((res) => setArticles(res?.blogs || []))
+      .catch(() => setArticles([]));
+    getPublicNews(5)
+      .then((res) => setNews(res?.news || []))
+      .catch(() => setNews([]));
+    getPublicSiteContent()
+      .then((res) => setCms(res?.data || null))
+      .catch(() => setCms(null));
+  }, []);
+
+  /* CMS-driven content with static fallbacks. */
+  const hero = {
+    eyebrow: cms?.hero?.eyebrow ?? "Pharmacy Excellence Platform",
+    titlePrefix: cms?.hero?.titlePrefix ?? "Master Pharmacy with",
+    titleHighlight: cms?.hero?.titleHighlight ?? "Structured Learning",
+    subtitle: cms?.hero?.subtitle ?? "Comprehensive pharmaceutical education for serious learners. Learn from industry experts, ace your exams, and build a career you're proud of.",
+    primaryCtaLabel: cms?.hero?.primaryCtaLabel ?? "Login",
+    secondaryCtaLabel: cms?.hero?.secondaryCtaLabel ?? "Browse Tests",
+    videoUrl: cms?.hero?.videoUrl ?? "https://www.youtube.com/embed/Tvf7CXEjFNU?si=toZhTVuzoNa1kNw0",
+  };
+  const aboutCms = {
+    eyebrow: cms?.about?.eyebrow ?? "Our Mission",
+    title: cms?.about?.title ?? "About Us",
+    paragraphs: (cms?.about?.paragraphs?.length ? cms.about.paragraphs : [
+      "Pharmacist Shubham is dedicated to democratising pharmaceutical education. We believe quality learning shouldn't be limited by geography or resources. Our platform combines expert instruction, practical assessments, and a supportive community to help pharmacy professionals excel.",
+      "Whether you're preparing for licensing exams, expanding your clinical knowledge, or advancing your career, we give you the tools and expertise you need to succeed.",
+    ]),
+  };
+  const featuresCms      = cms?.features?.length              ? cms.features              : FEATURES.map((f) => ({ title: f.title, description: f.description }));
+  const testimonialsCms  = cms?.testimonials?.length          ? cms.testimonials          : TESTIMONIALS;
+  const highlightsCms    = cms?.testSeriesHighlights?.length  ? cms.testSeriesHighlights  : TEST_SERIES_HIGHLIGHTS;
+  const faqCms           = cms?.faq?.length                   ? cms.faq                   : [];
+  const footerCms = {
+    brand: cms?.footer?.brand ?? "Pharmacist Academy",
+    description: cms?.footer?.description ?? "Empowering pharmacy professionals with structured, expert-led education.",
+    contactEmail: cms?.footer?.contactEmail ?? "support@pharmacistshubham.com",
+    contactPhone: cms?.footer?.contactPhone ?? "+91 XXXX XXX XXX",
+  };
+
   /* Animate counter stats */
   useEffect(() => {
     const interval = setInterval(() => {
       setStats((prev) => ({
         students: Math.min(prev.students + 234, 15000),
-        courses: Math.min(prev.courses + 8, 120),
+        tests: Math.min(prev.tests + 8, 125),
         success: Math.min(prev.success + 2, 95),
       }));
     }, 50);
@@ -508,8 +464,7 @@ const Home = () => {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      if (userRole === "teacher") navigate("/teacher/dashboard");
-      else if (userRole === "admin") navigate("/admin/dashboard");
+      if (userRole === "admin") navigate("/admin/dashboard");
       else navigate("/student/dashboard");
     } else {
       navigate("/login");
@@ -654,42 +609,55 @@ const Home = () => {
         <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
           {/* Left: Copy */}
-          <div className="space-y-8">
+          <motion.div
+            className="space-y-8"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
             {/* Eyebrow label */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/8 border border-brand-primary/25 rounded-full">
+            <motion.div
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/8 border border-brand-primary/25 rounded-full"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.05 }}
+            >
               <FaGraduationCap className="text-brand-primary text-sm" />
               <span className="text-xs font-semibold text-brand-primary tracking-wide">
-                Pharmacy Excellence Platform
+                {hero.eyebrow}
               </span>
-            </div>
+            </motion.div>
 
-            <div className="space-y-4">
+            <motion.div
+              className="space-y-4"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+            >
               <h1 className="text-5xl md:text-6xl font-black leading-[1.1] tracking-tight">
-                Master Pharmacy with{" "}
-                <span className="text-brand-primary">Structured Learning</span>
+                {hero.titlePrefix}{" "}
+                <span className="text-brand-primary">{hero.titleHighlight}</span>
               </h1>
               <p className="text-gray-400 text-lg leading-relaxed max-w-lg">
-                Comprehensive pharmaceutical education for serious learners.
-                Learn from industry experts, ace your exams, and build a career
-                you're proud of.
+                {hero.subtitle}
               </p>
-            </div>
+            </motion.div>
 
             {/* CTA row */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={handleGetStarted}
-                className="px-7 py-3.5 bg-brand-primary text-dark-400 rounded-lg font-bold text-sm hover:opacity-90 transition inline-flex items-center justify-center gap-2 group"
+                className="px-7 py-3.5 btn-gradient rounded-lg font-bold text-sm hover:opacity-90 transition inline-flex items-center justify-center gap-2 group"
               >
-                Student Login
+                {hero.primaryCtaLabel}
                 <FaArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
               <a
-                href="#courses"
+                href="#test-series"
                 className="px-7 py-3.5 bg-dark-200 text-white rounded-lg font-bold text-sm border border-dark-100 hover:border-brand-primary/40 transition inline-flex items-center justify-center gap-2"
               >
                 <FaPlay size={12} />
-                Browse Courses
+                {hero.secondaryCtaLabel}
               </a>
             </div>
 
@@ -703,9 +671,9 @@ const Home = () => {
               </div>
               <div>
                 <p className="text-3xl font-black text-brand-primary tabular-nums">
-                  {stats.courses}+
+                  {stats.tests}+
                 </p>
-                <p className="text-xs text-gray-500 mt-1 font-medium">Expert Courses</p>
+                <p className="text-xs text-gray-500 mt-1 font-medium">Mock Tests</p>
               </div>
               <div>
                 <p className="text-3xl font-black text-brand-primary tabular-nums">
@@ -714,14 +682,14 @@ const Home = () => {
                 <p className="text-xs text-gray-500 mt-1 font-medium">Success Rate</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Right: Video embed */}
           <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-dark-100 shadow-2xl shadow-black/40">
             <iframe
               width="100%"
               height="100%"
-              src="https://www.youtube.com/embed/Tvf7CXEjFNU?si=toZhTVuzoNa1kNw0"
+              src={hero.videoUrl}
               title="Pharmacist Academy Introduction"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -744,28 +712,19 @@ const Home = () => {
           <div className="space-y-5">
             <div>
               <span className="text-xs font-bold tracking-widest uppercase text-brand-primary mb-3 block">
-                Our Mission
+                {aboutCms.eyebrow}
               </span>
-              <h2 className="text-4xl md:text-5xl font-black text-white mb-4">About Us</h2>
+              <h2 className="text-4xl md:text-5xl font-black text-white mb-4">{aboutCms.title}</h2>
               <div className="w-10 h-0.5 bg-brand-primary rounded-full" />
             </div>
-            <p className="text-gray-400 leading-relaxed">
-              Pharmacist Shubham is dedicated to democratising pharmaceutical
-              education. We believe quality learning shouldn't be limited by
-              geography or resources. Our platform combines expert instruction,
-              practical assessments, and a supportive community to help pharmacy
-              professionals excel.
-            </p>
-            <p className="text-gray-400 leading-relaxed">
-              Whether you're preparing for licensing exams, expanding your
-              clinical knowledge, or advancing your career, we give you the
-              tools and expertise you need to succeed.
-            </p>
+            {aboutCms.paragraphs.map((p, i) => (
+              <p key={i} className="text-gray-400 leading-relaxed">{p}</p>
+            ))}
             <a
-              href="#courses"
+              href="#test-series"
               className="inline-flex items-center gap-2 text-brand-primary hover:opacity-80 font-semibold text-sm transition"
             >
-              Explore our courses
+              Explore our test series
               <FaArrowRight size={13} />
             </a>
           </div>
@@ -785,7 +744,7 @@ const Home = () => {
               iconBg="bg-blue-500/15"
               iconColor="text-blue-400"
               label="Courses"
-              value={`${stats.courses}+`}
+              value={`${stats.tests}+`}
               note="Expert-led"
             />
             <StatCard
@@ -809,29 +768,78 @@ const Home = () => {
       </Section>
 
       {/* ══════════════════════════════════════════
-          FEATURED COURSES
+          TEST SERIES (NEW)
       ══════════════════════════════════════════ */}
-      <Section id="courses" className="border-t border-dark-100">
+      <Section id="test-series" className="relative border-t border-dark-100 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-brand-primary/10 blur-3xl" />
+          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-brand-primary/10 blur-3xl" />
+        </div>
+
         <SectionHeading
-          eyebrow="Curriculum"
-          title="Featured Courses"
-          subtitle="Explore our most popular and impactful pharmacy courses, built for real-world outcomes."
+          eyebrow="Practice & Excel"
+          title="All-India Test Series"
+          subtitle="Mock exams with All India Rank, chapter-wise analytics, and real-exam pacing — built by pharmacy faculty."
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {FEATURED_COURSES.map((course) => (
-            <CourseCard key={course._id} course={course} />
-          ))}
+          {highlightsCms.map((s, i) => {
+            const Icon = s.icon || FaMedal;
+            return (
+            <div
+              key={i}
+              className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              {s.badge && (
+                <span className="absolute right-4 top-4 rounded-full bg-brand-primary/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
+                  {s.badge}
+                </span>
+              )}
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
+                <Icon size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
+                  {s.tag}
+                </p>
+                <h3 className="mt-1 text-lg font-bold text-white">{s.title}</h3>
+                <p className="mt-1.5 text-sm text-gray-400 leading-relaxed">{s.subtitle}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+                <div>
+                  <p className="text-base font-bold text-white">{s.tests}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
+                </div>
+                <div>
+                  <p className="text-base font-bold text-white">{s.duration}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Length</p>
+                </div>
+                <div>
+                  <p className="text-base font-bold text-brand-primary">{s.takers}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500">Takers</p>
+                </div>
+              </div>
+              <button
+                onClick={handleGetStarted}
+                className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+              >
+                Attempt Free Test
+                <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
+              </button>
+            </div>
+            );
+          })}
         </div>
 
         <div className="text-center">
-          <a
-            href="/student/courses"
-            className="inline-flex items-center gap-2 px-7 py-3 border border-brand-primary/50 text-brand-primary rounded-lg font-bold text-sm hover:bg-brand-primary/8 transition"
+          <button
+            onClick={handleGetStarted}
+            className="inline-flex items-center gap-2 px-7 py-3 btn-gradient rounded-lg font-bold text-sm hover:opacity-90 transition"
           >
-            View All {stats.courses}+ Courses
+            Browse All Test Series
             <FaArrowRight size={13} />
-          </a>
+          </button>
         </div>
       </Section>
 
@@ -849,14 +857,47 @@ const Home = () => {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map((f, i) => (
+          {featuresCms.map((f, i) => (
             <FeatureCard key={i} {...f} />
           ))}
         </div>
       </Section>
 
       {/* ══════════════════════════════════════════
-          BLOG
+          NEWS — live from /api/public/news
+      ══════════════════════════════════════════ */}
+      {news.length > 0 && (
+        <Section id="news" className="bg-dark-300/30 border-t border-dark-100">
+          <SectionHeading
+            eyebrow="What's New"
+            title="Latest Updates"
+            subtitle="Announcements, exam alerts, and platform releases — straight from our team."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {news.map((item, idx) => (
+              <article
+                key={item._id}
+                className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col gap-3 animate-fade-up"
+                style={{ animationDelay: `${idx * 70}ms` }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-brand-primary/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
+                    Update
+                  </span>
+                  <span className="text-[11px] text-gray-500">
+                    {new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white leading-snug">{item.title}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed line-clamp-3">{item.content}</p>
+              </article>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          ARTICLES (live from /api/public/blogs)
       ══════════════════════════════════════════ */}
       <Section id="blog" className="border-t border-dark-100">
         <SectionHeading
@@ -865,56 +906,49 @@ const Home = () => {
           subtitle="Expert insights, exam tips, and career guidance from the pharmacy education world."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {BLOG_POSTS.map((post) => {
-            const Icon = post.icon;
-            return (
-              <a
-                key={post.id}
-                href="#"
-                className="group bg-dark-200 rounded-xl border border-dark-100 hover:border-brand-primary/50 hover:shadow-lg hover:shadow-brand-primary/10 transition-all duration-300 flex flex-col h-full p-6"
+        {articles.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-20 text-center text-sm text-gray-400">
+            No articles published yet. Check back soon.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {articles.map((post, idx) => (
+              <article
+                key={post._id}
+                className="group glass-card glass-card-hover rounded-2xl flex flex-col h-full p-6 animate-fade-up"
+                style={{ animationDelay: `${idx * 80}ms` }}
               >
-                {/* Icon + category */}
                 <div className="flex items-center gap-3 mb-5">
                   <div className="p-2.5 bg-brand-primary/10 rounded-lg">
-                    <Icon className="text-brand-primary" size={15} />
+                    <FaBook className="text-brand-primary" size={15} />
                   </div>
                   <span className="text-xs font-bold text-brand-primary tracking-wide uppercase">
-                    {post.category}
+                    Article
                   </span>
                 </div>
 
-                <h3 className="text-sm font-bold text-white mb-2 leading-snug group-hover:text-brand-primary transition-colors line-clamp-2 min-h-10">
+                <h3 className="text-base font-bold text-white mb-2 leading-snug group-hover:text-brand-primary transition-colors line-clamp-2">
                   {post.title}
                 </h3>
 
-                <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 flex-1 mb-5">
-                  {post.description}
-                </p>
+                <div
+                  className="text-xs text-gray-400 leading-relaxed line-clamp-3 flex-1 mb-5 prose prose-invert prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: stripFirstParagraph(post.content) }}
+                />
 
-                <div className="flex items-center justify-between pt-4 border-t border-dark-100">
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
                   <span className="flex items-center gap-1.5 text-xs text-gray-500">
                     <FaClock size={11} />
-                    {post.readTime}
+                    {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <span className="text-xs font-bold text-brand-primary flex items-center gap-1 group-hover:gap-2 transition-all">
                     Read More <FaArrowRight size={11} />
                   </span>
                 </div>
-              </a>
-            );
-          })}
-        </div>
-
-        <div className="text-center">
-          <a
-            href="#blog"
-            className="inline-flex items-center gap-2 px-7 py-3 border border-brand-primary/50 text-brand-primary rounded-lg font-bold text-sm hover:bg-brand-primary/8 transition"
-          >
-            View All Articles
-            <FaArrowRight size={13} />
-          </a>
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* ══════════════════════════════════════════
@@ -931,7 +965,7 @@ const Home = () => {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {TESTIMONIALS.map((t, i) => (
+          {testimonialsCms.map((t, i) => (
             <TestimonialCard key={i} {...t} />
           ))}
         </div>
@@ -1006,7 +1040,7 @@ const Home = () => {
 
           <button
             onClick={handleGetStarted}
-            className="inline-flex items-center gap-2.5 px-9 py-4 bg-brand-primary text-dark-400 rounded-lg font-bold text-base hover:opacity-90 transition group"
+            className="inline-flex items-center gap-2.5 px-9 py-4 btn-gradient rounded-lg font-bold text-base hover:opacity-90 transition group"
           >
             Start Learning Today
             <FaArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
@@ -1019,6 +1053,34 @@ const Home = () => {
       </section>
 
       {/* ══════════════════════════════════════════
+          FAQ — CMS-driven, hidden if empty
+      ══════════════════════════════════════════ */}
+      {faqCms.length > 0 && (
+        <Section id="faq" className="bg-dark-300/30 border-t border-dark-100">
+          <SectionHeading
+            eyebrow="Questions"
+            title="Frequently Asked"
+            subtitle="The questions students ask us most often before signing up."
+          />
+          <div className="mx-auto max-w-3xl space-y-3">
+            {faqCms.map((q, i) => (
+              <details
+                key={i}
+                className="group glass-card glass-card-hover rounded-2xl p-5 cursor-pointer animate-fade-up"
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <summary className="flex items-center justify-between gap-4 list-none">
+                  <span className="text-sm md:text-base font-semibold text-white">{q.question}</span>
+                  <FaArrowRight size={12} className="text-brand-primary transition-transform group-open:rotate-90 shrink-0" />
+                </summary>
+                <p className="mt-3 text-sm text-gray-400 leading-relaxed">{q.answer}</p>
+              </details>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ══════════════════════════════════════════
           FOOTER
       ══════════════════════════════════════════ */}
       <footer className="border-t border-dark-100 bg-dark-300/50 py-14 px-6 md:px-12">
@@ -1027,19 +1089,14 @@ const Home = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-10">
             {/* Brand */}
             <div className="col-span-2">
-              <p className="text-base font-black text-white mb-2">
-                Pharmacist <span className="text-brand-primary">Academy</span>
-              </p>
-              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
-                Empowering pharmacy professionals with structured, expert-led
-                education.
-              </p>
+              <p className="text-base font-black text-white mb-2">{footerCms.brand}</p>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">{footerCms.description}</p>
             </div>
 
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-gray-300 mb-4">Product</p>
               <ul className="space-y-2.5 text-xs text-gray-500">
-                <li><a href="#courses" className="hover:text-white transition">Courses</a></li>
+                <li><a href="#test-series" className="hover:text-white transition">Test Series</a></li>
                 <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li>
                 <li><a href="#about" className="hover:text-white transition">About</a></li>
               </ul>
@@ -1066,10 +1123,10 @@ const Home = () => {
 
           {/* Bottom row: copyright + contact */}
           <div className="border-t border-dark-100 pt-7 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-            <p>&copy; {new Date().getFullYear()} Pharmacist Shubham. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} {footerCms.brand}. All rights reserved.</p>
             <div className="flex items-center gap-5">
-              <span>support@pharmacistshubham.com</span>
-              <span>+91 XXXX XXX XXX</span>
+              {footerCms.contactEmail && <span>{footerCms.contactEmail}</span>}
+              {footerCms.contactPhone && <span>{footerCms.contactPhone}</span>}
             </div>
           </div>
         </div>

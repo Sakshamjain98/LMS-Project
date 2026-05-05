@@ -50,9 +50,10 @@ const Navbar = () => {
   const navLinks = [
     { name: "Home", id: "home" },
     { name: "About", id: "about" },
+    { name: "Test Series", id: "test-series" },
     { name: "Features", id: "features" },
-    { name: "Courses", id: "courses" },
-    { name: "Faculty", id: "faculty" },
+    { name: "News", id: "news" },
+    { name: "Articles", id: "blog" },
     { name: "Testimonials", id: "testimonials" },
     { name: "Pricing", id: "pricing" },
   ];
@@ -173,48 +174,45 @@ const Navbar = () => {
           {/* RIGHT */}
           <div className="hidden lg:flex items-center gap-4">
             {isAuthenticated && userRole === "student" && (
-              <>
-                {/* Subscription Status Badge */}
-                <div className="relative">
-                  <button
-                    onClick={handleSubscriptionClick}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                      subscriptionStatus === "FREE"
-                        ? "bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20"
-                        : "bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 border border-brand-primary/20"
-                    }`}
-                    title={subscriptionStatus === "FREE" ? "Click to subscribe" : "View subscription details"}
-                  >
-                    <Zap size={16} />
-                    {subscriptionStatus === "FREE" ? "Free Plan" : "Subscribed"}
-                  </button>
-
-                  {/* Subscription Menu */}
-                  {showSubscriptionMenu && subscriptionStatus !== "FREE" && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-dark-300 border border-white/10 rounded-xl shadow-2xl p-4 z-50">
-                      <h3 className="font-bold text-white mb-3">Subscribed Features</h3>
-                      <ul className="space-y-2 text-sm text-gray-300">
-                        <li>✓ Access all premium courses</li>
-                        <li>✓ Unlimited test attempts</li>
-                        <li>✓ Download notes & materials</li>
-                        <li>✓ Priority support</li>
-                        <li>✓ Certificates of completion</li>
-                        <li>✓ Ad-free learning experience</li>
-                      </ul>
-                      <p className="text-xs text-gray-500 mt-4">Your subscription is active</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Student Dashboard Button */}
-                <Link
-                  to="/student/dashboard"
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white/10 text-white rounded-lg font-semibold hover:bg-white/20 transition-all text-sm"
+              <div className="relative">
+                <button
+                  onClick={handleSubscriptionClick}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                    subscriptionStatus === "FREE"
+                      ? "bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20"
+                      : "bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 border border-brand-primary/20"
+                  }`}
+                  title={subscriptionStatus === "FREE" ? "Click to subscribe" : "View subscription details"}
                 >
-                  <LayoutDashboard size={16} />
-                  Dashboard
-                </Link>
-              </>
+                  <Zap size={16} />
+                  {subscriptionStatus === "FREE" ? "Free Plan" : "Subscribed"}
+                </button>
+
+                {showSubscriptionMenu && subscriptionStatus !== "FREE" && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-dark-300 border border-white/10 rounded-xl shadow-2xl p-4 z-50">
+                    <h3 className="font-bold text-white mb-3">Subscribed Features</h3>
+                    <ul className="space-y-2 text-sm text-gray-300">
+                      <li>✓ Access all premium test series</li>
+                      <li>✓ Unlimited test attempts</li>
+                      <li>✓ Detailed analytics &amp; ranks</li>
+                      <li>✓ Priority support</li>
+                      <li>✓ Certificates of completion</li>
+                      <li>✓ Ad-free experience</li>
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-4">Your subscription is active</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isAuthenticated && (
+              <Link
+                to={userRole === "admin" ? "/admin/dashboard" : "/student/dashboard"}
+                className="flex items-center gap-2 px-5 py-2.5 btn-gradient rounded-lg font-bold text-sm"
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
             )}
 
             {isAuthenticated ? (
@@ -228,9 +226,9 @@ const Navbar = () => {
             ) : (
               <Link
                 to="/login"
-                className="px-6 py-2.5 bg-brand-primary text-dark-400 rounded-lg text-base font-bold hover:opacity-90 transition"
+                className="px-6 py-2.5 btn-gradient rounded-lg text-base font-bold hover:opacity-90 transition"
               >
-                Student Login
+                Login
               </Link>
             )}
           </div>
@@ -276,22 +274,24 @@ const Navbar = () => {
         {/* Mobile Auth Section */}
         <div className="p-6 border-t border-white/10 space-y-3">
           {isAuthenticated && userRole === "student" && (
+            <button
+              onClick={handleSubscriptionClick}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                subscriptionStatus === "FREE"
+                  ? "bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
+                  : "bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20"
+              }`}
+            >
+              <Zap size={16} />
+              {subscriptionStatus === "FREE" ? "Get Premium" : "Subscribed"}
+            </button>
+          )}
+          {isAuthenticated ? (
             <>
-              <button
-                onClick={handleSubscriptionClick}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                  subscriptionStatus === "FREE"
-                    ? "bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
-                    : "bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20"
-                }`}
-              >
-                <Zap size={16} />
-                {subscriptionStatus === "FREE" ? "Get Premium" : "Subscribed"}
-              </button>
               <Link
-                to="/student/dashboard"
+                to={userRole === "admin" ? "/admin/dashboard" : "/student/dashboard"}
                 onClick={() => setIsOpen(false)}
-                className="block w-full text-center px-4 py-2.5 bg-white/10 text-white rounded-lg font-semibold hover:bg-white/20"
+                className="block w-full text-center px-4 py-2.5 btn-gradient rounded-lg font-bold"
               >
                 Dashboard
               </Link>
@@ -302,17 +302,14 @@ const Navbar = () => {
                 Logout
               </button>
             </>
-          )}
-          {!isAuthenticated && (
-            <>
-              <Link
-                to="/login"
-                onClick={() => setIsOpen(false)}
-                className="block w-full text-center px-4 py-2.5 bg-brand-primary text-dark-400 rounded-lg font-bold"
-              >
-                Student Login
-              </Link>
-            </>
+          ) : (
+            <Link
+              to="/login"
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-center px-4 py-2.5 btn-gradient rounded-lg font-bold"
+            >
+              Login
+            </Link>
           )}
         </div>
       </div>

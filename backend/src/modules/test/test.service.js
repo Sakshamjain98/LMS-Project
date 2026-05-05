@@ -110,7 +110,9 @@ export const createTest = async (data, teacherId) => {
     topicId: hierarchy.topic._id,
     subjectId: hierarchy.subject._id,
     chapterId: hierarchy.chapter._id,
-    status: "draft",
+    // Tests created via the admin UI go straight to published — admins create
+    // intentionally and the student flow gates by status === "published".
+    status: "published",
   });
 };
 /**

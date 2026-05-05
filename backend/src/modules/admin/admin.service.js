@@ -8,6 +8,7 @@ import SubscriptionPlan from "../../models/subscriptionPlan.model.js";
 import Test from "../../models/test.model.js"
 import TestAttempt from "../../models/testAttempt.model.js";
 import PlatformSettings, { DEFAULT_TEACHER_SETTINGS } from "../../models/platformSettings.model.js";
+import SiteContent from "../../models/siteContent.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { comparePassword, hashPassword } from "../../shared/utils/bcrypt.js";
@@ -680,6 +681,14 @@ export const getCourseAnalytics = async () => {
 };
 
 
+export const getBlogById = async (blogId) => {
+  const blog = await Blog.findById(blogId).lean();
+  if (!blog) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Blog not found");
+  }
+  return blog;
+};
+
 export const getBlogs = async (query = {}) => {
   const page = Math.max(parseInt(query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
@@ -761,4 +770,93 @@ export const updateTeacherSettings = async (payload) => {
     teacherVisibility: settings.teacherVisibility,
     teacherDashboardStats: settings.teacherDashboardStats,
   };
+};
+// -------------------- Site Content --------------------
+export const DEFAULT_SITE_CONTENT = {
+  hero: {
+    eyebrow: "Pharmacy Excellence Platform",
+    titlePrefix: "Master Pharmacy with",
+    titleHighlight: "Structured Learning",
+    subtitle:
+      "Comprehensive pharmaceutical education for serious learners. Learn from industry experts, ace your exams, and build a career you're proud of.",
+    primaryCtaLabel: "Login",
+    secondaryCtaLabel: "Browse Tests",
+    videoUrl: "https://www.youtube.com/embed/Tvf7CXEjFNU?si=toZhTVuzoNa1kNw0",
+  },
+  about: {
+    eyebrow: "Our Mission",
+    title: "About Us",
+    paragraphs: [
+      "Pharmacist Shubham is dedicated to democratising pharmaceutical education. We believe quality learning shouldn't be limited by geography or resources. Our platform combines expert instruction, practical assessments, and a supportive community to help pharmacy professionals excel.",
+      "Whether you're preparing for licensing exams, expanding your clinical knowledge, or advancing your career, we give you the tools and expertise you need to succeed.",
+    ],
+  },
+  features: [
+    { title: "Comprehensive Curriculum", description: "Structured test series covering every chapter of pharmaceutical science — fundamentals to advanced specializations." },
+    { title: "Expert Instructors", description: "Learn from industry professionals and experienced pharmacists with decades of combined expertise." },
+    { title: "Learn at Your Pace", description: "Flexible scheduling lets you study on your own timeline — from anywhere, on any device." },
+    { title: "Practical Assessments", description: "Real-world tests and mock exams to validate your knowledge and prepare for certifications." },
+    { title: "Recognised Certificates", description: "Earn certificates that are valued by employers and institutions across the pharmaceutical industry." },
+    { title: "Dedicated Support", description: "Our support team is available to help you through every step of your learning journey." },
+  ],
+  testimonials: [
+    { text: "The courses are incredibly well-structured. I passed my GPAT exam on the first attempt thanks to the comprehensive materials.", author: "Priya Desai", role: "GPAT Aspirant", rating: 5 },
+    { text: "Best investment for my pharmacy career. The faculty are approachable and the content is industry-relevant.", author: "Rohan Singh", role: "Pharmacy Graduate", rating: 5 },
+    { text: "I appreciated the practical approach to clinical pharmacy. It helped me secure my clinical internship.", author: "Neha Verma", role: "Final Year Student", rating: 5 },
+    { text: "Study materials and test series are top-notch. Highly recommended for anyone serious about pharmacy.", author: "Arjun Malhotra", role: "NIPER Aspirant", rating: 5 },
+  ],
+  testSeriesHighlights: [
+    { tag: "GPAT", badge: "Most Popular", title: "GPAT Full-Length Mocks", subtitle: "Real-exam pattern with detailed solutions and All India Rank after every test.", tests: "40+", duration: "3 hrs", takers: "12k+" },
+    { tag: "NIPER", badge: "", title: "NIPER Topic-Wise", subtitle: "Chapter-wise sectional tests with adaptive difficulty and weakness reports.", tests: "60+", duration: "1 hr", takers: "5.4k" },
+    { tag: "Pharmacist", badge: "New", title: "State Board Pharmacist", subtitle: "State-board pattern mocks for government pharmacist roles across India.", tests: "25+", duration: "2 hrs", takers: "3.2k" },
+  ],
+  faq: [
+    { question: "Do I need to sign up to take tests?", answer: "Yes — register a free student account and you can start with the free tests right away. Premium tests require an active subscription." },
+    { question: "How are All-India Ranks calculated?", answer: "After you submit a test, your performance is compared against everyone else who attempted the same test, in real time. Ranks update as more students attempt." },
+    { question: "Are tests downloadable for offline use?", answer: "Yes — our mobile app supports offline mode. Download a test, attempt it offline, and your answers sync when you're back online." },
+    { question: "Can I cancel my subscription?", answer: "Yes, anytime. Your premium access stays active until the end of your billing period." },
+  ],
+  footer: {
+    brand: "Pharmacist Academy",
+    description: "Empowering pharmacy professionals with structured, expert-led education.",
+    contactEmail: "support@pharmacistshubham.com",
+    contactPhone: "+91 XXXX XXX XXX",
+  },
+};
+
+const mergeWithDefaults = (saved) => ({
+  hero:                  { ...DEFAULT_SITE_CONTENT.hero,    ...(saved?.hero || {}) },
+  about:                 { ...DEFAULT_SITE_CONTENT.about,   ...(saved?.about || {}) },
+  features:              Array.isArray(saved?.features)              && saved.features.length              ? saved.features              : DEFAULT_SITE_CONTENT.features,
+  testimonials:          Array.isArray(saved?.testimonials)          && saved.testimonials.length          ? saved.testimonials          : DEFAULT_SITE_CONTENT.testimonials,
+  testSeriesHighlights:  Array.isArray(saved?.testSeriesHighlights)  && saved.testSeriesHighlights.length  ? saved.testSeriesHighlights  : DEFAULT_SITE_CONTENT.testSeriesHighlights,
+  faq:                   Array.isArray(saved?.faq)                   && saved.faq.length                   ? saved.faq                   : DEFAULT_SITE_CONTENT.faq,
+  footer:                { ...DEFAULT_SITE_CONTENT.footer,  ...(saved?.footer || {}) },
+});
+
+export const getSiteContent = async () => {
+  const doc = await SiteContent.findOne({ key: "singleton" }).lean();
+  return mergeWithDefaults(doc?.data);
+};
+
+export const updateSiteContent = async (incoming = {}) => {
+  // Defensive: only persist top-level keys we know about, so the admin can't
+  // smuggle arbitrary fields into the doc.
+  const sanitized = {
+    hero:                 incoming.hero || {},
+    about:                incoming.about || {},
+    features:             Array.isArray(incoming.features)             ? incoming.features             : [],
+    testimonials:         Array.isArray(incoming.testimonials)         ? incoming.testimonials         : [],
+    testSeriesHighlights: Array.isArray(incoming.testSeriesHighlights) ? incoming.testSeriesHighlights : [],
+    faq:                  Array.isArray(incoming.faq)                  ? incoming.faq                  : [],
+    footer:               incoming.footer || {},
+  };
+
+  const updated = await SiteContent.findOneAndUpdate(
+    { key: "singleton" },
+    { key: "singleton", data: sanitized },
+    { new: true, upsert: true }
+  ).lean();
+
+  return mergeWithDefaults(updated?.data);
 };

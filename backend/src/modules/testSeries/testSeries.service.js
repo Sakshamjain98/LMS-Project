@@ -47,10 +47,14 @@ const cascadeDeleteTests = async (testIds = []) => {
 export const createTopic = async (payload, teacherId) => {
   const title = normalizeTitle(payload?.title, "Topic title");
   const description = normalizeDescription(payload?.description);
+  const isPaid = Boolean(payload?.isPaid);
+  const price = Math.max(0, Number(payload?.price) || 0);
 
   return TestSeriesTopic.create({
     title,
     description,
+    isPaid,
+    price: isPaid ? price : 0,
     teacherId: validateObjectId(teacherId, "teacherId"),
   });
 };
@@ -62,6 +66,16 @@ export const updateTopic = async (topicId, payload, teacherId) => {
   }
   if (payload?.description !== undefined) {
     updates.description = normalizeDescription(payload.description);
+  }
+  if (payload?.isPaid !== undefined) {
+    updates.isPaid = Boolean(payload.isPaid);
+  }
+  if (payload?.price !== undefined) {
+    updates.price = Math.max(0, Number(payload.price) || 0);
+  }
+  // If admin marks topic free, force price to 0 to keep state consistent.
+  if (updates.isPaid === false) {
+    updates.price = 0;
   }
 
   const updated = await TestSeriesTopic.findOneAndUpdate(

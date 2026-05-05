@@ -217,3 +217,18 @@ export const changeAdminPassword = async (data) => {
   const res = await API.put("/admin/change-password", data);
   return res.data;
 };
+// -------------------- Site Content (Landing CMS) --------------------
+export const getAdminSiteContent = async () => {
+  const res = await API.get("/admin/site-content");
+  return res.data;
+};
+
+export const updateAdminSiteContent = async (data) => {
+  const res = await API.put("/admin/site-content", data);
+  return res.data;
+};
+
+export const getBlogById = async (blogId) => {
+  const res = await API.get(`/admin/blogs/${blogId}`);
+  return res.data;
+};

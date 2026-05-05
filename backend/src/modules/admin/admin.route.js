@@ -28,6 +28,7 @@ router.post("/cms/blog", controller.createBlog);
 router.put("/cms/blog/:id", controller.updateBlog);
 router.delete("/cms/blog/:id", controller.deleteBlog);
 router.get("/blogs", controller.getBlogs);
+router.get("/blogs/:id", controller.getBlogById);
 router.get("/teachers/pending", controller.pendingTeachers);
 router.put("/teachers/:id/approve", controller.approveTeacher);
 
@@ -59,5 +60,9 @@ router.get("/analytics/courses", controller.getCourseAnalytics);
 // -------------------- Teacher Feature Settings --------------------
 router.get("/settings/teacher", controller.getTeacherSettings);
 router.put("/settings/teacher", controller.updateTeacherSettings);
+
+// -------------------- Site Content (Landing-page CMS) --------------------
+router.get("/site-content", controller.getSiteContent);
+router.put("/site-content", controller.updateSiteContent);
 
 export default router;

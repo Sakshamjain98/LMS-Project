@@ -228,6 +228,22 @@ export const updateTeacherSettings = asyncHandler(async (req, res) => {
 
 
 
+export const getBlogById = asyncHandler(async (req, res) => {
+  const blog = await service.getBlogById(req.params.id);
+  res.json({ success: true, blog });
+});
+
+// -------------------- Site Content --------------------
+export const getSiteContent = asyncHandler(async (_req, res) => {
+  const data = await service.getSiteContent();
+  res.json({ success: true, data });
+});
+
+export const updateSiteContent = asyncHandler(async (req, res) => {
+  const data = await service.updateSiteContent(req.body || {});
+  res.json({ success: true, message: "Site content updated", data });
+});
+
 export const getBlogs = asyncHandler(async (req, res) => {
   const result = await service.getBlogs(req.query);
 

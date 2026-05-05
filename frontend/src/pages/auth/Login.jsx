@@ -36,7 +36,6 @@ const Login = () => {
 
     const routes = {
       admin: "/admin/dashboard",
-      teacher: "/teacher/dashboard",
       student: "/student/dashboard",
     };
     navigate(routes[res.user.role] || "/student/dashboard");
@@ -135,7 +134,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-brand-primary text-dark-400 rounded-lg font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-2.5 btn-gradient rounded-lg font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? "Signing In..." : "Sign In"}
               </button>

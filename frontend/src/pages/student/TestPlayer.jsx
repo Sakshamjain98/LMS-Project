@@ -288,7 +288,7 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
                   }`}
                 >
                   <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                    isSelected ? "border-brand-primary bg-brand-primary text-dark-400" : "border-gray-500 text-transparent"
+                    isSelected ? "border-brand-primary btn-gradient" : "border-gray-500 text-transparent"
                   }`}>
                     <CheckCircle2 size={14} />
                   </div>

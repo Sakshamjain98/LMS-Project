@@ -75,7 +75,7 @@ const Register = () => {
           </p>
           <button 
             onClick={() => navigate("/login")}
-            className="w-full py-3 bg-brand-primary text-dark-400 rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
+            className="w-full py-3 btn-gradient rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 transition"
           >
             Go to Login <ArrowRight size={18} />
           </button>
@@ -104,10 +104,6 @@ const Register = () => {
               </div>
             )}
 
-            <div className="rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-4 py-2 text-xs text-brand-primary font-semibold">
-              Student registration only. Admin and educator access is managed by the platform administrator.
-            </div>
-
             <form className="space-y-4" onSubmit={handleSubmit}>
               <input type="text" name="name" placeholder="Full Name" onChange={handleChange} className="w-full px-4 py-2.5 bg-dark-300 border border-dark-100 rounded-lg text-white" />
               {fieldErrors.name && <p className="text-xs text-red-400">{fieldErrors.name}</p>}
@@ -123,7 +119,7 @@ const Register = () => {
               <input type="password" name="confirmPassword" placeholder="Confirm Password" onChange={handleChange} className="w-full px-4 py-2.5 bg-dark-300 border border-dark-100 rounded-lg text-white" />
               {fieldErrors.confirmPassword && <p className="text-xs text-red-400">{fieldErrors.confirmPassword}</p>}
 
-              <button type="submit" disabled={loading} className="w-full py-2.5 bg-brand-primary text-dark-400 rounded-lg font-bold">
+              <button type="submit" disabled={loading} className="w-full py-2.5 btn-gradient rounded-lg font-bold">
                 {loading ? "Creating Account..." : "Create Account"}
               </button>
             </form>

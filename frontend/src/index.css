@@ -1,9 +1,19 @@
 @import "tailwindcss";
 
+/* Global page background — true black surface across the entire app. */
+html, body, #root {
+  background: #000000;
+  background-color: #000000;
+  color: #ffffff;
+  min-height: 100%;
+}
+
 @theme {
   /* Brand Colors */
   --color-brand-primary: #00BA7C;
   --color-brand-primary-dark: #007950;
+  --color-brand-accent: #5B8DEF;
+  --color-brand-accent-soft: #99B4F0;
 
   /* Gray Palette */
   --color-gray-custom-light: #EDF2F7;
@@ -15,3 +25,141 @@
   --color-dark-300: #080C16;
   --color-dark-400: #070A13;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Global utilities — glassmorphism, scrollbars, animation primitives */
+/* ------------------------------------------------------------------ */
+
+@layer utilities {
+  .glass-panel {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .glass-card {
+    background: linear-gradient(135deg, rgba(18, 25, 38, 0.75), rgba(8, 12, 22, 0.65));
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .glass-card-hover {
+    transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+  }
+
+  .glass-card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 186, 124, 0.35);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 186, 124, 0.18);
+  }
+
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .ambient-glow::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    background:
+      radial-gradient(40% 40% at 20% 20%, rgba(0, 186, 124, 0.18), transparent 60%),
+      radial-gradient(40% 40% at 80% 30%, rgba(91, 141, 239, 0.14), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 186, 124, 0.5); }
+}
+
+/* keyframes used across the app */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50%      { transform: translateY(-12px) translateX(8px); }
+}
+
+.animate-fade-up { animation: fade-up 480ms ease-out both; }
+.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
+
+/* ---- Gradient buttons ---- */
+.btn-gradient {
+  background-image: linear-gradient(90deg, #00BA7C 0%, #005438 100%);
+  color: #ffffff !important;
+  position: relative;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  box-shadow: 0 6px 18px rgba(0, 186, 124, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.btn-gradient:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 10px 24px rgba(0, 186, 124, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.btn-gradient:active:not(:disabled) { transform: translateY(1px); }
+.btn-gradient:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* When the gradient is applied to a small inline pill (light label, dim bg), use ghost variant */
+.btn-gradient-soft {
+  background-image: linear-gradient(90deg, rgba(0, 186, 124, 0.18) 0%, rgba(0, 84, 56, 0.18) 100%);
+  border: 1px solid rgba(0, 186, 124, 0.35);
+  color: #00BA7C;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+.btn-gradient-soft:hover:not(:disabled) {
+  filter: brightness(1.1);
+  background-image: linear-gradient(90deg, #00BA7C 0%, #005438 100%);
+  color: #ffffff;
+}
+
+/* ---- Quill (react-quill-new) — dark theme overrides ---- */
+.quill-dark .ql-toolbar.ql-snow {
+  background: rgba(255,255,255,0.03);
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.quill-dark .ql-container.ql-snow { border: none; min-height: 220px; }
+.quill-dark .ql-editor {
+  color: #ffffff;
+  min-height: 220px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.quill-dark .ql-editor.ql-blank::before { color: rgba(255,255,255,0.35); font-style: normal; }
+.quill-dark .ql-snow .ql-stroke { stroke: rgba(255,255,255,0.7); }
+.quill-dark .ql-snow .ql-fill { fill: rgba(255,255,255,0.7); }
+.quill-dark .ql-snow .ql-picker { color: rgba(255,255,255,0.7); }
+.quill-dark .ql-snow.ql-toolbar button:hover .ql-stroke,
+.quill-dark .ql-snow.ql-toolbar button.ql-active .ql-stroke { stroke: var(--color-brand-primary); }
+.quill-dark .ql-snow.ql-toolbar button:hover .ql-fill,
+.quill-dark .ql-snow.ql-toolbar button.ql-active .ql-fill { fill: var(--color-brand-primary); }
+.quill-dark .ql-snow .ql-picker-options {
+  background: #0E1420;
+  border-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+/* ---- Article preview HTML (landing) ---- */
+.prose.prose-invert h1, .prose.prose-invert h2, .prose.prose-invert h3 { color: #fff; }
+.prose.prose-invert a { color: var(--color-brand-primary); }
+.prose.prose-invert strong { color: #fff; }
+.prose.prose-invert ul, .prose.prose-invert ol { padding-left: 1.25rem; }

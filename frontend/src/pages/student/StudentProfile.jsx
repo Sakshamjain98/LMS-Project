@@ -207,7 +207,7 @@ export default function StudentProfile() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-primary text-dark-400 rounded-xl text-sm font-semibold shadow-lg shadow-brand-primary/20 hover:brightness-110 transition disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 btn-gradient rounded-xl text-sm font-semibold shadow-lg shadow-brand-primary/20 hover:brightness-110 transition disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {saving ? "Saving..." : "Save Changes"}
@@ -268,7 +268,7 @@ export default function StudentProfile() {
                   <p className="text-gray-400 text-sm mb-3">You are on the Free plan</p>
                   <a
                     href="/#pricing"
-                    className="inline-block px-4 py-2 bg-brand-primary text-dark-400 rounded-lg text-sm font-semibold hover:opacity-90 transition"
+                    className="inline-block px-4 py-2 btn-gradient rounded-lg text-sm font-semibold hover:opacity-90 transition"
                   >
                     Upgrade to Premium
                   </a>

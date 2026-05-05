@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { getAllUsers, updateUserRole, deleteUser } from "../../services/adminService";
-import { Search, Edit2, Trash2, Filter, User, ChevronLeft, ChevronRight, UsersRound } from "lucide-react";
+import { getAllUsers, deleteUser } from "../../services/adminService";
+import { Search, Trash2, User, ChevronLeft, ChevronRight, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
-
-const roleOptions = ["student", "teacher", "admin"];
 
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ role: "", search: "" });
+  const [filters, setFilters] = useState({ search: "" });
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -20,8 +18,6 @@ export default function Users() {
     hasNextPage: false,
     hasPrevPage: false,
   });
-  const [editingRole, setEditingRole] = useState(null);
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(filters.search.trim());
@@ -33,18 +29,19 @@ export default function Users() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.role, limit]);
+  }, [limit]);
 
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.role, debouncedSearch, page, limit]);
+  }, [debouncedSearch, page, limit]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      // Hardcoded role=student — admin Users page is student-only by product spec.
       const res = await getAllUsers({
-        role: filters.role,
+        role: "student",
         search: debouncedSearch,
         page,
         limit,
@@ -55,17 +52,6 @@ export default function Users() {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRoleUpdate = async (userId, newRole) => {
-    try {
-      await updateUserRole(userId, newRole);
-      toast.success("Role updated successfully");
-      fetchUsers();
-      setEditingRole(null);
-    } catch {
-      toast.error("Failed to update role");
     }
   };
 
@@ -88,12 +74,12 @@ export default function Users() {
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
             <UsersRound size={28} className="text-brand-primary" />
-            User Management
+            Students
           </h1>
-          <p className="text-grayCustom-medium mt-1 text-sm font-medium">Paginated and optimized controls for very large user bases.</p>
+          <p className="text-grayCustom-medium mt-1 text-sm font-medium">Manage student accounts — search and remove inactive users.</p>
         </div>
         <div className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md text-sm text-gray-300">
-          Total Users: <span className="text-white font-bold">{pagination.total || 0}</span>
+          Total Students: <span className="text-white font-bold">{pagination.total || 0}</span>
         </div>
       </div>
 
@@ -103,28 +89,11 @@ export default function Users() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-grayCustom-medium w-4 h-4" />
           <input
             type="text"
-            placeholder="Search users by name or email..."
+            placeholder="Search students by name or email..."
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
             className="w-full bg-dark-300 border border-dark-100 text-white pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all placeholder:text-grayCustom-medium/50"
           />
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Filter className="text-brand-primary w-4 h-4" />
-          <select
-            value={filters.role}
-            onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-            className="bg-dark-300 border border-dark-100 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 cursor-pointer text-sm font-medium"
-          >
-            <option value="">All Roles</option>
-            {roleOptions.map((role) => (
-              <option key={role} value={role} className="bg-dark-300">
-                {role.charAt(0).toUpperCase() + role.slice(1)}
-              </option>
-            ))}
-          </select>
-
         </div>
       </div>
 
@@ -134,8 +103,8 @@ export default function Users() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-dark-300/50 border-b border-dark-100">
-                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">User Details</th>
-                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Account Role</th>
+                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Student Details</th>
+                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Joined</th>
                 <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Status</th>
                 <th className="px-6 py-5 text-right text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Actions</th>
               </tr>
@@ -170,27 +139,8 @@ export default function Users() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5">
-                      {editingRole === user._id ? (
-                        <select
-                          defaultValue={user.role}
-                          onChange={(e) => handleRoleUpdate(user._id, e.target.value)}
-                          className="bg-dark-400 border border-brand-primary text-white text-xs px-3 py-1.5 rounded-lg focus:outline-none"
-                          autoFocus
-                        >
-                          {roleOptions.map((role) => (
-                            <option key={role} value={role}>{role}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-tighter rounded-full ${
-                          user.role === "admin" ? "bg-red-500/10 text-red-500 border border-red-500/20" :
-                          user.role === "teacher" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
-                          "bg-brand-primary/10 text-brand-primary border border-brand-primary/20"
-                        }`}>
-                          {user.role}
-                        </span>
-                      )}
+                    <td className="px-6 py-5 text-xs text-grayCustom-medium">
+                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
@@ -203,16 +153,9 @@ export default function Users() {
                     <td className="px-6 py-5 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => setEditingRole(user._id)}
-                          className="p-2 text-grayCustom-medium hover:text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-all"
-                          title="Edit Role"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
                           onClick={() => handleDelete(user._id, user.name)}
                           className="p-2 text-grayCustom-medium hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                          title="Delete User"
+                          title="Delete student"
                         >
                           <Trash2 size={16} />
                         </button>

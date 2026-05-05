@@ -1,16 +1,6 @@
 import api from "./api";
 
-// Dashboard
-export const getStudentDashboard = async () => {
-  try {
-    const res = await api.get("/student/dashboard");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch dashboard" };
-  }
-};
-
-// Profile
+// ─── Profile ────────────────────────────────────────────────────────────────
 export const getStudentProfile = async () => {
   try {
     const res = await api.get("/student/profile");
@@ -29,121 +19,16 @@ export const updateStudentProfile = async (data) => {
   }
 };
 
-// Courses
-export const getAllCourses = async () => {
+// ─── Tests ──────────────────────────────────────────────────────────────────
+export const getAvailableTests = async () => {
   try {
-    const res = await api.get("/student/courses");
+    const res = await api.get("/student/tests");
     return res.data;
   } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch courses" };
+    throw err?.response?.data || { message: "Failed to fetch available tests" };
   }
 };
 
-export const getFreeCourses = async () => {
-  try {
-    const res = await api.get("/student/free/courses");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch free courses" };
-  }
-};
-
-export const getPaidCourses = async () => {
-  try {
-    const res = await api.get("/student/paid/courses");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch paid courses" };
-  }
-};
-
-export const getCourseById = async (courseId) => {
-  try {
-    const res = await api.get(`/student/courses/${courseId}`);
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch course" };
-  }
-};
-
-// Notes
-export const getAllNotes = async () => {
-  try {
-    const res = await api.get("/student/notes");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch notes" };
-  }
-};
-
-export const getFreeNotes = async () => {
-  try {
-    const res = await api.get("/student/free/notes");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch free notes" };
-  }
-};
-
-export const getPaidNotes = async () => {
-  try {
-    const res = await api.get("/student/paid/notes");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch paid notes" };
-  }
-};
-
-export const getNoteById = async (noteId) => {
-  try {
-    const res = await api.get(`/student/notes/${noteId}`);
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch note" };
-  }
-};
-
-// Blogs
-export const getAllBlogs = async () => {
-  try {
-    const res = await api.get("/student/blogs");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch blogs" };
-  }
-};
-
-// Schedule
-export const getStudentSchedule = async () => {
-  try {
-    const res = await api.get("/student/schedule");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch schedule" };
-  }
-};
-
-// Payment History
-export const getPaymentHistory = async () => {
-  try {
-    const res = await api.get("/student/payment-history");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch payment history" };
-  }
-};
-
-// Performance
-export const getPerformance = async () => {
-  try {
-    const res = await api.get("/student/performance");
-    return res.data;
-  } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch performance data" };
-  }
-};
-
-// Tests
 export const startTest = async (testId) => {
   try {
     const res = await api.post(`/test/start/${testId}`);
@@ -198,7 +83,7 @@ export const getTestLeaderboard = async (testId, limit = 10) => {
   }
 };
 
-// ================= PAYMENT =================
+// ─── Payments / Subscription ────────────────────────────────────────────────
 export const createPaymentOrder = async (planId) => {
   try {
     const res = await api.post("/payment/create-order", { planId });
@@ -213,7 +98,6 @@ export const verifyPayment = async (paymentData) => {
     const res = await api.post("/payment/verify", paymentData);
     return res.data;
   } catch (err) {
-    console.error("VERIFY ERR DATA:", err?.response?.data || err);
     throw err?.response?.data || { message: "Payment verification failed" };
   }
 };
@@ -236,7 +120,6 @@ export const getStudentSubscription = async () => {
   }
 };
 
-// ✅ ADD FREE SUBSCRIPTION HANDLER
 export const activateFreeSubscription = async () => {
   try {
     const res = await api.post("/payment/activate-free");
@@ -246,12 +129,30 @@ export const activateFreeSubscription = async () => {
   }
 };
 
-export const getAvailableTests = async () => {
+// ─── Public (no auth) ───────────────────────────────────────────────────────
+export const getPublicArticles = async (limit = 6) => {
   try {
-    const res = await api.get("/student/tests");
+    const res = await api.get("/public/blogs", { params: { limit } });
     return res.data;
   } catch (err) {
-    throw err?.response?.data || { message: "Failed to fetch available tests" };
+    throw err?.response?.data || { message: "Failed to fetch articles" };
   }
 };
 
+export const getPublicNews = async (limit = 5) => {
+  try {
+    const res = await api.get("/public/news", { params: { limit } });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch news" };
+  }
+};
+
+export const getPublicSiteContent = async () => {
+  try {
+    const res = await api.get("/public/site-content");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch site content" };
+  }
+};

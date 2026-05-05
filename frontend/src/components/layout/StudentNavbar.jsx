@@ -57,9 +57,7 @@ export default function StudentNavbar() {
 
   const mobileNavItems = [
     { to: "/student/dashboard", label: "Dashboard" },
-    { to: "/student/courses", label: "Courses" },
-    { to: "/student/tests", label: "Tests" },
-    { to: "/student/notes", label: "Notes" },
+    { to: "/student/tests", label: "Test Series" },
     { to: "/student/profile", label: "Profile" },
   ];
 

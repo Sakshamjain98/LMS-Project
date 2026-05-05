@@ -1,464 +1,394 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { 
-  getAdminDashboard, 
-  getRevenueAnalytics, 
-  getUserAnalytics, 
-  getPendingTeachers, 
-  getPendingContent, 
-  getPendingComments, 
-  getAllPayments, 
-  getAllUsers 
+import {
+  getAdminDashboard,
+  getRevenueAnalytics,
+  getAllPayments,
+  getAllUsers,
 } from "../../services/adminService";
-import { 
-  Users, UserCheck, BookOpen, DollarSign, 
-  Clock, Shield, MessageSquare, Newspaper, TrendingUp,
-  RefreshCw, Calendar, CheckCircle, XCircle, AlertCircle,
-  UserPlus, CreditCard, GraduationCap, FileText, BarChart3
+import { getTeacherTestSeries } from "../../services/teacherService";
+import {
+  Users, DollarSign, Layers, Newspaper, PenSquare, CreditCard,
+  ArrowUpRight, RefreshCw, TrendingUp, Sparkles, Activity, Clock, ChevronRight,
 } from "lucide-react";
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, BarChart, Bar, Legend 
-} from 'recharts';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 
-// ================== LOADING SKELETON ==================
-const StatCardSkeleton = () => (
-  <div className="bg-dark-200 border border-dark-100 rounded-xl p-6 animate-pulse">
-    <div className="flex items-center justify-between">
-      <div className="space-y-2">
-        <div className="h-4 w-24 bg-dark-100 rounded"></div>
-        <div className="h-8 w-20 bg-dark-100 rounded"></div>
-      </div>
-      <div className="h-12 w-12 bg-dark-100 rounded-lg"></div>
-    </div>
-  </div>
-);
+// ─── Sub-components ─────────────────────────────────────────────────────────
+const ACCENTS = {
+  primary: { glow: "bg-brand-primary/15", chip: "bg-brand-primary/15 text-brand-primary" },
+  accent:  { glow: "bg-brand-accent/15",  chip: "bg-brand-accent/15 text-brand-accent" },
+};
 
-// ================== STAT CARD ==================
-const StatCard = ({ title, value, color, link, trend }) => (
-  <Link to={link || "#"} className={`block ${link ? 'cursor-pointer' : 'cursor-default'}`}>
-    <div className="bg-dark-200 border border-dark-100 rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] hover:bg-dark-100 group">
-      <div className="flex items-center justify-between">
+function KpiCard({ icon: Icon, label, value, trend, accent = "primary", to }) {
+  const a = ACCENTS[accent] || ACCENTS.primary;
+  const inner = (
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.18 }}
+      className="glass-card glass-card-hover relative overflow-hidden rounded-2xl p-6 cursor-pointer h-full"
+    >
+      <div className={`absolute -top-10 -right-10 h-28 w-28 rounded-full ${a.glow} blur-2xl`} />
+      <div className="relative flex items-start justify-between">
         <div>
-          <p className="text-grayCustom-medium text-sm font-medium uppercase tracking-wider">{title}</p>
-          <p className="text-3xl font-bold mt-2 text-white italic">
-            {typeof value === 'number' ? value?.toLocaleString() || 0 : value || 0}
-          </p>
-          {trend !== undefined && (
-            <p className={`text-xs mt-1 flex items-center gap-1 ${trend >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}% from last month
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</p>
+          <p className="mt-2 text-3xl font-extrabold text-white tabular-nums">{value}</p>
+          {trend !== undefined && trend !== null && (
+            <p className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {trend >= 0 ? "↑" : "↓"} {Math.abs(trend)}% vs last month
             </p>
           )}
         </div>
-        <div className={`p-4 rounded-lg bg-dark-300 group-hover:bg-brand-primary/10 transition-colors`}>
-          <BarChart3 className={`w-7 h-7 ${color}`} />
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${a.chip}`}>
+          <Icon size={20} />
         </div>
       </div>
-    </div>
-  </Link>
-);
-
-// ================== PENDING ITEM ==================
-const PendingItem = ({ label, count, link }) => (
-  <Link to={link || "#"} className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-300 transition-colors cursor-pointer group">
-    <div className="flex items-center gap-3">
-        <div className="p-2 bg-dark-400 rounded group-hover:text-brand-primary">
-          <Clock className="w-5 h-5" />
+      {to && (
+        <div className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-white/50">
+          View <ArrowUpRight size={12} />
         </div>
-      <span className="text-gray-300">{label}</span>
-    </div>
-    <span className="bg-brand-primary/20 text-brand-primary px-2 py-1 rounded text-xs font-bold">
-      {count || 0}
-    </span>
-  </Link>
-);
+      )}
+    </motion.div>
+  );
+  return to ? <Link to={to} className="block h-full">{inner}</Link> : inner;
+}
 
-// ================== RECENT USER ITEM ==================
-const RecentUserItem = ({ user }) => (
-  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-300 transition-colors">
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-dark-400 flex items-center justify-center text-brand-primary font-bold">
-        {user.name?.charAt(0) || 'U'}
-      </div>
-      <div>
-        <p className="text-sm font-medium text-white">{user.name}</p>
-        <p className="text-xs text-grayCustom-medium">{user.email}</p>
-      </div>
+function ListRow({ left, right }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-white/5 transition-colors">
+      <div className="min-w-0 flex-1">{left}</div>
+      <div className="ml-3 shrink-0">{right}</div>
     </div>
-    <span className={`text-xs px-2 py-1 rounded-full ${
-      user.role === 'student' ? 'bg-blue-400/20 text-blue-400' : 
-      user.role === 'teacher' ? 'bg-green-400/20 text-green-400' : 
-      'bg-purple-400/20 text-purple-400'
-    }`}>
-      {user.role}
-    </span>
-  </div>
-);
+  );
+}
 
-// ================== RECENT PAYMENT ITEM ==================
-const RecentPaymentItem = ({ payment }) => (
-  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-300 transition-colors">
-    <div className="flex items-center gap-3">
-      <CreditCard className="w-5 h-5 text-brand-primary" />
-      <div>
-        <p className="text-sm font-medium text-white">₹{payment.amount?.toLocaleString() || 0}</p>
-        <p className="text-xs text-grayCustom-medium">
-          {payment.plan || 'N/A'} • {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Unknown'}
-        </p>
-      </div>
-    </div>
-    <span className={`text-xs px-2 py-1 rounded-full ${
-      payment.status === 'SUCCESS' || payment.status === 'COMPLETED' ? 'bg-green-400/20 text-green-400' : 
-      payment.status === 'PENDING' ? 'bg-yellow-400/20 text-yellow-400' : 
-      'bg-red-400/20 text-red-400'
-    }`}>
-      {payment.status || 'UNKNOWN'}
-    </span>
-  </div>
-);
+function statusPill(status) {
+  const ok = status === "SUCCESS" || status === "COMPLETED";
+  const pending = status === "PENDING";
+  const cls = ok
+    ? "bg-emerald-500/15 text-emerald-300"
+    : pending
+    ? "bg-amber-500/15 text-amber-300"
+    : "bg-red-500/15 text-red-300";
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cls}`}>{status || "—"}</span>;
+}
 
-// ================== MAIN DASHBOARD ==================
+// ─── Main ───────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
-  const [_revenueData, setRevenueData] = useState([]);
-  const [_userGrowthData, setUserGrowthData] = useState([]);
-  const [pendingTeachers, setPendingTeachers] = useState([]);
-  const [pendingContent, setPendingContent] = useState([]);
-  const [pendingComments, setPendingComments] = useState([]);
-  const [pendingPayments, setPendingPayments] = useState([]);
+  const [revenueData, setRevenueData] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
-  const [courseStats, setCourseStats] = useState({ totalCourses: 0, activeCourses: 0, totalEnrollments: 0 });
+  const [seriesTotal, setSeriesTotal] = useState({ topics: 0, tests: 0 });
+  const [period, setPeriod] = useState("30d");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [period, setPeriod] = useState("monthly");
 
-  // Helper to safely transform revenue data
-  const transformRevenueData = (data) => {
-    if (!data) return [];
-    // If it's already an array of { month, amount } or { name, amount }
-    if (Array.isArray(data)) {
-      return data.map(item => ({
-        month: item.month || item.name || 'Unknown',
-        amount: item.amount || 0
-      }));
-    }
-    // If it's an object with keys as months
-    if (typeof data === 'object') {
-      return Object.entries(data).map(([month, amount]) => ({ month, amount }));
-    }
-    return [];
-  };
-
-  // Helper to safely transform user growth data
-  const transformUserGrowthData = (analytics) => {
-    if (!analytics) return [];
-    const monthly = analytics.monthlyGrowth || analytics;
-    if (Array.isArray(monthly)) {
-      return monthly.map(item => ({
-        month: item._id || item.month || 'Unknown',
-        users: item.count || item.users || 0,
-        students: item.students || 0,
-        teachers: item.teachers || 0
-      }));
-    }
-    return [];
-  };
-
-  const loadData = useCallback(async (showRefresh = false) => {
+  const fetchAll = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
-    
+
     try {
-      const [
-        dashRes,
-        revenueRes,
-        userAnalyticsRes,
-        pendingTeachersRes,
-        pendingContentRes,
-        pendingCommentsRes,
-        paymentsRes,
-        usersRes,
-      ] = await Promise.allSettled([
+      const [dashRes, revRes, paymentsRes, usersRes, seriesRes] = await Promise.allSettled([
         getAdminDashboard(),
         getRevenueAnalytics(period),
-        getUserAnalytics(),
-        getPendingTeachers(),
-        getPendingContent(),
-        getPendingComments(),
         getAllPayments(),
-        getAllUsers({ limit: 5, sort: "-createdAt" }),
+        getAllUsers({ limit: 5, sort: "-createdAt", role: "student" }),
+        getTeacherTestSeries(),
       ]);
 
-      // Dashboard stats
-      if (dashRes.status === 'fulfilled' && dashRes.value?.data) {
-        setStats(dashRes.value.data);
-        setCourseStats({
-          totalCourses: dashRes.value.data.totalCourses || 0,
-          activeCourses: dashRes.value.data.activeCourses || 0,
-          totalEnrollments: dashRes.value.data.totalEnrollments || 0
-        });
+      if (dashRes.status === "fulfilled" && dashRes.value?.data) setStats(dashRes.value.data);
+
+      if (revRes.status === "fulfilled") {
+        const raw = revRes.value?.data || revRes.value || [];
+        setRevenueData(transformRevenue(raw));
       } else {
-        // Fallback empty stats
-        setStats({ totalRevenue: 0, totalUsers: 0, totalStudents: 0, totalTeachers: 0 });
+        setRevenueData([]);
       }
 
-      // Revenue data
-      if (revenueRes.status === 'fulfilled') {
-        const rawData = revenueRes.value?.data || revenueRes.value || [];
-        setRevenueData(transformRevenueData(rawData));
-      } else {
-        // Fallback demo data to show chart
-        setRevenueData([
-          { month: 'Jan', amount: 4000 },
-          { month: 'Feb', amount: 3000 },
-          { month: 'Mar', amount: 5000 },
-          { month: 'Apr', amount: 7000 },
-          { month: 'May', amount: 6000 },
-          { month: 'Jun', amount: 8000 },
-        ]);
+      if (paymentsRes.status === "fulfilled") {
+        const list = paymentsRes.value?.data || paymentsRes.value?.payments || paymentsRes.value || [];
+        setRecentPayments(Array.isArray(list) ? list.slice(0, 5) : []);
       }
 
-      // User analytics
-      if (userAnalyticsRes.status === 'fulfilled') {
-        setUserGrowthData(transformUserGrowthData(userAnalyticsRes.value?.data || userAnalyticsRes.value));
-      } else {
-        // Fallback demo data
-        setUserGrowthData([
-          { month: 'Jan', users: 20, students: 15, teachers: 5 },
-          { month: 'Feb', users: 35, students: 25, teachers: 10 },
-          { month: 'Mar', users: 50, students: 35, teachers: 15 },
-          { month: 'Apr', users: 65, students: 45, teachers: 20 },
-          { month: 'May', users: 80, students: 55, teachers: 25 },
-          { month: 'Jun', users: 100, students: 70, teachers: 30 },
-        ]);
-      }
+      if (usersRes.status === "fulfilled") setRecentUsers(usersRes.value?.users || []);
 
-      // Pending teachers
-      if (pendingTeachersRes.status === 'fulfilled') {
-        setPendingTeachers(pendingTeachersRes.value?.teachers || []);
+      if (seriesRes.status === "fulfilled") {
+        const topics = seriesRes.value?.topics || [];
+        let tests = 0;
+        topics.forEach((t) => t.subjects?.forEach((s) => s.chapters?.forEach((c) => { tests += c.tests?.length || 0; })));
+        setSeriesTotal({ topics: topics.length, tests });
       }
-
-      // Pending content
-      if (pendingContentRes.status === 'fulfilled') {
-        const content = pendingContentRes.value?.content?.courses || pendingContentRes.value?.courses || [];
-        setPendingContent(content);
-      }
-
-      // Pending comments
-      if (pendingCommentsRes.status === 'fulfilled') {
-        setPendingComments(pendingCommentsRes.value?.comments || []);
-      }
-
-      // Payments
-      if (paymentsRes.status === 'fulfilled') {
-        const payments = paymentsRes.value?.payments || [];
-        const pending = payments.filter(p => p.status === 'PENDING' || p.adminApproved === false);
-        setPendingPayments(pending);
-        setRecentPayments(payments.slice(0, 5));
-      }
-
-      // Recent users
-      if (usersRes.status === 'fulfilled') {
-        setRecentUsers(usersRes.value?.users || []);
-      }
-
-    } catch (error) {
-      console.error("Dashboard load error:", error);
-      toast.error("Failed to load dashboard data");
+    } catch (err) {
+      console.error("Dashboard fetch failed", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [period]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const handleRefresh = () => {
-    loadData(true);
+  const onRefresh = async () => {
+    await fetchAll(true);
     toast.success("Dashboard refreshed");
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-dark-400 p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div>
-            <div className="h-8 w-48 bg-dark-200 rounded animate-pulse"></div>
-            <div className="h-4 w-64 bg-dark-200 rounded mt-2 animate-pulse"></div>
-          </div>
-          <div className="h-10 w-32 bg-dark-200 rounded animate-pulse"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[...Array(8)].map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-dark-200 rounded-xl p-6 h-96 animate-pulse"></div>
-          <div className="bg-dark-200 rounded-xl p-6 h-96 animate-pulse"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Prepare stat cards
-  const cards = [
-    { title: "Total Revenue", value: `₹${stats?.totalRevenue?.toLocaleString() || 0}`, icon: DollarSign, color: "text-brand-primary", trend: stats?.revenueGrowth },
-    { title: "Total Users", value: stats?.totalUsers || 0, icon: Users, color: "text-blue-400", link: "/admin/users", trend: stats?.userGrowth },
-    { title: "Active Students", value: stats?.totalStudents || 0, icon: UserCheck, color: "text-green-400", link: "/admin/users?role=student" },
-    { title: "Total Teachers", value: stats?.totalTeachers || 0, icon: GraduationCap, color: "text-purple-400", link: "/admin/users?role=teacher" },
-    { title: "Pending Approvals", value: (pendingTeachers.length + pendingContent.length + pendingComments.length + pendingPayments.length), icon: Clock, color: "text-yellow-400" },
-    { title: "Pending Teachers", value: pendingTeachers.length, icon: Shield, color: "text-orange-400", link: "/admin/teachers" },
-    { title: "Pending Content", value: pendingContent.length, icon: BookOpen, color: "text-cyan-400", link: "/admin/pending-content" },
-    { title: "Pending Comments", value: pendingComments.length, icon: MessageSquare, color: "text-pink-400", link: "/admin/blogs" },
-  ];
-
-  const pendingTasks = [
-    { icon: Clock, label: "Teacher Approvals", count: pendingTeachers.length, link: "/admin/teachers" },
-    { icon: BookOpen, label: "Content for Review", count: pendingContent.length, link: "/admin/pending-content" },
-    { icon: MessageSquare, label: "Comments to Moderate", count: pendingComments.length, link: "/admin/blogs" },
-    { icon: CreditCard, label: "Pending Payments", count: pendingPayments.length, link: "/admin/payments" },
-    { icon: Newspaper, label: "News Drafts", count: stats?.totalNews || 0, link: "/admin/news" },
-  ];
+  const adminName = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}")?.name || "Admin"; } catch { return "Admin"; }
+  }, []);
 
   return (
-    <div className="min-h-screen bg-dark-400 text-white">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Insights Dashboard</h1>
-          <p className="text-grayCustom-medium mt-1">Complete overview of your platform's performance</p>
+    <div className="space-y-8">
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative overflow-hidden rounded-3xl glass-panel ambient-glow p-7 md:p-8"
+      >
+        <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full glass-pill px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/70">
+              <Sparkles size={12} className="text-brand-primary" />
+              Admin Insights
+            </span>
+            <h1 className="mt-3 text-3xl font-bold text-white md:text-4xl">Welcome back, {adminName}</h1>
+            <p className="mt-1.5 text-sm text-white/60">Snapshot of platform health, revenue, and student activity.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="rounded-xl glass-pill px-3 py-2 text-xs font-semibold text-white/80 focus:outline-none"
+            >
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+            </select>
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-xs font-bold text-dark-400 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              {refreshing ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex bg-dark-200 rounded-lg p-1">
-            {['weekly', 'monthly', 'yearly'].map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1 rounded-md text-sm transition-all ${
-                  period === p ? 'bg-brand-primary text-dark-400 font-bold' : 'text-grayCustom-medium hover:text-white'
-                }`}
+      </motion.div>
+
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {loading ? (
+          [...Array(4)].map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <>
+            <KpiCard
+              icon={DollarSign}
+              label="Total Revenue"
+              value={`₹${(stats?.totalRevenue || 0).toLocaleString()}`}
+              trend={stats?.revenueGrowth}
+            />
+            <KpiCard
+              icon={Users}
+              label="Total Students"
+              value={(stats?.totalStudents || 0).toLocaleString()}
+              trend={stats?.userGrowth}
+              to="/admin/users"
+            />
+            <KpiCard
+              icon={Layers}
+              label="Test Series"
+              value={`${seriesTotal.topics} • ${seriesTotal.tests} tests`}
+              accent="accent"
+              to="/admin/test-series"
+            />
+            <KpiCard
+              icon={CreditCard}
+              label="Pending Payments"
+              value={(recentPayments.filter((p) => p.status === "PENDING").length).toLocaleString()}
+              to="/admin/payments"
+            />
+          </>
+        )}
+      </div>
+
+      {/* Revenue chart + quick actions */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}
+          className="glass-card rounded-2xl p-6 lg:col-span-2"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Revenue trend</p>
+              <h2 className="mt-1 text-lg font-bold text-white inline-flex items-center gap-2">
+                <TrendingUp size={16} className="text-brand-primary" />
+                Earnings over time
+              </h2>
+            </div>
+          </div>
+          <div className="h-64 -mx-2">
+            {revenueData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-white/40">
+                No revenue data yet — earnings will chart here as payments arrive.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00BA7C" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#00BA7C" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ stroke: "rgba(255,255,255,0.1)" }}
+                    contentStyle={{ background: "#0E1420", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "#fff" }}
+                    labelStyle={{ color: "#fff" }}
+                  />
+                  <Area type="monotone" dataKey="amount" stroke="#00BA7C" strokeWidth={2.5} fill="url(#revGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.18 }}
+          className="glass-card rounded-2xl p-6"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Quick actions</p>
+          <h2 className="mt-1 text-lg font-bold text-white inline-flex items-center gap-2">
+            <Activity size={16} className="text-brand-primary" />
+            Manage platform
+          </h2>
+          <div className="mt-5 space-y-2">
+            {[
+              { label: "Create test series",  to: "/admin/test-series",  icon: Layers },
+              { label: "Publish an article",  to: "/admin/blogs",        icon: PenSquare },
+              { label: "Post a news item",    to: "/admin/news",         icon: Newspaper },
+              { label: "Review students",     to: "/admin/users",        icon: Users },
+              { label: "Review payments",     to: "/admin/payments",     icon: CreditCard },
+            ].map((a) => (
+              <Link
+                key={a.to}
+                to={a.to}
+                className="group flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 hover:border-brand-primary/30 hover:bg-white/5 transition-all"
               >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </button>
+                <span className="flex items-center gap-3 text-sm text-white/85">
+                  <a.icon size={15} className="text-brand-primary" />
+                  {a.label}
+                </span>
+                <ChevronRight size={14} className="text-white/30 group-hover:text-brand-primary transition-colors" />
+              </Link>
             ))}
           </div>
-          <button 
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="bg-brand-primary hover:bg-brand-primaryDark text-dark-400 font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-     
-        </div>
+        </motion.div>
       </div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {cards.map((card, index) => (
-          <StatCard key={index} {...card} />
-        ))}
-      </div>
+      {/* Activity */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.22 }}
+          className="glass-card rounded-2xl p-6"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-bold text-white inline-flex items-center gap-2">
+              <Users size={15} className="text-brand-primary" /> Recent students
+            </h2>
+            <Link to="/admin/users" className="text-[11px] font-semibold text-brand-primary hover:underline">View all</Link>
+          </div>
+          {recentUsers.length === 0 ? (
+            <p className="py-6 text-center text-xs text-white/40">No recent students.</p>
+          ) : (
+            <div className="space-y-1">
+              {recentUsers.map((u) => (
+                <ListRow
+                  key={u._id}
+                  left={
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary text-sm font-bold">
+                        {u.name?.charAt(0) || "S"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{u.name}</p>
+                        <p className="truncate text-xs text-white/50">{u.email}</p>
+                      </div>
+                    </div>
+                  }
+                  right={
+                    <span className="inline-flex items-center gap-1 text-[10px] text-white/40">
+                      <Clock size={10} />
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
+                    </span>
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </motion.div>
 
-
-
-      {/* Course Stats Cards (moved above recent activities) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gradient-to-r from-brand-primary/10 to-transparent border border-brand-primary/20 rounded-xl p-5">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-dark-300 rounded-xl">
-              <BookOpen className="w-6 h-6 text-brand-primary" />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.28 }}
+          className="glass-card rounded-2xl p-6"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-bold text-white inline-flex items-center gap-2">
+              <CreditCard size={15} className="text-brand-primary" /> Recent payments
+            </h2>
+            <Link to="/admin/payments" className="text-[11px] font-semibold text-brand-primary hover:underline">View all</Link>
+          </div>
+          {recentPayments.length === 0 ? (
+            <p className="py-6 text-center text-xs text-white/40">No recent payments.</p>
+          ) : (
+            <div className="space-y-1">
+              {recentPayments.map((p) => (
+                <ListRow
+                  key={p._id}
+                  left={
+                    <div className="flex items-center gap-3">
+                      <CreditCard size={16} className="text-brand-primary" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">₹{(p.amount || 0).toLocaleString()}</p>
+                        <p className="truncate text-xs text-white/50">
+                          {p.plan || "—"} • {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  }
+                  right={statusPill(p.status)}
+                />
+              ))}
             </div>
-            <div>
-              <p className="text-grayCustom-medium text-sm">Total Courses</p>
-              <p className="text-2xl font-bold text-white">{courseStats.totalCourses}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-blue-400/10 to-transparent border border-blue-400/20 rounded-xl p-5">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-dark-300 rounded-xl">
-              <CheckCircle className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <p className="text-grayCustom-medium text-sm">Active Courses</p>
-              <p className="text-2xl font-bold text-white">{courseStats.activeCourses}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-purple-400/10 to-transparent border border-purple-400/20 rounded-xl p-5">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-dark-300 rounded-xl">
-              <UserCheck className="w-6 h-6 text-purple-400" />
-            </div>
-            <div>
-              <p className="text-grayCustom-medium text-sm">Total Enrollments</p>
-              <p className="text-2xl font-bold text-white">{courseStats.totalEnrollments}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity & Pending Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Users */}
-        <div className="bg-dark-200 border border-dark-100 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Recent Users</h3>
-            <Link to="/admin/users" className="text-brand-primary text-sm hover:underline">View All →</Link>
-          </div>
-          <div className="space-y-2">
-            {recentUsers.length > 0 ? (
-              recentUsers.map(user => <RecentUserItem key={user._id} user={user} />)
-            ) : (
-              <p className="text-grayCustom-medium text-center py-8">No recent users</p>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Transactions */}
-        <div className="bg-dark-200 border border-dark-100 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Recent Transactions</h3>
-            <Link to="/admin/payments" className="text-brand-primary text-sm hover:underline">View All →</Link>
-          </div>
-          <div className="space-y-2">
-            {recentPayments.length > 0 ? (
-              recentPayments.map(payment => <RecentPaymentItem key={payment._id} payment={payment} />)
-            ) : (
-              <p className="text-grayCustom-medium text-center py-8">No recent transactions</p>
-            )}
-          </div>
-        </div>
-
-        {/* Pending Tasks */}
-        <div className="bg-dark-200 border border-dark-100 p-6 rounded-xl">
-          <h3 className="text-lg font-semibold mb-4">Pending Tasks Overview</h3>
-          <div className="space-y-2">
-            {pendingTasks.map((task, index) => (
-              <PendingItem key={index} {...task} />
-            ))}
-          </div>
-          <div className="mt-6 pt-4 border-t border-dark-100">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-grayCustom-medium">Total Pending</span>
-              <span className="font-bold text-brand-primary">
-                {pendingTasks.reduce((sum, task) => sum + task.count, 0)}
-              </span>
-            </div>
-          </div>
-          <Link 
-            to="/admin/pending-content"
-            className="w-full mt-4 py-3 border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-dark-400 rounded-lg transition-all font-medium text-center block"
-          >
-            View All Tasks
-          </Link>
-        </div>
+          )}
+        </motion.div>
       </div>
     </div>
   );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="glass-card rounded-2xl p-6 animate-pulse">
+      <div className="h-3 w-20 rounded bg-white/10" />
+      <div className="mt-3 h-7 w-24 rounded bg-white/10" />
+      <div className="mt-2 h-2 w-16 rounded bg-white/10" />
+    </div>
+  );
+}
+
+function transformRevenue(rawData) {
+  if (!rawData || !Array.isArray(rawData)) return [];
+  return rawData.map((row) => ({
+    month: row.month || row._id || row.label || "—",
+    amount: Number(row.amount || row.total || row.revenue || 0),
+  }));
 }

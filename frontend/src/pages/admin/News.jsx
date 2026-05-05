@@ -296,7 +296,7 @@ export default function News() {
                   <button type="button" onClick={closeModal} className="px-6 py-3 font-bold text-grayCustom-medium hover:text-white transition-all">
                     Discard
                   </button>
-                  <button type="submit" disabled={submitting} className="px-8 py-3 bg-brand-primary text-dark-400 font-bold rounded-xl hover:bg-brand-primaryDark transition-all shadow-lg shadow-brand-primary/10 disabled:opacity-60 inline-flex items-center gap-2">
+                  <button type="submit" disabled={submitting} className="px-8 py-3 btn-gradient font-bold rounded-xl hover:bg-brand-primaryDark transition-all shadow-lg shadow-brand-primary/10 disabled:opacity-60 inline-flex items-center gap-2">
                     {submitting && <Loader2 size={16} className="animate-spin" />}
                     {editingNews ? "Update Post" : "Publish Post"}
                   </button>

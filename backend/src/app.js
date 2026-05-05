@@ -15,8 +15,8 @@ import notesRoutes from "./modules/teacher/note.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
 import questionRoutes from "./modules/question/question.routes.js";
 import testAttemptRoutes from "./modules/testAttempt/testAttempt.routes.js";
-import { apiLimiter } from "./middlewares/rateLimiter.middleware.js";
 import adminRoutes from "./modules/admin/admin.route.js";
+import publicRoutes from "./modules/public/public.routes.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import { mongoSanitizeMiddleware } from "./middlewares/mongoSanitize.middleware.js";
@@ -61,7 +61,6 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 }));
-app.use(apiLimiter);
 app.use(express.json({ limit: process.env.REQUEST_SIZE_LIMIT || "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: process.env.REQUEST_SIZE_LIMIT || "10mb" }));
 app.use(requestLogger);
@@ -90,6 +89,7 @@ app.use("/api/teacher/notes", notesRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/test", testAttemptRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/public", publicRoutes);
 
 if (process.env.ENABLE_SWAGGER === "true") {
   const swaggerDocument = YAML.load("./swagger.yaml");
