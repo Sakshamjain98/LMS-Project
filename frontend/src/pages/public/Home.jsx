@@ -364,7 +364,7 @@ const Home = () => {
     subtitle: cms?.hero?.subtitle ?? "Comprehensive pharmaceutical education for serious learners. Learn from industry experts, ace your exams, and build a career you're proud of.",
     primaryCtaLabel: cms?.hero?.primaryCtaLabel ?? "Login",
     secondaryCtaLabel: cms?.hero?.secondaryCtaLabel ?? "Browse Tests",
-    videoUrl: cms?.hero?.videoUrl ?? "https://www.youtube.com/embed/Tvf7CXEjFNU?si=toZhTVuzoNa1kNw0",
+    videoUrl: cms?.hero?.videoUrl ?? "https://youtube.com/embed/playlist?list=PLjAABVNnKXdUwpGMfkSVqqXfNFA7-TtAc&si=LI9jhN5BN2dj10p3",
   };
   const aboutCms = {
     eyebrow: cms?.about?.eyebrow ?? "Our Mission",
