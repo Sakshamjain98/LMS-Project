@@ -163,3 +163,151 @@ html, body, #root {
 .prose.prose-invert a { color: var(--color-brand-primary); }
 .prose.prose-invert strong { color: #fff; }
 .prose.prose-invert ul, .prose.prose-invert ol { padding-left: 1.25rem; }
+
+/* ---- Article detail body (full HTML, public page) ----
+   These rules guarantee HTML content from the rich-text editor never breaks
+   the page layout: images and tables are responsive, long words / URLs wrap
+   instead of overflowing, and dark-mode-friendly tokens replace the defaults
+   we'd otherwise inherit. */
+.article-body {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1rem;
+  line-height: 1.75;
+  /* Hard guarantee against horizontal overflow on long URLs / code lines */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.article-body > * + * { margin-top: 1.1em; }
+
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5, .article-body h6 {
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  line-height: 1.3;
+}
+.article-body h1 { font-size: 1.875rem; }
+.article-body h2 { font-size: 1.5rem; }
+.article-body h3 { font-size: 1.25rem; }
+.article-body h4 { font-size: 1.1rem; }
+
+.article-body p { margin: 1em 0; }
+.article-body strong, .article-body b { color: #ffffff; font-weight: 600; }
+.article-body em, .article-body i { color: rgba(255, 255, 255, 0.92); }
+
+.article-body a {
+  color: var(--color-brand-primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 186, 124, 0.4);
+  text-underline-offset: 3px;
+  transition: color 150ms ease, text-decoration-color 150ms ease;
+}
+.article-body a:hover {
+  color: #36e9b0;
+  text-decoration-color: rgba(0, 186, 124, 0.9);
+}
+
+.article-body ul, .article-body ol {
+  padding-left: 1.4rem;
+  margin: 1em 0;
+}
+.article-body ul { list-style: disc; }
+.article-body ol { list-style: decimal; }
+.article-body li { margin: 0.35em 0; }
+.article-body li::marker { color: var(--color-brand-primary); }
+
+.article-body blockquote {
+  border-left: 3px solid var(--color-brand-primary);
+  background: rgba(0, 186, 124, 0.06);
+  border-radius: 0 0.75rem 0.75rem 0;
+  padding: 1rem 1.25rem;
+  margin: 1.5em 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+}
+.article-body blockquote p { margin: 0; }
+
+/* Inline code */
+.article-body code {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.9em;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+/* Block code */
+.article-body pre {
+  background: rgba(8, 12, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  margin: 1.5em 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  /* Inside <pre> we intentionally do NOT wrap — code is allowed to scroll. */
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.article-body pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Images, video, iframes — responsive, never overflow the column */
+.article-body img,
+.article-body video,
+.article-body iframe,
+.article-body embed,
+.article-body object {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5em auto;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.article-body iframe { aspect-ratio: 16 / 9; width: 100%; height: auto; }
+
+/* Tables — wrap in a horizontal scroll container so wide tables don't blow
+   out the layout. The wrapper is created via display: block on the table. */
+.article-body table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 0.92rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+}
+.article-body th, .article-body td {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+}
+.article-body th {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-weight: 600;
+}
+
+.article-body hr {
+  border: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2em 0;
+}
+
+/* Defensive: if Quill emits empty leading paragraphs, hide them so we don't
+   leave dead vertical space at the top of an article. */
+.article-body > p:first-child:empty,
+.article-body > p:first-child > br:only-child { display: none; }
