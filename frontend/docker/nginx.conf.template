@@ -1,0 +1,58 @@
+# nginx config — runs through envsubst at container start so we pick up
+# Railway's injected $PORT. The base nginx:alpine image processes any file
+# under /etc/nginx/templates/*.template and writes the result to
+# /etc/nginx/conf.d/, so this file is the single source of truth.
+
+server {
+  listen ${PORT};
+  server_name _;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # Security headers — same set we shipped on Vercel
+  add_header X-Frame-Options          "SAMEORIGIN"                       always;
+  add_header X-Content-Type-Options   "nosniff"                          always;
+  add_header Referrer-Policy          "strict-origin-when-cross-origin"  always;
+  add_header Permissions-Policy       "camera=(), microphone=(), geolocation=()" always;
+
+  # Compression — small wins, big payloads
+  gzip on;
+  gzip_proxied any;
+  gzip_comp_level 6;
+  gzip_min_length 1024;
+  gzip_types
+    text/plain
+    text/css
+    application/json
+    application/javascript
+    text/xml
+    application/xml
+    image/svg+xml
+    application/x-font-ttf
+    font/woff2;
+
+  # Long-lived caching for hashed Vite assets. index.html is intentionally NOT
+  # cached so deploys roll out instantly.
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files $uri =404;
+  }
+
+  location = /index.html {
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+  }
+
+  # Lightweight liveness probe for Railway's healthcheck
+  location = /healthz {
+    add_header Content-Type text/plain;
+    return 200 "ok\n";
+  }
+
+  # SPA fallback — every non-asset path resolves to index.html so React Router
+  # can take over.
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
