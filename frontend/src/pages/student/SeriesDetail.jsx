@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -83,7 +83,7 @@ export default function SeriesDetail() {
     setSearch("");
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -103,12 +103,12 @@ export default function SeriesDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [topicId]);
 
   useEffect(() => {
     if (view !== "series") return;
     loadData();
-  }, [topicId, view]);
+  }, [loadData, view]);
 
   const subActive =
     subscription?.status === "ACTIVE" &&
@@ -133,11 +133,17 @@ export default function SeriesDetail() {
     }, {});
   }, [attempts]);
 
-  const subjects = topic?.subjects || [];
-  const selectedSubject = subjects.find((s) => s._id === selectedSubjectId) || null;
-  const chapters = selectedSubject?.chapters || [];
-  const selectedChapter = chapters.find((c) => c._id === selectedChapterId) || null;
-  const tests = selectedChapter?.tests || [];
+  const subjects = useMemo(() => topic?.subjects || [], [topic]);
+  const selectedSubject = useMemo(
+    () => subjects.find((s) => s._id === selectedSubjectId) || null,
+    [subjects, selectedSubjectId]
+  );
+  const chapters = useMemo(() => selectedSubject?.chapters || [], [selectedSubject]);
+  const selectedChapter = useMemo(
+    () => chapters.find((c) => c._id === selectedChapterId) || null,
+    [chapters, selectedChapterId]
+  );
+  const tests = useMemo(() => selectedChapter?.tests || [], [selectedChapter]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -318,9 +324,9 @@ export default function SeriesDetail() {
                         </span>
                       )}
                     </div>
-                    <h1 className="mt-3 text-3xl font-bold text-white md:text-4xl break-words">{topic.title}</h1>
+                    <h1 className="mt-3 text-3xl font-bold text-white md:text-4xl wrap-break-word">{topic.title}</h1>
                     {topic.description && (
-                      <p className="mt-2 max-w-2xl text-sm text-white/60 break-words">{topic.description}</p>
+                      <p className="mt-2 max-w-2xl text-sm text-white/60 wrap-break-word">{topic.description}</p>
                     )}
                     <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/60">
                       <Pill label="Subjects" value={subjects.length} />
@@ -386,7 +392,7 @@ export default function SeriesDetail() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-4 rounded-2xl glass-card p-4">
-                <div className="relative min-w-[260px] flex-1">
+                <div className="relative min-w-65 flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
                   <input
                     value={search}
@@ -402,7 +408,7 @@ export default function SeriesDetail() {
                 <div className="overflow-x-auto custom-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-white/10 bg-white/[0.03]">
+                      <tr className="border-b border-white/10 bg-white/3">
                         <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">
                           {headerTitle.replace(/s$/, "")}
                         </th>
@@ -525,18 +531,18 @@ function Pill({ label, value }) {
 function HierarchyRow({ idx, title, description, icon, meta, onOpen }) {
   return (
     <tr
-      className="transition-colors hover:bg-white/[0.04] animate-fade-up cursor-pointer"
+      className="transition-colors hover:bg-white/4 animate-fade-up cursor-pointer"
       style={{ animationDelay: `${idx * 25}ms` }}
       onClick={onOpen}
     >
       <td className="px-6 py-4 text-sm font-semibold text-white">
         <div className="flex items-center gap-2">
           {icon}
-          <span className="break-words">{title}</span>
+          <span className="wrap-break-word">{title}</span>
         </div>
       </td>
       <td className="hidden px-6 py-4 text-sm text-white/50 md:table-cell">
-        <span className="line-clamp-2 break-words">{description || "—"}</span>
+        <span className="line-clamp-2 wrap-break-word">{description || "—"}</span>
       </td>
       <td className="px-6 py-4 text-xs text-white/60 whitespace-nowrap">{meta}</td>
       <td className="px-6 py-4 text-right">
@@ -569,17 +575,17 @@ function TestRow({ idx, test, isUnlocked, attemptInfo, onStart, onViewResult }) 
 
   return (
     <tr
-      className="transition-colors hover:bg-white/[0.04] animate-fade-up"
+      className="transition-colors hover:bg-white/4 animate-fade-up"
       style={{ animationDelay: `${idx * 25}ms` }}
     >
       <td className="px-6 py-4 text-sm font-semibold text-white">
         <div className="flex items-center gap-2">
           <FileText size={14} className="text-brand-primary shrink-0" />
-          <span className="break-words">{test.title}</span>
+          <span className="wrap-break-word">{test.title}</span>
         </div>
       </td>
       <td className="hidden px-6 py-4 text-sm text-white/50 md:table-cell">
-        <span className="line-clamp-2 break-words">{test.description || "—"}</span>
+        <span className="line-clamp-2 wrap-break-word">{test.description || "—"}</span>
       </td>
       <td className="px-6 py-4 text-xs text-white/60 whitespace-nowrap">
         <div className="flex flex-wrap items-center gap-2">
