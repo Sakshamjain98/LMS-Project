@@ -29,7 +29,6 @@ export default function TestSeriesAnalytics() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getTopicAnalytics(topicId)
       .then((res) => {
         if (active) setData(res);
@@ -90,8 +89,8 @@ export default function TestSeriesAnalytics() {
           </button>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">Analytics</p>
-            <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl break-words">{topic.title}</h1>
-            <p className="mt-1 text-xs text-white/50 break-words">
+            <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl wrap-break-word">{topic.title}</h1>
+            <p className="mt-1 text-xs text-white/50 wrap-break-word">
               {topic.isPaid ? `Premium · ₹${Number(topic.price || 0).toLocaleString()}` : "Free Series"}
               {topic.description && <> &nbsp;·&nbsp; {topic.description}</>}
             </p>
@@ -121,10 +120,10 @@ export default function TestSeriesAnalytics() {
           ) : (
             <div className="space-y-3">
               {peakTests.map((t, idx) => (
-                <div key={t._id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <div key={t._id} className="rounded-xl border border-white/10 bg-white/3 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-white break-words">
+                      <p className="text-sm font-bold text-white wrap-break-word">
                         <span className="mr-2 text-brand-primary">#{idx + 1}</span>
                         {t.title}
                       </p>
@@ -158,7 +157,7 @@ export default function TestSeriesAnalytics() {
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-white/10 bg-white/[0.03]">
+                <tr className="border-b border-white/10 bg-white/3">
                   <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Subject</th>
                   <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Chapters</th>
                   <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Tests</th>
@@ -167,8 +166,8 @@ export default function TestSeriesAnalytics() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {data.subjectBreakdown.map((s) => (
-                  <tr key={s._id} className="hover:bg-white/[0.04]">
-                    <td className="px-4 py-3 text-sm font-semibold text-white">{s.title}</td>
+                  <tr key={s._id} className="hover:bg-white/4">
+                    <td className="px-4 py-3 text-sm font-semibold text-white wrap-break-word">{s.title}</td>
                     <td className="px-4 py-3 text-sm text-white/70">{s.chapters}</td>
                     <td className="px-4 py-3 text-sm text-white/70">{s.tests}</td>
                     <td className="px-4 py-3 text-sm font-bold text-brand-primary">{s.attempts}</td>
@@ -189,7 +188,7 @@ export default function TestSeriesAnalytics() {
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/[0.03]">
+                  <tr className="border-b border-white/10 bg-white/3">
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Test</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Attempts</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Students</th>
@@ -200,8 +199,8 @@ export default function TestSeriesAnalytics() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {testPaged.map((t) => (
-                    <tr key={t._id} className="hover:bg-white/[0.04]">
-                      <td className="px-4 py-3 text-sm font-semibold text-white break-words">
+                    <tr key={t._id} className="hover:bg-white/4">
+                      <td className="px-4 py-3 text-sm font-semibold text-white wrap-break-word">
                         <Link
                           to={`/admin/test-series/test/${t._id}`}
                           className="hover:text-brand-primary"
@@ -235,7 +234,7 @@ export default function TestSeriesAnalytics() {
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/[0.03]">
+                  <tr className="border-b border-white/10 bg-white/3">
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Rank</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Student</th>
                     <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/50">Attempts</th>
@@ -248,7 +247,7 @@ export default function TestSeriesAnalytics() {
                   {lbPaged.map((row, idx) => {
                     const rank = (lbPage - 1) * PAGE_SIZE + idx + 1;
                     return (
-                      <tr key={row.studentId} className="hover:bg-white/[0.04]">
+                      <tr key={row.studentId} className="hover:bg-white/4">
                         <td className="px-4 py-3 text-sm font-bold text-white">
                           <span className="inline-flex items-center gap-1.5">
                             {rank === 1 ? <Crown size={14} className="text-amber-300" /> : null}
@@ -256,8 +255,8 @@ export default function TestSeriesAnalytics() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-white">
-                          <p className="font-semibold break-words">{row.studentName || "—"}</p>
-                          <p className="text-[11px] text-white/50 break-words">{row.studentEmail || ""}</p>
+                          <p className="font-semibold wrap-break-word">{row.studentName || "—"}</p>
+                          <p className="text-[11px] text-white/50 wrap-break-word">{row.studentEmail || ""}</p>
                         </td>
                         <td className="px-4 py-3 text-sm text-white/70">{row.attempts}</td>
                         <td className="px-4 py-3 text-sm font-bold text-brand-primary">{row.totalMarks}</td>
@@ -320,7 +319,7 @@ function ActivityChart({ data }) {
   return (
     <div className="flex h-32 items-end gap-1.5">
       {data.map((d) => (
-        <div key={d._id} className="group flex flex-1 min-w-[6px] flex-col items-center justify-end" title={`${d._id}: ${d.attempts}`}>
+        <div key={d._id} className="group flex flex-1 min-w-1.5 flex-col items-center justify-end" title={`${d._id}: ${d.attempts}`}>
           <div
             className="w-full rounded-t-md bg-brand-primary/60 transition-colors group-hover:bg-brand-primary"
             style={{ height: `${(d.attempts / max) * 100}%` }}

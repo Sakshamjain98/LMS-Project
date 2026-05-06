@@ -8,6 +8,9 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Home from "./pages/public/Home";
 import ArticleDetail from "./pages/public/ArticleDetail";
+import Privacy from "./pages/public/Privacy";
+import Terms from "./pages/public/Terms";
+import Cookies from "./pages/public/Cookies";
 
 /* Student Pages */
 import StudentDashboard from "./pages/student/StudentDashboard";
@@ -79,6 +82,9 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/articles/:id" element={<ArticleDetail />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/cookies" element={<Cookies />} />
 
         {/* Legacy redirects — old links should still resolve */}
         <Route path="/teacher/*" element={<Navigate to="/admin/test-series" replace />} />

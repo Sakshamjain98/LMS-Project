@@ -279,7 +279,7 @@ function WhyChooseUsForm({ value = {}, onChange }) {
       <Label label="Reasons" hint="Each card has a short title and a one-line description.">
         <div className="space-y-3">
           {items.map((it, i) => (
-            <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/3 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Reason {i + 1}</span>
                 <button
@@ -413,13 +413,13 @@ function ListEditor({ list = [], onChange, schema, title }) {
       </div>
 
       {list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center text-sm text-white/40">
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/2 p-10 text-center text-sm text-white/40">
           No items yet — click <strong className="text-brand-primary">Add Item</strong> to create the first one.
         </div>
       ) : (
         <div className="space-y-3">
           {list.map((item, i) => (
-            <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/3 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Item {i + 1}</span>
                 <div className="flex gap-1">

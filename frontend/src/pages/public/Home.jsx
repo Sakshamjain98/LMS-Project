@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
 import {
-  getPaymentPlans,
-  createPaymentOrder,
-  verifyPayment,
-  activateFreeSubscription,
-  getStudentSubscription,
   getPublicArticles,
   getPublicNews,
   getPublicSiteContent,
@@ -253,45 +247,6 @@ const SPAN_CLASSES = {
   "2x2": "col-span-2 row-span-2",
 };
 
-const FEATURES = [
-  {
-    icon: FaBook,
-    title: "Comprehensive Curriculum",
-    description:
-      "Structured test series covering every chapter of pharmaceutical science — fundamentals to advanced specializations.",
-  },
-  {
-    icon: FaUserTie,
-    title: "Expert Instructors",
-    description:
-      "Learn from industry professionals and experienced pharmacists with decades of combined expertise.",
-  },
-  {
-    icon: FaClock,
-    title: "Learn at Your Pace",
-    description:
-      "Flexible scheduling lets you study on your own timeline — from anywhere, on any device.",
-  },
-  {
-    icon: FaCheckCircle,
-    title: "Practical Assessments",
-    description:
-      "Real-world tests and mock exams to validate your knowledge and prepare for certifications.",
-  },
-  {
-    icon: FaShieldAlt,
-    title: "Recognised Certificates",
-    description:
-      "Earn certificates that are valued by employers and institutions across the pharmaceutical industry.",
-  },
-  {
-    icon: FaHeadset,
-    title: "Dedicated Support",
-    description:
-      "Our support team is available to help you through every step of your learning journey.",
-  },
-];
-
 const TESTIMONIALS = [
   {
     text: "The courses are incredibly well-structured. I passed my GPAT exam on the first attempt thanks to the comprehensive materials.",
@@ -369,16 +324,7 @@ const Home = () => {
   const [articles, setArticles] = useState([]);
   const [news, setNews] = useState([]);
   const [cms, setCms] = useState(null);
-  // Drives the "Free Trial" → Explore Test Series modal.
-  const [trialModalOpen, setTrialModalOpen] = useState(false);
   const [seriesList, setSeriesList] = useState([]);
-  const [plans, setPlans] = useState([]);
-  const [_loadingPlans, setLoadingPlans] = useState(true);
-  const [processingPlan, setProcessingPlan] = useState(null);
-  const [error, setError] = useState("");
-  const [subscriptionStatus, setSubscriptionStatus] = useState(
-    localStorage.getItem("subscriptionStatus") || "FREE"
-  );
 
   const isAuthenticated = !!localStorage.getItem("token");
   const userRole = localStorage.getItem("userRole");
@@ -392,22 +338,6 @@ const Home = () => {
     return () => {
       if (document.body.contains(script)) document.body.removeChild(script);
     };
-  }, []);
-
-  /* Fetch pricing plans */
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        setLoadingPlans(true);
-        const fetchedPlans = await getPaymentPlans();
-        setPlans(fetchedPlans || []);
-      } catch {
-        setPlans([]);
-      } finally {
-        setLoadingPlans(false);
-      }
-    };
-    fetchPlans();
   }, []);
 
   /* Fetch published articles + news + site content */
@@ -444,7 +374,6 @@ const Home = () => {
       "Whether you're preparing for licensing exams, expanding your clinical knowledge, or advancing your career, we give you the tools and expertise you need to succeed.",
     ]),
   };
-  const featuresCms      = cms?.features?.length              ? cms.features              : FEATURES.map((f) => ({ title: f.title, description: f.description }));
   const testimonialsCms  = cms?.testimonials?.length          ? cms.testimonials          : TESTIMONIALS;
   const faqCms           = cms?.faq?.length                   ? cms.faq                   : [];
   const statsCms         = Array.isArray(cms?.stats)          ? cms.stats                 : [];
@@ -470,50 +399,6 @@ const Home = () => {
     return () => clearInterval(interval);
   }, []);
 
-  /* Sync subscription from API */
-  useEffect(() => {
-    const syncSubscription = async () => {
-      if (!isAuthenticated || userRole !== "student") return;
-      try {
-        const subscription = await getStudentSubscription();
-        const activePlan =
-          subscription?.status === "ACTIVE" && subscription?.plan !== "FREE"
-            ? subscription.plan
-            : "FREE";
-        setSubscriptionStatus(activePlan);
-        localStorage.setItem("subscriptionStatus", activePlan);
-      } catch {
-        /* fail silently */
-      }
-    };
-    syncSubscription();
-  }, [isAuthenticated, userRole]);
-
-  /* Auto-open the trial popup for anonymous visitors. We use a short
-     cooldown (1 hour, per browser session) so the popup fires reliably on
-     first visit but doesn't pester someone who refreshes every 30 seconds. */
-  useEffect(() => {
-    if (isAuthenticated) return;
-    const COOLDOWN_KEY = "trialPopupShownAt";
-    const COOLDOWN_MS = 60 * 60 * 1000; // 1h
-    let last = 0;
-    try { last = Number(localStorage.getItem(COOLDOWN_KEY) || 0); } catch { /* ignore */ }
-    if (Date.now() - last < COOLDOWN_MS) return;
-    const timer = setTimeout(() => {
-      setTrialModalOpen(true);
-      try { localStorage.setItem(COOLDOWN_KEY, String(Date.now())); } catch { /* ignore */ }
-    }, 1500); // short delay so the page can paint, then we nudge
-    return () => clearTimeout(timer);
-  }, [isAuthenticated]);
-
-  /* Listen for the navbar's Free Trial click. The Navbar dispatches a
-     `ps:open-trial-modal` event so it doesn't need to share state with us. */
-  useEffect(() => {
-    const handler = () => setTrialModalOpen(true);
-    window.addEventListener("ps:open-trial-modal", handler);
-    return () => window.removeEventListener("ps:open-trial-modal", handler);
-  }, []);
-
   /* ── Handlers ── */
 
   const handleGetStarted = () => {
@@ -525,141 +410,7 @@ const Home = () => {
     }
   };
 
-  // "Get Started Free" / "Free Trial" — open the popup with the
-  // "Explore Test Series" CTA. Conversion happens in handleExploreTestSeries.
-  const handleFreePlanActivation = () => {
-    setError("");
-    setTrialModalOpen(true);
-  };
-
-  // Modal CTA — logged-in students go straight to the test catalog;
-  // everyone else is sent to the login page.
-  // const handleExploreTestSeries = async () => {
-  //   setTrialModalOpen(false);
-  //   if (isAuthenticated && userRole === "student") {
-  //     // Best-effort silent activation so paid checks treat them as a free user.
-  //     try {
-  //       const response = await activateFreeSubscription();
-  //       if (response?.success) {
-  //         localStorage.setItem("subscriptionStatus", "FREE");
-  //         setSubscriptionStatus("FREE");
-  //       }
-  //     } catch {
-  //       /* already on free or backend rejected — proceed regardless */
-  //     }
-  //     navigate("/student/tests");
-  //   } else {
-  //     navigate("/login");
-  //   }
-  // };
-
-  // const handleSubscribe = async (plan) => {
-  //   const token = localStorage.getItem("token");
-  //   const role = localStorage.getItem("userRole");
-  //   const currentPlan = subscriptionStatus;
-
-  //   if (!token || role !== "student") {
-  //     alert("Please log in as a student to subscribe.");
-  //     navigate("/login");
-  //     return;
-  //   }
-
-  //   if (plan.id === "FREE" || plan.price === 0 || plan.price === "Free" || !plan.price) {
-  //     return handleFreePlanActivation();
-  //   }
-
-  //   if (currentPlan && currentPlan !== "FREE") {
-  //     alert("You already have an active Premium membership!");
-  //     return;
-  //   }
-
-  //   const planIdMap = { Professional: "MONTHLY", Premium: "YEARLY", "6 Month": "QUARTERLY", "12 Month": "YEARLY" };
-  //   const planId = plan.id || planIdMap[plan.name];
-
-  //   if (!["MONTHLY", "QUARTERLY", "YEARLY"].includes(planId)) {
-  //     setError("Invalid plan selected. Please try again.");
-  //     return;
-  //   }
-
-  //   if (!window.Razorpay) {
-  //     setError("Payment gateway not loaded. Please refresh the page.");
-  //     return;
-  //   }
-
-  //   setProcessingPlan(plan.id || planId);
-  //   setError("");
-
-  //   try {
-  //     const orderData = await createPaymentOrder(planId);
-
-  //     const handlePaymentSuccess = async (response) => {
-  //       try {
-  //         const verifyRes = await verifyPayment({
-  //           razorpay_order_id: response.razorpay_order_id,
-  //           razorpay_payment_id: response.razorpay_payment_id,
-  //           razorpay_signature: response.razorpay_signature,
-  //         });
-  //         if (verifyRes.success) {
-  //           localStorage.setItem("subscriptionStatus", planId);
-  //           setSubscriptionStatus(planId);
-  //           alert(`✅ Welcome to Premium!\nYour subscription is now active.`);
-  //           setTimeout(() => navigate("/student/dashboard"), 2000);
-  //         }
-  //       } catch (verifyErr) {
-  //         setError(verifyErr.message || "Payment verification failed.");
-  //       } finally {
-  //         setProcessingPlan(null);
-  //       }
-  //     };
-
-  //     /* DEV mode bypass */
-  //     if (orderData.orderId.startsWith("dev_order_")) {
-  //       return handlePaymentSuccess({
-  //         razorpay_order_id: orderData.orderId,
-  //         razorpay_payment_id: "DEV_PAY_" + Date.now(),
-  //         razorpay_signature: "mock_signature",
-  //       });
-  //     }
-
-  //     /* Production Razorpay */
-  //     const rzp = new window.Razorpay({
-  //       key: orderData.razorpayKeyId,
-  //       amount: orderData.amountInPaise,
-  //       currency: orderData.currency,
-  //       name: "PS Classes",
-  //       description: `${orderData.planName} Plan`,
-  //       order_id: orderData.orderId,
-  //       prefill: {
-  //         email: localStorage.getItem("userEmail") || "",
-  //         contact: localStorage.getItem("userPhone") || "",
-  //       },
-  //       theme: { color: "#00c885" },
-  //       handler: handlePaymentSuccess,
-  //       modal: { ondismiss: () => setProcessingPlan(null) },
-  //     });
-  //     rzp.on("payment.failed", (res) => {
-  //       setError(`Payment failed: ${res.error.description}`);
-  //       setProcessingPlan(null);
-  //     });
-  //     rzp.open();
-  //   } catch (err) {
-  //     setError(err.message || "Failed to initiate payment.");
-  //     setProcessingPlan(null);
-  //   }
-  // };
-
   /* ── Derived data ── */
-
-  // The backend's `/payment/plans` filters out the FREE plan, so we re-attach
-  // it to the front of the list. Without this, the "Get Started Free" CTA
-  // never renders when the API is reachable, and the trial popup has no entry
-  // point in the pricing grid.
-  const FREE_PLAN_FALLBACK = FALLBACK_PLANS.find((p) => p.id === "FREE");
-  // const pricingPlans = (() => {
-  //   if (plans.length === 0) return FALLBACK_PLANS;
-  //   const hasFree = plans.some((p) => p.id === "FREE" || p.price === 0 || p.price === "Free");
-  //   return hasFree ? plans : [FREE_PLAN_FALLBACK, ...plans];
-  // })();
 
   return (
     <div className="bg-dark-400 text-white overflow-hidden">
@@ -1180,7 +931,7 @@ const Home = () => {
           </div>
 
           <button
-            onClick={isAuthenticated ? handleGetStarted : handleFreePlanActivation}
+            onClick={handleGetStarted}
             className="inline-flex items-center gap-2.5 px-9 py-4 btn-gradient rounded-lg font-bold text-base hover:opacity-90 transition group"
           >
             {isAuthenticated ? "Start Learning Today" : "Start Free Trial"}
@@ -1323,7 +1074,7 @@ const Home = () => {
         <p className="text-xs font-bold uppercase tracking-wider text-gray-300 mb-4">Product</p>
         <ul className="space-y-2.5 text-xs text-gray-500">
           <li><a href="#test-series" className="hover:text-white transition">Test Series</a></li>
-          <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li>
+          {/* <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li> */}
           <li><a href="#about" className="hover:text-white transition">About</a></li>
         </ul>
       </div>
@@ -1332,17 +1083,17 @@ const Home = () => {
         <p className="text-xs font-bold uppercase tracking-wider text-gray-300 mb-4">Learn</p>
         <ul className="space-y-2.5 text-xs text-gray-500">
           <li><a href="#blog" className="hover:text-white transition">Blog</a></li>
-          <li><a href="#" className="hover:text-white transition">Resources</a></li>
-          <li><a href="#" className="hover:text-white transition">FAQ</a></li>
+          {/* <li><a href="#" className="hover:text-white transition">Resources</a></li> */}
+          <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
         </ul>
       </div>
 
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-gray-300 mb-4">Legal</p>
         <ul className="space-y-2.5 text-xs text-gray-500">
-          <li><a href="#" className="hover:text-white transition">Privacy</a></li>
-          <li><a href="#" className="hover:text-white transition">Terms</a></li>
-          <li><a href="#" className="hover:text-white transition">Cookies</a></li>
+          <li><Link to="/privacy" className="hover:text-white transition">Privacy</Link></li>
+          <li><Link to="/terms" className="hover:text-white transition">Terms</Link></li>
+          <li><Link to="/cookies" className="hover:text-white transition">Cookies</Link></li>
         </ul>
       </div>
     </div>
