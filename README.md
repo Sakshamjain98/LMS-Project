@@ -12,6 +12,7 @@ Production-ready monorepo for LMS backend (Node.js/Express/MongoDB/Redis) and fr
   - Security middleware: Helmet, HPP, Mongo sanitization.
   - Compression and improved HTTP server timeouts.
   - Readiness endpoint and graceful shutdown handling.
+  - 
 - Frontend hardening:
   - Removed hardcoded Google OAuth Client ID.
   - Env-driven API/OAuth configuration.
