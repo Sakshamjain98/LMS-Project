@@ -17,6 +17,7 @@ import {
   uploadTestCSV,
 } from "../../services/teacherService";
 import {
+  ChevronLeft,
   ChevronRight,
   FileText,
   Folder,
@@ -26,6 +27,7 @@ import {
   Search,
   Trash2,
   UploadCloud,
+  BarChart2,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 
@@ -75,6 +77,8 @@ export default function AdminTestSeries() {
   const [csvForm, setCsvForm] = useState(emptyCsvForm);
   const [confirmState, setConfirmState] = useState({ isOpen: false, type: null, id: null });
   const [actionLoading, setActionLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const fetchSeries = useCallback(async () => {
     try {
@@ -141,6 +145,17 @@ export default function AdminTestSeries() {
     else rows = selectedChapter?.tests || [];
     return search ? rows.filter((row) => row.title.toLowerCase().includes(search)) : rows;
   }, [filters.search, level, topics, selectedTopic, selectedSubject, selectedChapter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const paginatedRows = useMemo(
+    () => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredRows, page]
+  );
+
+  // Reset page when scope or search changes.
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, level, selectedTopicId, selectedSubjectId, selectedChapterId]);
 
   const openModal = (type, mode, data = null) => {
     setModalState({ isOpen: true, type, mode });
@@ -393,7 +408,7 @@ export default function AdminTestSeries() {
                    "No records found."}
                 </td></tr>
               ) : (
-                filteredRows.map((row, idx) => (
+                paginatedRows.map((row, idx) => (
                   <tr key={row._id} className="transition-colors hover:bg-white/[0.04] animate-fade-up" style={{ animationDelay: `${idx * 25}ms` }}>
                     <td className="px-6 py-4 text-sm font-semibold text-white cursor-pointer" onClick={() => handleRowSelect(row)}>
                       <div className="flex items-center gap-2">
@@ -422,6 +437,15 @@ export default function AdminTestSeries() {
                             className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white"
                           >
                             View
+                          </button>
+                        )}
+                        {level === "topics" && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/test-series/${row._id}/analytics`); }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-brand-primary/15 px-3 py-1.5 text-xs font-bold text-brand-primary hover:bg-brand-primary/25"
+                            title="View analytics & leaderboard"
+                          >
+                            <BarChart2 size={12} /> Analytics
                           </button>
                         )}
                         <button
@@ -453,6 +477,10 @@ export default function AdminTestSeries() {
           </table>
         </div>
       </div>
+
+      {filteredRows.length > PAGE_SIZE && (
+        <PaginationBar page={page} totalPages={totalPages} totalCount={filteredRows.length} pageSize={PAGE_SIZE} onChange={setPage} />
+      )}
 
       <Modal
         isOpen={modalState.isOpen && modalState.type === "entity"}
@@ -557,6 +585,39 @@ export default function AdminTestSeries() {
         message="This action will remove all nested data. Continue?"
       />
 
+    </div>
+  );
+}
+
+function PaginationBar({ page, totalPages, totalCount, pageSize, onChange }) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/60">
+      <span>
+        Showing <span className="font-bold text-white">{start}</span>–
+        <span className="font-bold text-white">{end}</span> of{" "}
+        <span className="font-bold text-white">{totalCount}</span>
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
+        >
+          <ChevronLeft size={12} /> Prev
+        </button>
+        <span className="px-2 font-semibold text-white">
+          {page} / {totalPages}
+        </span>
+        <button
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
+        >
+          Next <ChevronRight size={12} />
+        </button>
+      </div>
     </div>
   );
 }

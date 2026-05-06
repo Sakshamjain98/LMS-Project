@@ -1,3 +1,5 @@
+import toast from "react-hot-toast";
+
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const normalizedApiBaseUrl = rawApiBaseUrl?.trim().replace(/\/+$/, "");
 const apiBaseUrl = normalizedApiBaseUrl
@@ -52,6 +54,7 @@ const request = async (method, url, data, config = {}) => {
     if (!response.ok) {
       const error = new Error(payload?.message || `Request failed with status ${response.status}`);
       error.response = { status: response.status, data: payload };
+      maybeNotify(error, config);
       throw error;
     }
 
@@ -63,13 +66,27 @@ const request = async (method, url, data, config = {}) => {
     if (error.name === "AbortError") {
       const timeoutError = new Error("Request timed out");
       timeoutError.response = { status: 408, data: { message: "Request timed out" } };
+      maybeNotify(timeoutError, config);
       throw timeoutError;
     }
     if (error.response) throw error;
-    throw new Error(error.message || "Network error");
+    const networkError = new Error(error.message || "Network error");
+    maybeNotify(networkError, config);
+    throw networkError;
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+// Surface API errors as a top-right toast unless the caller opts out via
+// `config.silent === true`. Caller-specific messages still get re-thrown.
+const maybeNotify = (error, config) => {
+  if (config?.silent) return;
+  const status = error?.response?.status;
+  // Auth/validation errors are usually shown by the page itself; don't double up.
+  if (status === 401 || status === 422) return;
+  const msg = error?.response?.data?.message || error?.message || "Something went wrong";
+  toast.error(msg, { id: `api-${status || "err"}-${msg.slice(0, 24)}` });
 };
 
 const api = {

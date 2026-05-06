@@ -97,13 +97,42 @@ const testAttemptSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound index for unique attempt per student per test
-testAttemptSchema.index({ testId: 1, studentId: 1 }, { unique: false });
+// NOTE: students may have multiple attempts at the same test (attemptLimit allows
+// 0 = unlimited). DO NOT add a unique index on (testId, studentId) here.
+// The individual `testId` and `studentId` indexes above are sufficient.
 testAttemptSchema.index({ testId: 1, status: 1 });
 testAttemptSchema.index({ studentId: 1, status: 1 });
 testAttemptSchema.index({ marksObtained: -1, timeTaken: 1 });
 
-// Remove calculateResult() method - logic moved to service layer
-// All calculation happens in testAttempt.service.js
+const TestAttempt = mongoose.model("TestAttempt", testAttemptSchema);
 
-export default mongoose.model("TestAttempt", testAttemptSchema);
+// Self-heal: an earlier version of this schema had a UNIQUE compound index on
+// (testId, studentId). MongoDB keeps that index even after the schema changes,
+// which makes the second attempt fail with E11000. Drop it once at startup.
+const dropStaleUniqueIndex = async () => {
+  try {
+    const indexes = await TestAttempt.collection.indexes();
+    const stale = indexes.find(
+      (idx) =>
+        idx.name === "testId_1_studentId_1" ||
+        (idx.unique && idx.key && idx.key.testId === 1 && idx.key.studentId === 1)
+    );
+    if (stale) {
+      await TestAttempt.collection.dropIndex(stale.name);
+      console.log(`[testAttempt] dropped stale unique index '${stale.name}'`);
+    }
+  } catch (err) {
+    if (err?.codeName !== "IndexNotFound") {
+      console.warn("[testAttempt] index cleanup skipped:", err.message);
+    }
+  }
+};
+
+mongoose.connection.once("open", () => {
+  dropStaleUniqueIndex();
+});
+if (mongoose.connection.readyState === 1) {
+  dropStaleUniqueIndex();
+}
+
+export default TestAttempt;

@@ -1,14 +1,71 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Loader2, Plus, Save, Trash2,
+  Loader2, Plus, Save, Trash2, ImagePlus,
   LayoutTemplate, FileText, Award, MessageCircle, ListChecks, Phone, Layers,
+  Sparkles, BarChart3, Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   getAdminSiteContent,
   updateAdminSiteContent,
+  uploadSiteImage,
 } from "../../services/adminService";
+
+// Convert any common YouTube URL form (watch, youtu.be, playlist, embed) into
+// a working /embed/ URL. The admin can paste anything; the player on Home runs
+// the same helper before mounting the iframe so display Just Works.
+export const normalizeYouTubeUrl = (input) => {
+  if (!input) return "";
+  const url = String(input).trim();
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    // Already an embed URL — leave it untouched.
+    if (host.includes("youtube.com") && u.pathname.startsWith("/embed/")) return url;
+    // Playlist links — embed via videoseries
+    if (host.includes("youtube.com") && u.pathname === "/playlist") {
+      const list = u.searchParams.get("list");
+      return list ? `https://www.youtube.com/embed/videoseries?list=${list}` : url;
+    }
+    // youtu.be short links — `/{id}`
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1).split("/")[0];
+      const list = u.searchParams.get("list");
+      const t = u.searchParams.get("t");
+      const params = new URLSearchParams();
+      if (list) params.set("list", list);
+      if (t) params.set("start", String(parseTimestamp(t)));
+      const qs = params.toString();
+      return id ? `https://www.youtube.com/embed/${id}${qs ? `?${qs}` : ""}` : url;
+    }
+    // Standard /watch?v=ID — convert to /embed/ID and preserve start time / playlist.
+    if (host.includes("youtube.com") && u.pathname === "/watch") {
+      const id = u.searchParams.get("v");
+      if (!id) return url;
+      const list = u.searchParams.get("list");
+      const t = u.searchParams.get("t");
+      const params = new URLSearchParams();
+      if (list) params.set("list", list);
+      if (t) params.set("start", String(parseTimestamp(t)));
+      const qs = params.toString();
+      return `https://www.youtube.com/embed/${id}${qs ? `?${qs}` : ""}`;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
+
+// Accepts "1883s", "31m23s", or a plain integer.
+const parseTimestamp = (t) => {
+  if (!t) return 0;
+  if (/^\d+$/.test(t)) return Number(t);
+  const m = t.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
+  if (!m) return 0;
+  const [, h = 0, mm = 0, s = 0] = m;
+  return Number(h) * 3600 + Number(mm) * 60 + Number(s);
+};
 
 // Empty scaffold used when the API can't be reached — admin can still author
 // content and save once the backend is back up.
@@ -24,7 +81,10 @@ const EMPTY_CONTENT = {
   },
   about: { eyebrow: "", title: "", paragraphs: [""] },
   features: [],
+  whyChooseUs: { eyebrow: "Why Choose Us", title: "", subtitle: "", items: [] },
+  stats: [],
   testimonials: [],
+  studentReviews: [],
   testSeriesHighlights: [],
   faq: [],
   footer: { brand: "", description: "", contactEmail: "", contactPhone: "" },
@@ -45,13 +105,16 @@ const Label = ({ label, hint, required, children }) => (
 );
 
 const TABS = [
-  { key: "hero",                 label: "Hero",          icon: LayoutTemplate },
-  { key: "about",                label: "About",         icon: FileText },
-  { key: "features",             label: "Features",      icon: Award },
-  { key: "testSeriesHighlights", label: "Highlights",    icon: Layers },
-  { key: "testimonials",         label: "Testimonials",  icon: MessageCircle },
-  { key: "faq",                  label: "FAQ",           icon: ListChecks },
-  { key: "footer",               label: "Footer",        icon: Phone },
+  { key: "hero",                 label: "Hero",            icon: LayoutTemplate },
+  { key: "about",                label: "About",           icon: FileText },
+  { key: "stats",                label: "Stats",           icon: BarChart3 },
+  { key: "features",             label: "Features",        icon: Award },
+  { key: "whyChooseUs",          label: "Why Choose Us",   icon: Sparkles },
+  { key: "testSeriesHighlights", label: "Highlights",      icon: Layers },
+  { key: "testimonials",         label: "Testimonials",    icon: MessageCircle },
+  { key: "studentReviews",       label: "Student Reviews", icon: Star },
+  { key: "faq",                  label: "FAQ",             icon: ListChecks },
+  { key: "footer",               label: "Footer",          icon: Phone },
 ];
 
 export default function SiteContent() {
@@ -194,9 +257,12 @@ export default function SiteContent() {
       >
         {tab === "hero"                && <HeroForm    value={content.hero} onChange={(v) => set("hero", v)} />}
         {tab === "about"               && <AboutForm   value={content.about} onChange={(v) => set("about", v)} />}
+        {tab === "stats"               && <ListEditor list={content.stats || []}            onChange={(fn) => setList("stats", fn)}                schema={statsSchema}         title="Stat cards (label + value)" />}
         {tab === "features"            && <ListEditor list={content.features}              onChange={(fn) => setList("features", fn)}             schema={featuresSchema}      title="Feature cards" />}
+        {tab === "whyChooseUs"         && <WhyChooseUsForm value={content.whyChooseUs}      onChange={(v) => set("whyChooseUs", v)} />}
         {tab === "testSeriesHighlights"&& <ListEditor list={content.testSeriesHighlights}   onChange={(fn) => setList("testSeriesHighlights", fn)} schema={highlightsSchema}    title="Test-series highlight cards" />}
         {tab === "testimonials"        && <ListEditor list={content.testimonials}           onChange={(fn) => setList("testimonials", fn)}         schema={testimonialsSchema}  title="Testimonials" />}
+        {tab === "studentReviews"      && <ListEditor list={content.studentReviews || []}   onChange={(fn) => setList("studentReviews", fn)}       schema={studentReviewsSchema} title="Student review bento (with image)" />}
         {tab === "faq"                 && <ListEditor list={content.faq}                    onChange={(fn) => setList("faq", fn)}                  schema={faqSchema}           title="FAQ entries" />}
         {tab === "footer"              && <FooterForm  value={content.footer} onChange={(v) => set("footer", v)} />}
       </motion.div>
@@ -232,8 +298,85 @@ function HeroForm({ value = {}, onChange }) {
           <input value={value.secondaryCtaLabel || ""} onChange={(e) => upd("secondaryCtaLabel", e.target.value)} className={fieldInput} />
         </Label>
       </div>
-      <Label label="Hero Video URL" hint="YouTube embed URL (https://www.youtube.com/embed/…).">
-        <input value={value.videoUrl || ""} onChange={(e) => upd("videoUrl", e.target.value)} className={fieldInput} />
+      <Label
+        label="Hero Video URL"
+        hint="Paste any YouTube link — watch, youtu.be, playlist, or embed. We auto-convert to the embed form when rendering."
+      >
+        <input
+          value={value.videoUrl || ""}
+          onChange={(e) => upd("videoUrl", e.target.value)}
+          className={fieldInput}
+          placeholder="https://www.youtube.com/watch?v=…"
+        />
+        {value.videoUrl && (
+          <p className="mt-1.5 text-[11px] text-white/40">
+            Will embed as:{" "}
+            <span className="text-brand-primary break-all">{normalizeYouTubeUrl(value.videoUrl)}</span>
+          </p>
+        )}
+      </Label>
+    </div>
+  );
+}
+
+// "Why Choose Us" — heading + bullet list. Stored under content.whyChooseUs.
+function WhyChooseUsForm({ value = {}, onChange }) {
+  const upd = (k, v) => onChange({ ...value, [k]: v });
+  const items = value.items || [];
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Label label="Eyebrow"><input value={value.eyebrow || ""} onChange={(e) => upd("eyebrow", e.target.value)} className={fieldInput} /></Label>
+        <Label label="Title" required><input value={value.title || ""} onChange={(e) => upd("title", e.target.value)} className={fieldInput} placeholder="Why students choose us" /></Label>
+      </div>
+      <Label label="Subtitle"><textarea rows={2} value={value.subtitle || ""} onChange={(e) => upd("subtitle", e.target.value)} className={`${fieldInput} resize-none`} /></Label>
+      <Label label="Reasons" hint="Each card has a short title and a one-line description.">
+        <div className="space-y-3">
+          {items.map((it, i) => (
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Reason {i + 1}</span>
+                <button
+                  onClick={() => upd("items", items.filter((_, j) => j !== i))}
+                  className="rounded-md bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Label label="Title">
+                  <input
+                    value={it.title || ""}
+                    onChange={(e) => upd("items", items.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
+                    className={fieldInput}
+                  />
+                </Label>
+                <Label label="Icon (emoji or short label)" hint="Optional decorative tag.">
+                  <input
+                    value={it.icon || ""}
+                    onChange={(e) => upd("items", items.map((x, j) => (j === i ? { ...x, icon: e.target.value } : x)))}
+                    className={fieldInput}
+                    placeholder="✨"
+                  />
+                </Label>
+              </div>
+              <Label label="Description">
+                <textarea
+                  rows={2}
+                  value={it.description || ""}
+                  onChange={(e) => upd("items", items.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))}
+                  className={`${fieldInput} resize-none`}
+                />
+              </Label>
+            </div>
+          ))}
+          <button
+            onClick={() => upd("items", [...items, { title: "", description: "", icon: "" }])}
+            className="inline-flex items-center gap-2 rounded-xl glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white"
+          >
+            <Plus size={12} /> Add reason
+          </button>
+        </div>
       </Label>
     </div>
   );
@@ -360,6 +503,11 @@ function ListEditor({ list = [], onChange, schema, title }) {
                         onChange={(e) => update(i, f.key, Number(e.target.value))}
                         className={fieldInput}
                       />
+                    ) : f.type === "image" ? (
+                      <ImageUploader
+                        value={item[f.key] || ""}
+                        onChange={(url) => update(i, f.key, url)}
+                      />
                     ) : (
                       <input
                         value={item[f.key] || ""}
@@ -419,3 +567,73 @@ const faqSchema = {
     { key: "answer",   label: "Answer",   type: "textarea", rows: 3, full: true },
   ],
 };
+
+// Stat card on the landing page — pairs a label with its value.
+const statsSchema = {
+  empty: () => ({ label: "", value: "", note: "" }),
+  fields: [
+    { key: "label", label: "Label", placeholder: "Active Students", required: true },
+    { key: "value", label: "Value", placeholder: "15,000+", required: true },
+    { key: "note",  label: "Subtext", placeholder: "Across India", full: true },
+  ],
+};
+
+// Each student review on the bento grid — image is required for the bento layout.
+const studentReviewsSchema = {
+  empty: () => ({ image: "", name: "", role: "", quote: "", rating: 5, span: "1x1" }),
+  fields: [
+    { key: "image", label: "Photo / Cover Image", type: "image", required: true, full: true,
+      hint: "Square or portrait works best — auto-cropped in the bento grid." },
+    { key: "name",  label: "Student Name", required: true },
+    { key: "role",  label: "Course / Year", placeholder: "GPAT 2024 Topper" },
+    { key: "quote", label: "Quote", type: "textarea", rows: 3, full: true },
+    { key: "rating", label: "Rating (1–5)", type: "number", min: 1, max: 5 },
+    { key: "span", label: "Bento Size", placeholder: "1x1, 1x2, 2x1, 2x2",
+      hint: "Use 2x2 for a hero card, 1x2 for tall, 2x1 for wide. Defaults to 1x1." },
+  ],
+};
+
+// Cloudinary-backed uploader — used by the studentReviews schema.
+function ImageUploader({ value, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const res = await uploadSiteImage(file);
+      const url = res?.url;
+      if (!url) throw new Error("Upload returned no URL");
+      onChange(url);
+      toast.success("Image uploaded");
+    } catch (err) {
+      toast.error(err?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+  return (
+    <div className="flex items-center gap-3">
+      {value ? (
+        <img src={value} alt="" className="h-16 w-16 rounded-xl object-cover ring-1 ring-white/10" />
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/30">
+          <ImagePlus size={18} />
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg glass-pill px-3 py-2 text-xs font-bold text-white/80 hover:text-white">
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+          {busy ? "Uploading…" : value ? "Replace" : "Upload"}
+          <input type="file" accept="image/*" onChange={onPick} className="hidden" />
+        </label>
+        {value && (
+          <button onClick={() => onChange("")} className="text-[11px] text-red-300 hover:text-red-200">
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

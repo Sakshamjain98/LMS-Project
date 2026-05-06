@@ -821,11 +821,15 @@ export const DEFAULT_SITE_CONTENT = {
     { question: "Can I cancel my subscription?", answer: "Yes, anytime. Your premium access stays active until the end of your billing period." },
   ],
   footer: {
-    brand: "Pharmacist Academy",
+    brand: "PS Classes",
     description: "Empowering pharmacy professionals with structured, expert-led education.",
     contactEmail: "support@pharmacistshubham.com",
     contactPhone: "+91 XXXX XXX XXX",
   },
+  // New CMS sections — kept empty by default; admin populates from the panel.
+  stats: [],
+  whyChooseUs: { eyebrow: "Why Choose Us", title: "", subtitle: "", items: [] },
+  studentReviews: [],
 };
 
 const mergeWithDefaults = (saved) => ({
@@ -836,6 +840,10 @@ const mergeWithDefaults = (saved) => ({
   testSeriesHighlights:  Array.isArray(saved?.testSeriesHighlights)  && saved.testSeriesHighlights.length  ? saved.testSeriesHighlights  : DEFAULT_SITE_CONTENT.testSeriesHighlights,
   faq:                   Array.isArray(saved?.faq)                   && saved.faq.length                   ? saved.faq                   : DEFAULT_SITE_CONTENT.faq,
   footer:                { ...DEFAULT_SITE_CONTENT.footer,  ...(saved?.footer || {}) },
+  stats:                 Array.isArray(saved?.stats)                 ? saved.stats                 : DEFAULT_SITE_CONTENT.stats,
+  whyChooseUs:           { ...DEFAULT_SITE_CONTENT.whyChooseUs, ...(saved?.whyChooseUs || {}),
+                            items: Array.isArray(saved?.whyChooseUs?.items) ? saved.whyChooseUs.items : [] },
+  studentReviews:        Array.isArray(saved?.studentReviews)        ? saved.studentReviews        : DEFAULT_SITE_CONTENT.studentReviews,
 });
 
 export const getSiteContent = async () => {
@@ -854,6 +862,9 @@ export const updateSiteContent = async (incoming = {}) => {
     testSeriesHighlights: Array.isArray(incoming.testSeriesHighlights) ? incoming.testSeriesHighlights : [],
     faq:                  Array.isArray(incoming.faq)                  ? incoming.faq                  : [],
     footer:               incoming.footer || {},
+    stats:                Array.isArray(incoming.stats)                ? incoming.stats                : [],
+    whyChooseUs:          incoming.whyChooseUs && typeof incoming.whyChooseUs === "object" ? incoming.whyChooseUs : { items: [] },
+    studentReviews:       Array.isArray(incoming.studentReviews)       ? incoming.studentReviews       : [],
   };
 
   const updated = await SiteContent.findOneAndUpdate(

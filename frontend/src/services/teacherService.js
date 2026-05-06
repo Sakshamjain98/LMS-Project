@@ -20,11 +20,7 @@ export const getTeacherUiSettings = async () => {
 
 export const createCourse = async (formData) => {
   try {
-    const res = await api.post("/teacher/courses", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const res = await api.post("/teacher/courses", formData);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Course creation failed" };
@@ -51,11 +47,7 @@ export const getCourseById = async (courseId) => {
 
 export const updateCourse = async (courseId, formData) => {
   try {
-    const res = await api.put(`/teacher/courses/${courseId}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const res = await api.put(`/teacher/courses/${courseId}`, formData);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Update failed" };
@@ -122,8 +114,7 @@ export const uploadSectionNotes = async (courseId, sectionId, files) => {
 
     const response = await api.post(
       `/teacher/courses/${courseId}/sections/${sectionId}/notes`,
-      fd,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      fd
     );
     
     return response.data;
@@ -180,9 +171,7 @@ export const deleteVideoFromSection = async (courseId, sectionId, videoIndex) =>
 // ================= NOTES =================
 export const createNote = async (formData) => {
   try {
-    const res = await api.post("/teacher/notes", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const res = await api.post("/teacher/notes", formData);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Create failed" };
@@ -209,9 +198,7 @@ export const getNoteById = async (id) => {
 
 export const updateNote = async (id, formData) => {
   try {
-    const res = await api.put(`/teacher/notes/${id}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const res = await api.put(`/teacher/notes/${id}`, formData);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Update failed" };
@@ -243,6 +230,15 @@ export const getTeacherTestSeries = async () => {
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Fetch test series failed" };
+  }
+};
+
+export const getTopicAnalytics = async (topicId) => {
+  try {
+    const res = await api.get(`/teacher/test-series/topics/${topicId}/analytics`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to load analytics" };
   }
 };
 
@@ -494,9 +490,10 @@ export const updateTeacherProfile = async (data) => {
 
 export const uploadTestCSV = async (formData) => {
   try {
-    const res = await api.post("/teacher/tests/upload-csv", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    // Do NOT set Content-Type manually — the browser auto-sets it with the
+    // multipart boundary. Setting it strips the boundary and the server fails
+    // with "multi part boundary not found".
+    const res = await api.post("/teacher/tests/upload-csv", formData);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Failed to upload CSV" };

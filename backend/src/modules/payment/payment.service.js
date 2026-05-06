@@ -8,6 +8,8 @@ import { razorpay } from "../../config/razorpay.js";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import Subscription from "../../models/subscription.model.js";
+import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
+import TopicAccess from "../../models/topicAccess.model.js";
 
 const getPlanDurationInDays = (plan) => {
   if (plan === "YEARLY") return 365;
@@ -313,4 +315,134 @@ export const getActiveSubscription = async (userId) => {
     status: "ACTIVE",
     endDate: { $gt: new Date() },
   }).lean();
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-topic (test series) one-time unlock — uses the topic's own price.
+// Independent of the MONTHLY/YEARLY subscription bundle.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const userHasTopicAccess = async (userId, topicId) => {
+  if (!userId || !topicId) return false;
+  if (!mongoose.Types.ObjectId.isValid(topicId)) return false;
+  const access = await TopicAccess.findOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    topicId: new mongoose.Types.ObjectId(topicId),
+  }).lean();
+  return Boolean(access);
+};
+
+export const createTopicOrder = async (userId, topicId) => {
+  if (!mongoose.Types.ObjectId.isValid(topicId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid topicId");
+  }
+
+  const topic = await TestSeriesTopic.findById(topicId).lean();
+  if (!topic) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
+  }
+  if (!topic.isPaid || !(topic.price > 0)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "This series is free");
+  }
+
+  // Already unlocked — no need to charge again.
+  const already = await userHasTopicAccess(userId, topicId);
+  if (already) {
+    return { alreadyUnlocked: true };
+  }
+
+  let orderId;
+  let razorpayOrderData = null;
+
+  if (process.env.PAYMENT_MODE === "DEV") {
+    orderId = `dev_topic_${Date.now()}_${userId}`;
+  } else {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new ApiError(STATUS_CODES.SERVER_ERROR, "Razorpay configuration missing");
+    }
+    try {
+      razorpayOrderData = await razorpay.orders.create({
+        amount: Math.round(topic.price * 100),
+        currency: "INR",
+        receipt: `tpc_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`,
+        notes: {
+          userId: userId.toString(),
+          topicId: topic._id.toString(),
+          kind: "TOPIC",
+        },
+      });
+      orderId = razorpayOrderData.id;
+    } catch (err) {
+      console.error("Razorpay topic order error:", err);
+      throw new ApiError(
+        STATUS_CODES.SERVER_ERROR,
+        err.error?.description || "Failed to create order with payment gateway"
+      );
+    }
+  }
+
+  return {
+    orderId,
+    amount: topic.price,
+    amountInPaise: Math.round(topic.price * 100),
+    currency: "INR",
+    topicId: topic._id.toString(),
+    topicTitle: topic.title,
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID || "DEV_KEY",
+    ...(razorpayOrderData && { razorpayOrder: razorpayOrderData }),
+  };
+};
+
+export const verifyTopicPayment = async ({
+  userId,
+  topicId,
+  razorpay_order_id,
+  razorpay_payment_id,
+  razorpay_signature,
+}) => {
+  if (!mongoose.Types.ObjectId.isValid(topicId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid topicId");
+  }
+  if (!razorpay_order_id) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Order id is required");
+  }
+
+  const topic = await TestSeriesTopic.findById(topicId).lean();
+  if (!topic) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
+  }
+
+  // Idempotency: if already unlocked, succeed without reprocessing.
+  const existing = await TopicAccess.findOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    topicId: new mongoose.Types.ObjectId(topicId),
+  }).lean();
+  if (existing) {
+    return { alreadyProcessed: true, success: true };
+  }
+
+  if (process.env.PAYMENT_MODE !== "DEV") {
+    if (!razorpay_payment_id || !razorpay_signature) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing payment verification fields");
+    }
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid payment signature");
+    }
+  }
+
+  await TopicAccess.create({
+    userId: new mongoose.Types.ObjectId(userId),
+    topicId: new mongoose.Types.ObjectId(topicId),
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
+    amount: topic.price,
+    currency: "INR",
+  });
+
+  return { success: true, message: "Test series unlocked" };
 };

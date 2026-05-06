@@ -8,7 +8,6 @@ import {
   LogOut,
   Menu,
   X,
-  Shield,
   UserPlus,
   UserCircle2,
   ChevronDown,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { getTeacherTestSeries } from "../../services/teacherService";
+import logo from "../../assets/icons/logo.png";
 
 // 1. Dashboard, 2. Users, 3. Payments, 4. News, 5. Blogs,
 // 6. Test Series (collapsible tree), 7. Create Admin, 8. Profile
@@ -105,15 +105,15 @@ export default function AdminLayout() {
         {/* Logo + collapse button */}
         <div className="flex items-center justify-between px-5 pt-6 pb-4 border-b border-white/5">
           <Link to="/admin/dashboard" className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-primary shadow-[0_8px_24px_rgba(0,186,124,0.4)] shrink-0">
-              <Shield className="h-5 w-5 text-dark-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 shadow-[0_8px_24px_rgba(0,186,124,0.25)] shrink-0 overflow-hidden">
+              <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
             </div>
             {!collapsed && (
               <div className="min-w-0">
                 <h2 className="text-lg font-extrabold tracking-tight text-white">
-                  Admin<span className="text-brand-primary ml-1">Portal</span>
+                  PS<span className="text-brand-primary ml-1">Classes</span>
                 </h2>
-                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/40">Control Center</p>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/40">Admin Portal</p>
               </div>
             )}
           </Link>

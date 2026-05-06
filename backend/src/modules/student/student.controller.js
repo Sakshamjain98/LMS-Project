@@ -5,6 +5,7 @@ import { activityQueue } from "../../infrastucture/queues/activity.queue.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import * as testSeriesService from "../testSeries/testSeries.service.js";
+import TopicAccess from "../../models/topicAccess.model.js";
 
 export const dashboard = asyncHandler(async (req, res) => {
   // 1. Fetch dashboard data
@@ -189,9 +190,30 @@ export const paidNotes = asyncHandler(async (req, res) => {
 export const getAvailableTests = asyncHandler(async (req, res) => {
   const topics = await testSeriesService.getStudentSeriesTree();
 
+  // Annotate each paid topic with whether the current student has unlocked it
+  // (either via active premium subscription or a per-topic purchase).
+  const userId = req.user._id;
+  const sub = await service.getUserSubscription(userId);
+  const subActive =
+    sub?.status === "ACTIVE" && sub?.plan && sub.plan !== "FREE" &&
+    (!sub.endDate || new Date(sub.endDate) > new Date());
+
+  const paidTopicIds = topics.filter((t) => t.isPaid).map((t) => t._id);
+  const accessDocs = paidTopicIds.length
+    ? await TopicAccess.find({ userId, topicId: { $in: paidTopicIds } })
+        .select("topicId")
+        .lean()
+    : [];
+  const unlockedSet = new Set(accessDocs.map((a) => a.topicId.toString()));
+
+  const annotated = topics.map((topic) => ({
+    ...topic,
+    isUnlocked: !topic.isPaid || subActive || unlockedSet.has(topic._id.toString()),
+  }));
+
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
-    topics,
+    topics: annotated,
   });
 });
 

@@ -33,6 +33,7 @@ import {
   FaHeadset,
   FaMedal,
 } from "react-icons/fa";
+import { normalizeYouTubeUrl } from "../admin/SiteContent";
 
 /* ─────────────────────────────────────────────────────────────
    Reusable primitives
@@ -234,6 +235,22 @@ const TEST_SERIES_HIGHLIGHTS = [
   },
 ];
 
+// Cycled when CMS-driven stats don't specify their own palette.
+const STAT_PALETTE = [
+  { icon: FaGraduationCap, iconBg: "bg-brand-primary/15", iconColor: "text-brand-primary" },
+  { icon: FaBook,          iconBg: "bg-blue-500/15",      iconColor: "text-blue-400" },
+  { icon: FaCheckCircle,   iconBg: "bg-green-500/15",     iconColor: "text-green-400" },
+  { icon: FaUserTie,       iconBg: "bg-orange-500/15",    iconColor: "text-orange-400" },
+];
+
+// Bento grid spans — admin picks "1x1" / "2x1" / "1x2" / "2x2" per review.
+const SPAN_CLASSES = {
+  "1x1": "col-span-1 row-span-1",
+  "2x1": "col-span-2 row-span-1",
+  "1x2": "col-span-1 row-span-2",
+  "2x2": "col-span-2 row-span-2",
+};
+
 const FEATURES = [
   {
     icon: FaBook,
@@ -426,8 +443,12 @@ const Home = () => {
   const featuresCms      = cms?.features?.length              ? cms.features              : FEATURES.map((f) => ({ title: f.title, description: f.description }));
   const testimonialsCms  = cms?.testimonials?.length          ? cms.testimonials          : TESTIMONIALS;
   const faqCms           = cms?.faq?.length                   ? cms.faq                   : [];
+  const statsCms         = Array.isArray(cms?.stats)          ? cms.stats                 : [];
+  const whyChooseCms     = cms?.whyChooseUs && (cms.whyChooseUs.title || cms.whyChooseUs.items?.length)
+                            ? cms.whyChooseUs : null;
+  const studentReviewsCms = Array.isArray(cms?.studentReviews) ? cms.studentReviews        : [];
   const footerCms = {
-    brand: cms?.footer?.brand ?? "Pharmacist Academy",
+    brand: cms?.footer?.brand ?? "PS Classes",
     description: cms?.footer?.description ?? "Empowering pharmacy professionals with structured, expert-led education.",
     contactEmail: cms?.footer?.contactEmail ?? "support@pharmacistshubham.com",
     contactPhone: cms?.footer?.contactPhone ?? "+91 XXXX XXX XXX",
@@ -484,7 +505,7 @@ const Home = () => {
         localStorage.setItem("subscriptionPlan", "FREE");
         localStorage.setItem("subscriptionStatus", "FREE");
         setSubscriptionStatus("FREE");
-        alert("✅ Welcome to Pharmacist Academy!\nFree plan activated.");
+        alert("✅ Welcome to PS Classes!\nFree plan activated.");
         setTimeout(() => navigate("/student/dashboard"), 2000);
       }
     } catch (err) {
@@ -567,7 +588,7 @@ const Home = () => {
         key: orderData.razorpayKeyId,
         amount: orderData.amountInPaise,
         currency: orderData.currency,
-        name: "Pharmacist Academy",
+        name: "PS Classes",
         description: `${orderData.planName} Plan`,
         order_id: orderData.orderId,
         prefill: {
@@ -693,8 +714,8 @@ const Home = () => {
             <iframe
               width="100%"
               height="100%"
-              src={hero.videoUrl}
-              title="Pharmacist Academy Introduction"
+              src={normalizeYouTubeUrl(hero.videoUrl)}
+              title="PS Classes Introduction"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -733,41 +754,32 @@ const Home = () => {
             </a>
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <StatCard
-              icon={FaGraduationCap}
-              iconBg="bg-brand-primary/15"
-              iconColor="text-brand-primary"
-              label="Total Students"
-              value={stats.students.toLocaleString()}
-              note="Worldwide"
-            />
-            <StatCard
-              icon={FaBook}
-              iconBg="bg-blue-500/15"
-              iconColor="text-blue-400"
-              label="Courses"
-              value={`${stats.tests}+`}
-              note="Expert-led"
-            />
-            <StatCard
-              icon={FaCheckCircle}
-              iconBg="bg-green-500/15"
-              iconColor="text-green-400"
-              label="Success Rate"
-              value={`${stats.success}%`}
-              note="Exam pass rate"
-            />
-            <StatCard
-              icon={FaUserTie}
-              iconBg="bg-orange-500/15"
-              iconColor="text-orange-400"
-              label="Expert Faculty"
-              value="50+"
-              note="Industry professionals"
-            />
-          </div>
+          {/* Stats grid — CMS-driven when present, otherwise the live counters fall back. */}
+          {statsCms.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {statsCms.slice(0, 4).map((s, i) => {
+                const palette = STAT_PALETTE[i % STAT_PALETTE.length];
+                return (
+                  <StatCard
+                    key={i}
+                    icon={palette.icon}
+                    iconBg={palette.iconBg}
+                    iconColor={palette.iconColor}
+                    label={s.label || ""}
+                    value={s.value || ""}
+                    note={s.note || ""}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <StatCard icon={FaGraduationCap} iconBg="bg-brand-primary/15" iconColor="text-brand-primary" label="Total Students" value={stats.students.toLocaleString()} note="Worldwide" />
+              <StatCard icon={FaBook} iconBg="bg-blue-500/15" iconColor="text-blue-400" label="Courses" value={`${stats.tests}+`} note="Expert-led" />
+              <StatCard icon={FaCheckCircle} iconBg="bg-green-500/15" iconColor="text-green-400" label="Success Rate" value={`${stats.success}%`} note="Exam pass rate" />
+              <StatCard icon={FaUserTie} iconBg="bg-orange-500/15" iconColor="text-orange-400" label="Expert Faculty" value="50+" note="Industry professionals" />
+            </div>
+          )}
         </div>
       </Section>
 
@@ -877,6 +889,88 @@ const Home = () => {
           ))}
         </div>
       </Section>
+
+      {/* ══════════════════════════════════════════
+          WHY CHOOSE US — explicit reasons block, CMS-driven
+      ══════════════════════════════════════════ */}
+      {whyChooseCms && (whyChooseCms.title || (whyChooseCms.items?.length || 0) > 0) && (
+        <Section id="why-us" className="border-t border-dark-100">
+          <SectionHeading
+            eyebrow={whyChooseCms.eyebrow || "Why Choose Us"}
+            title={whyChooseCms.title || "Why students choose us"}
+            subtitle={whyChooseCms.subtitle || ""}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {(whyChooseCms.items || []).map((it, i) => (
+              <div
+                key={i}
+                className="bg-dark-200 border border-dark-100 rounded-xl p-7 hover:border-brand-primary/40 transition-colors animate-fade-up"
+                style={{ animationDelay: `${i * 70}ms` }}
+              >
+                <div className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-brand-primary/15 text-brand-primary mb-5 text-xl">
+                  {it.icon || "✨"}
+                </div>
+                <h3 className="text-base font-bold text-white mb-2">{it.title}</h3>
+                {it.description && (
+                  <p className="text-sm text-gray-400 leading-relaxed">{it.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          STUDENT REVIEWS — bento grid, image-first cards
+      ══════════════════════════════════════════ */}
+      {studentReviewsCms.length > 0 && (
+        <Section id="student-reviews" className="bg-dark-300/30 border-t border-dark-100">
+          <SectionHeading
+            eyebrow="Student Voices"
+            title="Stories from our students"
+            subtitle="What our toppers and learners say after attempting our test series."
+          />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[180px] gap-4">
+            {studentReviewsCms.map((r, i) => {
+              const span = SPAN_CLASSES[r.span] || SPAN_CLASSES["1x1"];
+              return (
+                <article
+                  key={i}
+                  className={`relative overflow-hidden rounded-2xl group animate-fade-up ${span}`}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {r.image ? (
+                    <img
+                      src={r.image}
+                      alt={r.name || "Student"}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-dark-200 to-dark-300" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-4">
+                    {r.rating > 0 && (
+                      <div className="flex gap-0.5 mb-1.5">
+                        {[...Array(Math.min(5, Math.max(0, Number(r.rating) || 0)))].map((_, k) => (
+                          <FaStar key={k} size={11} className="text-yellow-400" />
+                        ))}
+                      </div>
+                    )}
+                    {r.quote && (
+                      <p className="text-xs md:text-sm text-white/90 leading-snug line-clamp-3 mb-2">
+                        "{r.quote}"
+                      </p>
+                    )}
+                    <p className="text-sm font-bold text-white">{r.name || "Student"}</p>
+                    {r.role && <p className="text-[11px] text-white/60">{r.role}</p>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {/* ══════════════════════════════════════════
           NEWS — live from /api/public/news

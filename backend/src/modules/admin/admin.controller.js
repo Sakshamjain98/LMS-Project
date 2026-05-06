@@ -244,6 +244,19 @@ export const updateSiteContent = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Site content updated", data });
 });
 
+// Multer + Cloudinary middleware writes the uploaded file to Cloudinary;
+// the resulting URL lives on `req.file.path`.
+export const uploadSiteImage = asyncHandler(async (req, res) => {
+  if (!req.file?.path) {
+    return res.status(400).json({ success: false, message: "No image uploaded" });
+  }
+  res.json({
+    success: true,
+    url: req.file.path,
+    public_id: req.file.filename,
+  });
+});
+
 export const getBlogs = asyncHandler(async (req, res) => {
   const result = await service.getBlogs(req.query);
 

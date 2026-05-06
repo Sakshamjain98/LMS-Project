@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 /* Public Pages */
 import Login from "./pages/auth/Login";
@@ -28,6 +29,7 @@ import CreateAdmin from "./pages/admin/CreateAdmin";
 import AdminProfile from "./pages/admin/Profile";
 import AdminTestSeries from "./pages/admin/TestSeries";
 import AdminTestEditor from "./pages/admin/TestEditor";
+import AdminTestSeriesAnalytics from "./pages/admin/TestSeriesAnalytics";
 import AdminSiteContent from "./pages/admin/SiteContent";
 import AdminBlogEditor from "./pages/admin/BlogEditor";
 
@@ -41,6 +43,34 @@ const AdminRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+      {/* Global top-right toaster — themed to match the dark glass UI */}
+      <Toaster
+        position="top-right"
+        gutter={10}
+        toastOptions={{
+          duration: 4500,
+          style: {
+            background: "rgba(20, 24, 32, 0.92)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
+            backdropFilter: "blur(14px)",
+            borderRadius: "14px",
+            padding: "12px 16px",
+            fontSize: "13px",
+            fontWeight: 500,
+            fontFamily: '"Space Grotesk", "DM Sans", sans-serif',
+          },
+          success: {
+            iconTheme: { primary: "#00c885", secondary: "#0a0d12" },
+            style: { borderColor: "rgba(0, 200, 133, 0.35)" },
+          },
+          error: {
+            iconTheme: { primary: "#f87171", secondary: "#0a0d12" },
+            style: { borderColor: "rgba(248, 113, 113, 0.35)" },
+          },
+        }}
+      />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
@@ -82,6 +112,7 @@ function App() {
           <Route path="blogs/new" element={<AdminBlogEditor />} />
           <Route path="blogs/:id/edit" element={<AdminBlogEditor />} />
           <Route path="test-series" element={<AdminTestSeries />} />
+          <Route path="test-series/:topicId/analytics" element={<AdminTestSeriesAnalytics />} />
           <Route path="test-series/test/:testId" element={<AdminTestEditor />} />
           <Route path="site-content" element={<AdminSiteContent />} />
           <Route path="create-admin" element={<CreateAdmin />} />

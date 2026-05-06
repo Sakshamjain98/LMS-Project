@@ -9,8 +9,8 @@ import {
   Menu,
   ClipboardList,
   X,
-  GraduationCap,
 } from "lucide-react";
+import logo from "../../assets/icons/logo.png";
 
 export default function StudentSidebar() {
   const [collapsed, setCollapsed] = useState(() => {
@@ -58,10 +58,10 @@ export default function StudentSidebar() {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 p-4 min-h-[72px]">
             <button onClick={() => navigate("/")} className="flex items-center gap-2.5 hover:opacity-80 transition">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-primary shadow-[0_8px_24px_rgba(0,186,124,0.4)]">
-                <GraduationCap className="text-dark-400" size={18} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden shadow-[0_8px_24px_rgba(0,186,124,0.25)]">
+                <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
               </div>
-              {!collapsed && <span className="text-white font-bold text-base tracking-tight">Pharmacist <span className="text-brand-primary">Academy</span></span>}
+              {!collapsed && <span className="text-white font-bold text-base tracking-tight">PS <span className="text-brand-primary">Classes</span></span>}
             </button>
 
             <button

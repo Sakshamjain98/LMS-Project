@@ -2,6 +2,7 @@ import express from "express";
 import * as controller from "./admin.controller.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
+import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -64,5 +65,7 @@ router.put("/settings/teacher", controller.updateTeacherSettings);
 // -------------------- Site Content (Landing-page CMS) --------------------
 router.get("/site-content", controller.getSiteContent);
 router.put("/site-content", controller.updateSiteContent);
+// Generic image upload — used by SiteContent (review avatars, bento images).
+router.post("/site-content/upload-image", upload.single("image"), controller.uploadSiteImage);
 
 export default router;

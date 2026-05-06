@@ -101,3 +101,8 @@ export const createTestInChapter = asyncHandler(async (req, res) => {
     test,
   });
 });
+
+export const getTopicAnalytics = asyncHandler(async (req, res) => {
+  const data = await seriesService.getTopicAnalytics(req.params.topicId, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, ...data });
+});

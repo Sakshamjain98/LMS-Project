@@ -4,6 +4,7 @@ import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import Subscription from "../../models/subscription.model.js";
+import TopicAccess from "../../models/topicAccess.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import {
@@ -80,11 +81,15 @@ export const startTest = async (testId, studentId) => {
   }
 
   // Paid-topic gating — pricing lives on the parent test series (topic).
+  // Access is granted by EITHER an active paid subscription OR a per-topic unlock.
   if (test.topicId) {
     const topic = await TestSeriesTopic.findById(test.topicId).lean();
     if (topic?.isPaid) {
-      const ok = await hasActivePaidSubscription(objStudentId);
-      if (!ok) {
+      const [subOk, topicOk] = await Promise.all([
+        hasActivePaidSubscription(objStudentId),
+        TopicAccess.exists({ userId: objStudentId, topicId: topic._id }),
+      ]);
+      if (!subOk && !topicOk) {
         throw new ApiError(
           STATUS_CODES.FORBIDDEN,
           `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to start.`

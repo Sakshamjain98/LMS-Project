@@ -144,6 +144,7 @@ router.put("/test-series/chapters/:chapterId", testSeriesController.updateChapte
 router.delete("/test-series/chapters/:chapterId", testSeriesController.deleteChapter);
 
 router.post("/test-series/chapters/:chapterId/tests", testSeriesController.createTestInChapter);
+router.get("/test-series/topics/:topicId/analytics", testSeriesController.getTopicAnalytics);
 
 // ========== PERFORMANCE ==========
 router.get("/performance", controller.studentPerformance);

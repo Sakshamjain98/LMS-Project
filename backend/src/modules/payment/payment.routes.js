@@ -18,6 +18,11 @@ router.post("/verify", authMiddleware, authorize("student"), controller.verifyPa
 router.post("/activate-free", authMiddleware, authorize("student"), controller.activateFreeSubscription);
 router.get("/subscription", authMiddleware, authorize("student"), controller.getSubscription);
 
+// Per-topic test-series unlock via Razorpay (one-time per topic)
+router.post("/topic/:topicId/order", authMiddleware, authorize("student"), controller.createTopicOrder);
+router.post("/topic/:topicId/verify", authMiddleware, authorize("student"), controller.verifyTopicPayment);
+router.get("/topic/:topicId/access", authMiddleware, authorize("student"), controller.checkTopicAccess);
+
 // Admin routes — payment approval
 router.get("/pending-approval", authMiddleware, authorize("admin"), controller.getPendingApprovalPayments);
 router.put("/:id/approve", authMiddleware, authorize("admin"), controller.approvePayment);

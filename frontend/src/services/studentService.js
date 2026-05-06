@@ -129,6 +129,34 @@ export const activateFreeSubscription = async () => {
   }
 };
 
+// ─── Per-topic (test series) one-time unlock ────────────────────────────────
+export const createTopicOrder = async (topicId) => {
+  try {
+    const res = await api.post(`/payment/topic/${topicId}/order`);
+    return res.data.order;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to create unlock order" };
+  }
+};
+
+export const verifyTopicPayment = async (topicId, payload) => {
+  try {
+    const res = await api.post(`/payment/topic/${topicId}/verify`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Topic payment verification failed" };
+  }
+};
+
+export const checkTopicAccess = async (topicId) => {
+  try {
+    const res = await api.get(`/payment/topic/${topicId}/access`);
+    return Boolean(res.data?.unlocked);
+  } catch {
+    return false;
+  }
+};
+
 // ─── Public (no auth) ───────────────────────────────────────────────────────
 export const getPublicArticles = async (limit = 6) => {
   try {

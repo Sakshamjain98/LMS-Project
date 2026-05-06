@@ -228,6 +228,14 @@ export const updateAdminSiteContent = async (data) => {
   return res.data;
 };
 
+// Returns { url } — the secure Cloudinary URL of the uploaded image.
+export const uploadSiteImage = async (file) => {
+  const fd = new FormData();
+  fd.append("image", file);
+  const res = await API.post("/admin/site-content/upload-image", fd);
+  return res.data;
+};
+
 export const getBlogById = async (blogId) => {
   const res = await API.get(`/admin/blogs/${blogId}`);
   return res.data;

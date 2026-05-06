@@ -93,3 +93,31 @@ export const rejectPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// Per-topic (paid test series) unlock via Razorpay
+export const createTopicOrder = asyncHandler(async (req, res) => {
+  const order = await service.createTopicOrder(req.user._id, req.params.topicId);
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: "Topic order created",
+    order,
+  });
+});
+
+export const verifyTopicPayment = asyncHandler(async (req, res) => {
+  const result = await service.verifyTopicPayment({
+    userId: req.user._id,
+    topicId: req.params.topicId,
+    ...req.body,
+  });
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: result.alreadyProcessed ? "Already unlocked" : MESSAGES.PAYMENT_SUCCESS,
+    ...result,
+  });
+});
+
+export const checkTopicAccess = asyncHandler(async (req, res) => {
+  const unlocked = await service.userHasTopicAccess(req.user._id, req.params.topicId);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, unlocked });
+});
+

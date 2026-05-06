@@ -6,6 +6,7 @@ import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import TestAttempt from "../../models/testAttempt.model.js";
 import TestConfig from "../../models/testConfig.model.js";
+import TopicAccess from "../../models/topicAccess.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 
@@ -269,7 +270,7 @@ export const getTeacherSeriesTree = async (teacherId) => {
 
   const tests = chapterIds.length
     ? await Test.find({ teacherId: objTeacherId, chapterId: { $in: chapterIds } })
-        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId createdAt questions isPaid")
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId createdAt questions isPaid isProctored attemptLimit")
         .sort({ createdAt: -1 })
         .lean()
     : [];
@@ -310,6 +311,197 @@ export const getTeacherSeriesTree = async (teacherId) => {
   }));
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-test-series analytics for the admin dashboard.
+// Aggregates engagement, performance, demand, and revenue for one topic.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getTopicAnalytics = async (topicId, teacherId) => {
+  const objTopicId = validateObjectId(topicId, "topicId");
+  const objTeacherId = validateObjectId(teacherId, "teacherId");
+
+  const topic = await TestSeriesTopic.findOne({ _id: objTopicId, teacherId: objTeacherId }).lean();
+  if (!topic) throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
+
+  const subjects = await TestSeriesSubject.find({ topicId: objTopicId, teacherId: objTeacherId }).lean();
+  const subjectIds = subjects.map((s) => s._id);
+  const chapters = subjectIds.length
+    ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds }, teacherId: objTeacherId }).lean()
+    : [];
+  const chapterIds = chapters.map((c) => c._id);
+  const tests = chapterIds.length
+    ? await Test.find({ chapterId: { $in: chapterIds }, teacherId: objTeacherId })
+        .select("title status totalMarks duration chapterId subjectId topicId isProctored isPaid")
+        .lean()
+    : [];
+  const testIds = tests.map((t) => t._id);
+
+  const perTest = testIds.length
+    ? await TestAttempt.aggregate([
+        { $match: { testId: { $in: testIds } } },
+        {
+          $group: {
+            _id: "$testId",
+            attempts: { $sum: 1 },
+            uniqueStudents: { $addToSet: "$studentId" },
+            avgPercent: { $avg: "$percentage" },
+            maxPercent: { $max: "$percentage" },
+            avgTime: { $avg: "$timeTaken" },
+            completed: {
+              $sum: { $cond: [{ $in: ["$status", ["submitted", "evaluated"]] }, 1, 0] },
+            },
+            firstAttemptAt: { $min: "$createdAt" },
+            lastAttemptAt: { $max: "$createdAt" },
+          },
+        },
+      ])
+    : [];
+
+  const statsByTest = new Map(perTest.map((row) => [row._id.toString(), row]));
+
+  const now = new Date();
+  const thirtyAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const dailyActivity = testIds.length
+    ? await TestAttempt.aggregate([
+        { $match: { testId: { $in: testIds }, createdAt: { $gte: thirtyAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            attempts: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+    : [];
+
+  const totalAttempts = perTest.reduce((sum, t) => sum + (t.attempts || 0), 0);
+  const totalCompleted = perTest.reduce((sum, t) => sum + (t.completed || 0), 0);
+  const uniqueStudentsAcrossTopic = new Set();
+  perTest.forEach((t) => (t.uniqueStudents || []).forEach((id) => uniqueStudentsAcrossTopic.add(id.toString())));
+  const totalUniqueStudents = uniqueStudentsAcrossTopic.size;
+  const overallAvgPercent =
+    totalAttempts > 0
+      ? perTest.reduce((sum, t) => sum + (t.avgPercent || 0) * (t.attempts || 0), 0) / totalAttempts
+      : 0;
+
+  const testBreakdown = tests
+    .map((test) => {
+      const stat = statsByTest.get(test._id.toString());
+      return {
+        _id: test._id,
+        title: test.title,
+        status: test.status,
+        chapterId: test.chapterId,
+        subjectId: test.subjectId,
+        attempts: stat?.attempts || 0,
+        uniqueStudents: stat ? stat.uniqueStudents.length : 0,
+        avgPercent: Math.round((stat?.avgPercent || 0) * 10) / 10,
+        maxPercent: Math.round((stat?.maxPercent || 0) * 10) / 10,
+        avgTimeMin: stat ? Math.round((stat.avgTime || 0) / 60) : 0,
+        completed: stat?.completed || 0,
+        lastAttemptAt: stat?.lastAttemptAt || null,
+      };
+    })
+    .sort((a, b) => b.attempts - a.attempts);
+
+  const chaptersBySubject = new Map();
+  chapters.forEach((c) => {
+    const list = chaptersBySubject.get(c.subjectId.toString()) || [];
+    list.push(c);
+    chaptersBySubject.set(c.subjectId.toString(), list);
+  });
+  const testsByChapter = new Map();
+  testBreakdown.forEach((t) => {
+    const list = testsByChapter.get(t.chapterId?.toString()) || [];
+    list.push(t);
+    testsByChapter.set(t.chapterId?.toString(), list);
+  });
+
+  const subjectBreakdown = subjects.map((s) => {
+    const subjChapters = chaptersBySubject.get(s._id.toString()) || [];
+    let attempts = 0;
+    let testsInSubject = 0;
+    subjChapters.forEach((c) => {
+      const ts = testsByChapter.get(c._id.toString()) || [];
+      testsInSubject += ts.length;
+      attempts += ts.reduce((sum, t) => sum + t.attempts, 0);
+    });
+    return {
+      _id: s._id,
+      title: s.title,
+      chapters: subjChapters.length,
+      tests: testsInSubject,
+      attempts,
+    };
+  });
+
+  const revenueAgg = topic.isPaid
+    ? await TopicAccess.aggregate([
+        { $match: { topicId: objTopicId } },
+        { $group: { _id: null, unlocks: { $sum: 1 }, revenue: { $sum: "$amount" } } },
+      ])
+    : [];
+  const revenue = revenueAgg[0] || { unlocks: 0, revenue: 0 };
+
+  const leaderboard = testIds.length
+    ? await TestAttempt.aggregate([
+        { $match: { testId: { $in: testIds }, status: { $in: ["submitted", "evaluated"] } } },
+        {
+          $group: {
+            _id: "$studentId",
+            attempts: { $sum: 1 },
+            totalMarks: { $sum: "$marksObtained" },
+            avgPercent: { $avg: "$percentage" },
+            bestPercent: { $max: "$percentage" },
+            lastAttemptAt: { $max: "$createdAt" },
+          },
+        },
+        { $sort: { totalMarks: -1, avgPercent: -1 } },
+        { $limit: 50 },
+        { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "student" } },
+        { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 0,
+            studentId: "$_id",
+            studentName: "$student.name",
+            studentEmail: "$student.email",
+            attempts: 1,
+            totalMarks: 1,
+            avgPercent: { $round: ["$avgPercent", 1] },
+            bestPercent: { $round: ["$bestPercent", 1] },
+            lastAttemptAt: 1,
+          },
+        },
+      ])
+    : [];
+
+  return {
+    topic: {
+      _id: topic._id,
+      title: topic.title,
+      description: topic.description,
+      isPaid: topic.isPaid,
+      price: topic.price,
+    },
+    summary: {
+      subjects: subjects.length,
+      chapters: chapters.length,
+      tests: tests.length,
+      publishedTests: tests.filter((t) => t.status === "published").length,
+      totalAttempts,
+      totalCompleted,
+      totalUniqueStudents,
+      overallAvgPercent: Math.round(overallAvgPercent * 10) / 10,
+      revenue: revenue.revenue || 0,
+      unlocks: revenue.unlocks || 0,
+    },
+    dailyActivity,
+    subjectBreakdown,
+    testBreakdown,
+    leaderboard,
+  };
+};
+
 export const getStudentSeriesTree = async () => {
   const topics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).lean();
   if (!topics.length) {
@@ -331,7 +523,7 @@ export const getStudentSeriesTree = async () => {
 
   const tests = chapterIds.length
     ? await Test.find({ chapterId: { $in: chapterIds }, status: "published" })
-        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid")
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit")
         .sort({ createdAt: -1 })
         .lean()
     : [];
