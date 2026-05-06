@@ -367,6 +367,8 @@ const Home = () => {
   const [articles, setArticles] = useState([]);
   const [news, setNews] = useState([]);
   const [cms, setCms] = useState(null);
+  // Drives the "Free Trial" → Explore Test Series modal.
+  const [trialModalOpen, setTrialModalOpen] = useState(false);
   const [seriesList, setSeriesList] = useState([]);
   const [plans, setPlans] = useState([]);
   const [_loadingPlans, setLoadingPlans] = useState(true);
@@ -496,22 +498,31 @@ const Home = () => {
     }
   };
 
-  const handleFreePlanActivation = async () => {
-    setProcessingPlan("FREE");
+  // "Get Started Free" / "Free Trial" — open the popup with the
+  // "Explore Test Series" CTA. Conversion happens in handleExploreTestSeries.
+  const handleFreePlanActivation = () => {
     setError("");
-    try {
-      const response = await activateFreeSubscription();
-      if (response.success) {
-        localStorage.setItem("subscriptionPlan", "FREE");
-        localStorage.setItem("subscriptionStatus", "FREE");
-        setSubscriptionStatus("FREE");
-        alert("✅ Welcome to PS Classes!\nFree plan activated.");
-        setTimeout(() => navigate("/student/dashboard"), 2000);
+    setTrialModalOpen(true);
+  };
+
+  // Modal CTA — logged-in students go straight to the test catalog;
+  // everyone else is sent to the login page.
+  const handleExploreTestSeries = async () => {
+    setTrialModalOpen(false);
+    if (isAuthenticated && userRole === "student") {
+      // Best-effort silent activation so paid checks treat them as a free user.
+      try {
+        const response = await activateFreeSubscription();
+        if (response?.success) {
+          localStorage.setItem("subscriptionStatus", "FREE");
+          setSubscriptionStatus("FREE");
+        }
+      } catch {
+        /* already on free or backend rejected — proceed regardless */
       }
-    } catch (err) {
-      setError(err.message || "Failed to activate plan");
-    } finally {
-      setProcessingPlan(null);
+      navigate("/student/tests");
+    } else {
+      navigate("/login");
     }
   };
 
@@ -1124,7 +1135,7 @@ const Home = () => {
                 processingPlan={processingPlan}
                 subscriptionStatus={subscriptionStatus}
                 onSubscribe={handleSubscribe}
-                onGetStarted={handleGetStarted}
+                onGetStarted={handleFreePlanActivation}
               />
             );
           })}
@@ -1241,6 +1252,47 @@ const Home = () => {
           </div>
         </div>
       </footer>
+
+      {/* Free-trial popup — fired from any "Get Started Free" CTA. */}
+      {trialModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-md px-4 animate-fade-in"
+          onClick={() => setTrialModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-3xl border border-white/10 bg-dark-200 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.6)] animate-fade-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setTrialModalOpen(false)}
+              aria-label="Close"
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:bg-white/5 hover:text-white"
+            >
+              ×
+            </button>
+
+            <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary">
+              <FaPlay size={20} />
+            </div>
+            <h3 className="text-2xl font-bold text-white">Try PS Classes free</h3>
+            <p className="mt-2 text-sm text-white/60">
+              Jump into our test series and attempt free mocks right now. Premium series unlock individually whenever you're ready.
+            </p>
+
+            <button
+              onClick={handleExploreTestSeries}
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl btn-gradient px-5 py-3 text-sm font-bold"
+            >
+              Explore Test Series
+              <FaArrowRight size={13} />
+            </button>
+
+            <p className="mt-3 text-center text-[11px] text-white/40">
+              {isAuthenticated ? "We'll take you to the test catalogue." : "We'll ask you to sign in first — it takes a few seconds."}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

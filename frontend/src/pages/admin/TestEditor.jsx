@@ -405,6 +405,32 @@ function DetailsTab({ form, onChange }) {
         </label>
       </div>
 
+      {/* Proctored toggle — duplicated from the Configuration tab so admins
+          can flip it without leaving the Details view. Both writes go to the
+          same `form.isProctored` state. */}
+      <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-dark-300 p-4 text-sm text-white/80 cursor-pointer hover:border-amber-400/30 transition-colors">
+        <input
+          type="checkbox"
+          className={`${fieldChk} mt-0.5`}
+          checked={Boolean(form.isProctored)}
+          onChange={(e) => onChange({ ...form, isProctored: e.target.checked })}
+        />
+        <div className="min-w-0">
+          <p className="font-semibold text-white inline-flex items-center gap-1.5">
+            Proctored Mode
+            {form.isProctored && (
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                ON
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-[11px] text-white/40">
+            Forces fullscreen, blocks copy/paste & right-click, and auto-submits on tab switches.
+            More options live in the <strong className="text-white/70">Configuration</strong> tab.
+          </p>
+        </div>
+      </label>
+
       {!form.isOpenTest && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <FieldLabel label="Starts At" hint="Earliest moment students can begin.">

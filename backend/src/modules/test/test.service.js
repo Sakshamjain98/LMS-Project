@@ -206,19 +206,21 @@ export const updateTest = async (testId, updateData, teacherId) => {
 export const saveTestConfig = async (testId, config, teacherId) => {
   const configData = config || {};
 
-  // Validate duration
   if (configData.duration && configData.duration <= 0) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Duration must be > 0");
   }
 
-  // Apply safe defaults
+  // Pass the full set of configuration fields through. The earlier version
+  // dropped `isProctored` (and a few others), so toggling Proctored Mode in the
+  // admin UI silently failed to persist. Map every flag the front-end sends.
   const updatePayload = {
     duration: configData.duration || 60,
     shuffleQuestions: configData.shuffleQuestions ?? false,
     shuffleOptions: configData.shuffleOptions ?? false,
-    showResults: configData.showResults ?? true,
-    allowRetake: configData.allowRetake ?? false,
-    negativeMarks: configData.negativeMarks ?? 0,
+    isProctored: Boolean(configData.isProctored),
+    showSolution: configData.showSolution !== false,
+    allowReview: configData.allowReview !== false,
+    negativeMarking: Math.max(0, Number(configData.negativeMarking) || 0),
   };
 
   return updateTest(testId, updatePayload, teacherId);

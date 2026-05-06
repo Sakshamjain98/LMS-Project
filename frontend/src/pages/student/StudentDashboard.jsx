@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   getStudentProfile,
   getMyAttempts,
-  
-} from "../../services/studentService"; // Update path if needed
+  getAvailableTests,
+} from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
   ChevronRight,
@@ -13,13 +13,21 @@ import {
   FileText,
   LayoutDashboard,
   LineChart,
-  Trophy
+  Trophy,
+  Layers,
+  Lock,
+  Sparkles,
+  ArrowRight,
+  ShieldAlert,
+  CheckCircle2,
+  PlayCircle,
 } from "lucide-react";
 
 export default function StudentDashboard() {
-  // const [dashboardData, setDashboardData] = useState(null);
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [attempts, setAttempts] = useState([]);
+  const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -27,24 +35,63 @@ export default function StudentDashboard() {
     const fetchAllData = async () => {
       try {
         setLoading(true);
-        const [profRes, attemptsRes] = await Promise.all([
+        const [profRes, attemptsRes, testsRes] = await Promise.all([
           getStudentProfile().catch(() => ({})),
-          getMyAttempts().catch(() => ({ data: [] }))
+          getMyAttempts().catch(() => ({ data: [] })),
+          getAvailableTests().catch(() => ({ topics: [] })),
         ]);
-
-        // setDashboardData(dashRes || {});
         setProfile(profRes.user || {});
         setAttempts(Array.isArray(attemptsRes.data) ? attemptsRes.data : []);
-      } catch (err) {
-        console.error("Dashboard error:", err);
+        setTopics(Array.isArray(testsRes.topics) ? testsRes.topics : []);
+      } catch {
         setError("Failed to load some dashboard components.");
       } finally {
         setLoading(false);
       }
     };
-
     fetchAllData();
   }, []);
+
+  const firstName = profile?.name?.trim()?.split(" ")?.[0] || "Student";
+  const greeting = getGreeting();
+
+  // Sort attempts newest-first for both "Continue" and "Recent" sections.
+  const sortedAttempts = useMemo(
+    () => [...attempts].sort((a, b) => {
+      const aTime = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+      const bTime = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+      return bTime - aTime;
+    }),
+    [attempts]
+  );
+
+  const completedTests = sortedAttempts.filter(
+    (a) => a.status === "submitted" || a.status === "evaluated"
+  ).length;
+  const ongoingTests = sortedAttempts.filter(
+    (a) => a.status !== "submitted" && a.status !== "evaluated"
+  ).length;
+  const averageScore = attempts.length > 0
+    ? (attempts.reduce((sum, a) => sum + Number(a.percentage || 0), 0) / attempts.length).toFixed(1)
+    : "0.0";
+
+  const continueTests = sortedAttempts.filter(
+    (a) => a.status !== "submitted" && a.status !== "evaluated"
+  ).slice(0, 6);
+  const recentTests = sortedAttempts.filter(
+    (a) => a.status === "submitted" || a.status === "evaluated"
+  ).slice(0, 6);
+
+  // Featured series — show free + unlocked series first, top 6.
+  const featuredSeries = useMemo(() => {
+    const list = [...topics];
+    list.sort((a, b) => {
+      const aOpen = !a.isPaid || a.isUnlocked ? 0 : 1;
+      const bOpen = !b.isPaid || b.isUnlocked ? 0 : 1;
+      return aOpen - bOpen;
+    });
+    return list.slice(0, 6);
+  }, [topics]);
 
   if (loading) {
     return (
@@ -53,51 +100,19 @@ export default function StudentDashboard() {
         <div className="flex min-h-screen items-center justify-center bg-dark-400">
           <div className="space-y-4 text-center">
             <div className="mx-auto h-12 w-12 rounded-full border-4 border-brand-primary border-t-transparent animate-spin" />
-            <p className="text-base font-semibold text-white">Loading your workspace...</p>
+            <p className="text-base font-semibold text-white">Loading your workspace…</p>
           </div>
         </div>
       </>
     );
   }
 
-  const firstName = profile?.name?.trim()?.split(" ")?.[0] || "Student";
-  const greeting = getGreeting();
-
-  // Metrics Calculations
-  const sortedAttempts = [...attempts].sort((a, b) => {
-    const aTime = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
-    const bTime = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
-
-  const completedTests = attempts.filter(
-    (a) => a.status === "submitted" || a.status === "evaluated"
-  ).length;
-  const ongoingTests = attempts.filter(
-    (a) => a.status !== "submitted" && a.status !== "evaluated"
-  ).length;
-  
-  const averageScore = attempts.length > 0
-    ? (attempts.reduce((sum, a) => sum + Number(a.percentage || 0), 0) / attempts.length).toFixed(1)
-    : "0.0";
-    
-  // Data Slicing
-  const continueTests = sortedAttempts.filter(
-    (a) => a.status !== "submitted" && a.status !== "evaluated"
-  );
-  const recentTests = sortedAttempts.filter(
-    (a) => a.status === "submitted" || a.status === "evaluated"
-  );
-  const displayContinueTests = (continueTests.length > 0 ? continueTests : sortedAttempts).slice(0, 6);
-  const displayTests = (recentTests.length > 0 ? recentTests : sortedAttempts).slice(0, 6);
-
   return (
     <>
       <StudentNavbar />
       <div className="min-h-screen bg-dark-400 pb-16 text-gray-200 selection:bg-brand-primary/30">
-        <div className="mx-auto flex max-w-400 flex-col gap-8 px-6 py-8 md:px-10 lg:py-10">
-          
-          {/* Error Banner */}
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 lg:py-10">
+
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-200">
               <CircleAlert size={20} className="mt-0.5 shrink-0 text-red-400" />
@@ -107,151 +122,86 @@ export default function StudentDashboard() {
 
           {/* Header */}
           <header className="flex flex-col gap-2">
-            <p className="text-base font-medium text-brand-primary uppercase tracking-wider">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold text-brand-primary uppercase tracking-widest">
+              <Sparkles size={14} />
               {greeting}
             </p>
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
               Welcome back, {firstName}
             </h1>
+            <p className="text-sm text-white/60">
+              Pick up where you left off, or start a new test from your enrolled series.
+            </p>
           </header>
 
           {/* Top Metrics Row */}
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard 
-              icon={<FileText size={24} />} 
-              label="Total Attempts" 
-              value={attempts.length} 
-            />
-            <MetricCard 
-              icon={<Trophy size={24} />} 
-              label="Completed Tests" 
-              value={completedTests} 
-            />
-            <MetricCard 
-              icon={<LayoutDashboard size={24} />} 
-              label="Ongoing Tests" 
-              value={ongoingTests} 
-            />
-            <MetricCard 
-              icon={<LineChart size={24} />} 
-              label="Average Score" 
-              value={`${averageScore}%`} 
-              isPercentage
-            />
+            <MetricCard icon={<FileText size={22} />} label="Total Attempts" value={attempts.length} />
+            <MetricCard icon={<Trophy size={22} />} label="Completed Tests" value={completedTests} />
+            <MetricCard icon={<LayoutDashboard size={22} />} label="Ongoing Tests" value={ongoingTests} />
+            <MetricCard icon={<LineChart size={22} />} label="Average Score" value={`${averageScore}%`} isPercentage />
           </div>
 
-          {/* Main Dashboard Layout */}
-          <div className="space-y-8">
+          {/* Featured Series — card grid */}
+          <DashboardSection
+            title="Your Test Series"
+            actionLabel="Browse all"
+            actionTo="/student/tests"
+          >
+            {featuredSeries.length === 0 ? (
+              <EmptyState title="No test series available yet" actionTo="/student/tests" actionLabel="Browse Catalog" />
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {featuredSeries.map((topic, idx) => (
+                  <SeriesCard
+                    key={topic._id}
+                    topic={topic}
+                    delay={idx * 50}
+                    onClick={() => navigate(`/student/tests/${topic._id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </DashboardSection>
+
+          {/* Continue Tests — card grid */}
+          {continueTests.length > 0 && (
             <DashboardSection
-              title="Continue Tests"
-              actionLabel="Explore more"
+              title="Continue where you left off"
+              actionLabel="My Results"
               actionTo="/student/tests"
             >
-              {displayContinueTests.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  {displayContinueTests.map((attempt) => (
-                    <div
-                      key={attempt._id}
-                      className="flex flex-col gap-4 rounded-xl border border-white/5 bg-dark-200 p-5 transition-colors hover:bg-dark-100 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-dark-100 text-brand-primary">
-                          <LayoutDashboard size={24} />
-                        </div>
-                        <div>
-                          <p className="text-base font-semibold text-white">
-                            {attempt.testId?.title || "Practice Assessment"}
-                          </p>
-                          <div className="mt-1 flex items-center gap-3 text-sm text-gray-400">
-                            <span className="flex items-center gap-1.5">
-                              <Clock size={14} /> {formatDuration(attempt.timeTaken)}
-                            </span>
-                            <span>•</span>
-                            <span>{formatDateLabel(attempt.updatedAt || attempt.createdAt)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Link
-                        to="/student/tests"
-                        className="inline-flex items-center justify-center rounded-lg bg-brand-primary/15 px-4 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/25 transition"
-                      >
-                        Continue Test
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No tests available to continue" actionTo="/student/tests" />
-              )}
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {continueTests.map((attempt, idx) => (
+                  <ContinueCard key={attempt._id} attempt={attempt} delay={idx * 50} />
+                ))}
+              </div>
             </DashboardSection>
+          )}
 
-            <DashboardSection
-              title="Recent Tests"
-              actionLabel="Explore more"
-              actionTo="/student/tests"
-            >
-              {displayTests.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  {displayTests.map((attempt) => {
-                    const score = Number(attempt?.percentage || 0);
-                    const isGood = score >= 70;
-                    const isAverage = score >= 40 && score < 70;
-
-                    return (
-                      <div
-                        key={attempt._id}
-                        className="flex flex-col gap-4 rounded-xl border border-white/5 bg-dark-200 p-5 transition-colors hover:bg-dark-100 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-dark-100 text-brand-primary">
-                            <FileText size={24} />
-                          </div>
-                          <div>
-                            <p className="text-base font-semibold text-white">
-                              {attempt.testId?.title || "Practice Assessment"}
-                            </p>
-                            <div className="mt-1 flex items-center gap-3 text-sm text-gray-400">
-                              <span className="flex items-center gap-1.5">
-                                <Clock size={14} /> {formatDuration(attempt.timeTaken)}
-                              </span>
-                              <span>•</span>
-                              <span>{formatDateLabel(attempt.updatedAt || attempt.createdAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-6 sm:justify-end">
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-white">{score.toFixed(1)}%</p>
-                            <p className="text-sm text-gray-500">Score</p>
-                          </div>
-                          <span className={`flex h-8 items-center justify-center rounded-md px-3 text-xs font-bold uppercase tracking-wider ${
-                            isGood ? "bg-emerald-500/10 text-emerald-400" :
-                            isAverage ? "bg-amber-500/10 text-amber-400" :
-                            "bg-red-500/10 text-red-400"
-                          }`}>
-                            {isGood ? "Passed" : isAverage ? "Average" : "Failed"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState title="No recent tests" actionTo="/student/tests" />
-              )}
-            </DashboardSection>
-          </div>
+          {/* Recent Tests — card grid */}
+          <DashboardSection
+            title="Recent Results"
+            actionLabel="See all"
+            actionTo="/student/tests"
+          >
+            {recentTests.length === 0 ? (
+              <EmptyState title="No recent test results" actionTo="/student/tests" actionLabel="Take a test" />
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {recentTests.map((attempt, idx) => (
+                  <RecentCard key={attempt._id} attempt={attempt} delay={idx * 50} />
+                ))}
+              </div>
+            )}
+          </DashboardSection>
         </div>
       </div>
     </>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* SUB-COMPONENTS                             */
-/* -------------------------------------------------------------------------- */
+/* ----------------------- Sub-components ------------------------------- */
 
 function DashboardSection({ title, actionLabel, actionTo, children }) {
   return (
@@ -274,17 +224,15 @@ function DashboardSection({ title, actionLabel, actionTo, children }) {
 }
 
 function MetricCard({ icon, label, value, isPercentage }) {
-  // Determine if value is negative (from your screenshot showing -25.0%)
-  const isNegative = String(value).includes('-');
-  
+  const isNegative = String(value).includes("-");
   return (
-    <div className="flex items-center gap-5 rounded-2xl border border-white/5 bg-dark-200 p-6 shadow-sm">
+    <div className="flex items-center gap-5 rounded-2xl border border-white/5 bg-dark-200 p-6 shadow-sm transition-colors hover:border-brand-primary/30">
       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
         {icon}
       </div>
       <div>
         <p className="text-sm font-medium text-gray-400">{label}</p>
-        <p className={`mt-1 text-3xl font-bold ${isPercentage && isNegative ? 'text-red-400' : 'text-white'}`}>
+        <p className={`mt-1 text-3xl font-bold ${isPercentage && isNegative ? "text-red-400" : "text-white"}`}>
           {value}
         </p>
       </div>
@@ -292,7 +240,163 @@ function MetricCard({ icon, label, value, isPercentage }) {
   );
 }
 
-function EmptyState({ title, actionTo }) {
+function SeriesCard({ topic, onClick, delay = 0 }) {
+  const stats = useMemo(() => {
+    let tests = 0;
+    let chapters = 0;
+    const subjects = topic.subjects?.length || 0;
+    topic.subjects?.forEach((s) => {
+      chapters += s.chapters?.length || 0;
+      s.chapters?.forEach((c) => { tests += c.tests?.length || 0; });
+    });
+    return { subjects, chapters, tests };
+  }, [topic]);
+
+  const locked = topic.isPaid && !topic.isUnlocked;
+
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${delay}ms` }}
+      className="group relative overflow-hidden text-left animate-fade-up rounded-2xl border border-white/5 bg-dark-200 p-5 transition-colors hover:border-brand-primary/40 hover:bg-dark-100/60 flex flex-col gap-3"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
+            <Layers size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Series</p>
+            <h3 className="text-base font-bold text-white line-clamp-1">{topic.title}</h3>
+          </div>
+        </div>
+        {topic.isPaid ? (
+          locked ? (
+            <span className="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
+              <Lock size={10} /> ₹{Number(topic.price || 0).toLocaleString()}
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+              Unlocked
+            </span>
+          )
+        ) : (
+          <span className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+            Free
+          </span>
+        )}
+      </div>
+
+      {topic.description && (
+        <p className="text-xs text-white/50 line-clamp-2">{topic.description}</p>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+        <StatMini label="Subjects" value={stats.subjects} />
+        <StatMini label="Chapters" value={stats.chapters} />
+        <StatMini label="Tests" value={stats.tests} accent />
+      </div>
+
+      <div className="mt-auto inline-flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold bg-brand-primary/10 text-brand-primary">
+        <span>{locked ? `Unlock for ₹${Number(topic.price || 0).toLocaleString()}` : "Open Series"}</span>
+        <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </button>
+  );
+}
+
+function ContinueCard({ attempt, delay = 0 }) {
+  return (
+    <Link
+      to="/student/tests"
+      style={{ animationDelay: `${delay}ms` }}
+      className="group animate-fade-up flex flex-col gap-3 rounded-2xl border border-white/5 bg-dark-200 p-5 transition-colors hover:border-brand-primary/40 hover:bg-dark-100/60"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
+          <PlayCircle size={20} />
+        </div>
+        <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+          In progress
+        </span>
+      </div>
+      <h3 className="text-base font-bold text-white line-clamp-2">
+        {attempt.testId?.title || "Practice Assessment"}
+      </h3>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-white/50">
+        <span className="inline-flex items-center gap-1.5">
+          <Clock size={12} /> {formatDuration(attempt.timeTaken)}
+        </span>
+        <span>•</span>
+        <span>{formatDateLabel(attempt.updatedAt || attempt.createdAt)}</span>
+      </div>
+      <div className="mt-auto inline-flex items-center justify-between rounded-xl bg-brand-primary/10 px-3 py-2 text-xs font-bold text-brand-primary">
+        <span>Continue Test</span>
+        <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </Link>
+  );
+}
+
+function RecentCard({ attempt, delay = 0 }) {
+  const score = Number(attempt?.percentage || 0);
+  const tier = score >= 70 ? "good" : score >= 40 ? "average" : "poor";
+  const tierStyles = {
+    good: { color: "text-emerald-400", bg: "bg-emerald-500/10", label: "Passed", icon: <CheckCircle2 size={12} /> },
+    average: { color: "text-amber-400", bg: "bg-amber-500/10", label: "Average", icon: <ShieldAlert size={12} /> },
+    poor: { color: "text-red-400", bg: "bg-red-500/10", label: "Below par", icon: <ShieldAlert size={12} /> },
+  }[tier];
+
+  return (
+    <div
+      style={{ animationDelay: `${delay}ms` }}
+      className="animate-fade-up flex flex-col gap-3 rounded-2xl border border-white/5 bg-dark-200 p-5 transition-colors hover:border-brand-primary/30"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-white">
+          <FileText size={20} />
+        </div>
+        <span className={`inline-flex items-center gap-1 rounded-full ${tierStyles.bg} px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${tierStyles.color}`}>
+          {tierStyles.icon}
+          {tierStyles.label}
+        </span>
+      </div>
+      <h3 className="text-base font-bold text-white line-clamp-2">
+        {attempt.testId?.title || "Practice Assessment"}
+      </h3>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-white/50">
+        <span className="inline-flex items-center gap-1.5">
+          <Clock size={12} /> {formatDuration(attempt.timeTaken)}
+        </span>
+        <span>•</span>
+        <span>{formatDateLabel(attempt.updatedAt || attempt.createdAt)}</span>
+      </div>
+      <div className="mt-auto flex items-end justify-between border-t border-white/5 pt-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Your Score</p>
+          <p className={`mt-1 text-2xl font-bold ${tierStyles.color}`}>{score.toFixed(1)}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Marks</p>
+          <p className="mt-1 text-sm font-bold text-white">
+            {attempt.marksObtained || 0}/{attempt.totalMarks || 0}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatMini({ label, value, accent }) {
+  return (
+    <div>
+      <p className={`text-base font-bold ${accent ? "text-brand-primary" : "text-white"}`}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+function EmptyState({ title, actionTo, actionLabel = "Browse Catalog" }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-dark-200/50 py-12 text-center">
       <div className="mb-3 rounded-full bg-dark-100 p-4 text-gray-500">
@@ -301,16 +405,14 @@ function EmptyState({ title, actionTo }) {
       <p className="text-base font-medium text-gray-300">{title}</p>
       {actionTo && (
         <Link to={actionTo} className="mt-4 rounded-lg bg-brand-primary/10 px-5 py-2 text-sm font-semibold text-brand-primary transition-colors hover:bg-brand-primary/20">
-          Browse Catalog
+          {actionLabel}
         </Link>
       )}
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* UTILS                                    */
-/* -------------------------------------------------------------------------- */
+/* ------------------------------- Utils -------------------------------- */
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -319,13 +421,14 @@ function getGreeting() {
   return "Good evening";
 }
 
-function formatDuration(minutes) {
-  const totalMinutes = Number(minutes || 0);
-  if (!totalMinutes) return "0m";
-  if (totalMinutes < 60) return `${totalMinutes}m`;
-  const hours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
-  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+function formatDuration(seconds) {
+  const total = Number(seconds || 0);
+  if (!total) return "0m";
+  const minutes = Math.round(total / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return remaining ? `${hours}h ${remaining}m` : `${hours}h`;
 }
 
 function formatDateLabel(dateValue) {

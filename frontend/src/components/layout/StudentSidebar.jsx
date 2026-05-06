@@ -1,16 +1,22 @@
 import { useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   User,
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Menu,
   ClipboardList,
   X,
+  Layers,
+  Folder,
+  FileText,
+  Lock,
 } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
+import { getAvailableTests } from "../../services/studentService";
 
 export default function StudentSidebar() {
   const [collapsed, setCollapsed] = useState(() => {
@@ -21,24 +27,33 @@ export default function StudentSidebar() {
   });
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [seriesTree, setSeriesTree] = useState([]);
+  const [seriesExpanded, setSeriesExpanded] = useState(true);
+  const [openTopic, setOpenTopic] = useState(null);
+  const [openSubject, setOpenSubject] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     localStorage.setItem("studentSidebarCollapsed", JSON.stringify(collapsed));
   }, [collapsed]);
+
+  // Pull the same hierarchy the student sees on /tests, so the sidebar can mirror
+  // the admin's drill-down nav. Refetch on route change so unlock state stays fresh.
+  useEffect(() => {
+    let active = true;
+    getAvailableTests()
+      .then((res) => { if (active) setSeriesTree(res?.topics || []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [location.pathname, location.search]);
 
   const handleLogout = () => {
     localStorage.clear();
     navigate("/login");
   };
 
-  const sidebarWidth = collapsed ? "w-20" : "w-64";
-
-  const navItems = [
-    { path: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/student/tests",     icon: ClipboardList,   label: "Test Series" },
-    { path: "/student/profile",   icon: User,            label: "Profile" },
-  ];
+  const sidebarWidth = collapsed ? "w-20" : "w-72";
 
   return (
     <>
@@ -77,26 +92,136 @@ export default function StudentSidebar() {
             </button>
           </div>
 
-          {/* Nav */}
-          <nav className="custom-scrollbar flex-1 space-y-1.5 px-3 py-6 overflow-y-auto">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-                    isActive
-                      ? "btn-gradient font-bold shadow-[0_6px_18px_rgba(0,186,124,0.3)]"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
-                  } ${collapsed ? "justify-center px-0" : ""}`
-                }
-                title={collapsed ? item.label : ""}
+          {/* Nav — scrolls only the tree section so the rest of the sidebar stays put. */}
+          <nav className="custom-scrollbar flex-1 min-w-0 space-y-1.5 px-3 py-3 overflow-y-auto">
+            <SidebarLink to="/student/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
+
+            {/* Test Series — collapsible hierarchy (mirrors the admin sidebar pattern) */}
+            <div className="mt-1 min-w-0">
+              <button
+                onClick={() => setSeriesExpanded((v) => !v)}
+                className={`group flex w-full items-center justify-between rounded-xl px-4 py-2.5 transition-colors ${
+                  location.pathname.startsWith("/student/tests")
+                    ? "bg-brand-primary/15 text-brand-primary"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                } ${collapsed ? "justify-center px-0" : ""}`}
+                title={collapsed ? "Test Series" : ""}
               >
-                <item.icon size={18} className="shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </NavLink>
-            ))}
+                <span className="flex items-center gap-3">
+                  <ClipboardList size={18} />
+                  {!collapsed && <span className="text-sm font-semibold">Test Series</span>}
+                </span>
+                {!collapsed && (
+                  <ChevronDown size={16} className={`transition-transform ${seriesExpanded ? "rotate-0" : "-rotate-90"}`} />
+                )}
+              </button>
+
+              {!collapsed && seriesExpanded && (
+                <div className="mt-1 space-y-0.5 pl-2 pr-1 min-w-0">
+                  <NavLink
+                    to="/student/tests"
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${
+                        isActive ? "bg-white/5 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+                      }`
+                    }
+                    end
+                  >
+                    <Layers size={13} className="text-brand-primary" />
+                    All Series
+                  </NavLink>
+
+                  {seriesTree.length === 0 ? (
+                    <p className="px-3 py-1.5 text-[11px] text-white/40">
+                      No series available yet.
+                    </p>
+                  ) : (
+                    seriesTree.map((topic) => {
+                      const locked = topic.isPaid && !topic.isUnlocked;
+                      return (
+                        <div key={topic._id} className="min-w-0">
+                          <div className="flex items-center min-w-0">
+                            <button
+                              onClick={() => setOpenTopic((v) => (v === topic._id ? null : topic._id))}
+                              className="shrink-0 rounded-md p-1 text-white/40 hover:text-white"
+                            >
+                              <ChevronRight size={12} className={`transition-transform ${openTopic === topic._id ? "rotate-90" : ""}`} />
+                            </button>
+                            <Link
+                              to={`/student/tests/${topic._id}`}
+                              onClick={() => setMobileOpen(false)}
+                              className="flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                            >
+                              <Layers size={12} className="text-brand-primary shrink-0" />
+                              <span className="truncate flex-1 min-w-0">{topic.title}</span>
+                              {locked ? (
+                                <Lock size={10} className="shrink-0 text-amber-400" />
+                              ) : (
+                                <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
+                                  {topic.subjects?.length || 0}
+                                </span>
+                              )}
+                            </Link>
+                          </div>
+
+                          {openTopic === topic._id && (
+                            <div className="mb-1 ml-5 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
+                              {(topic.subjects || []).map((subj) => (
+                                <div key={subj._id} className="min-w-0">
+                                  <div className="flex items-center min-w-0">
+                                    <button
+                                      onClick={() => setOpenSubject((v) => (v === subj._id ? null : subj._id))}
+                                      className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
+                                    >
+                                      <ChevronRight size={11} className={`transition-transform ${openSubject === subj._id ? "rotate-90" : ""}`} />
+                                    </button>
+                                    <Link
+                                      to={`/student/tests/${topic._id}?level=chapters&subjectId=${subj._id}`}
+                                      onClick={() => setMobileOpen(false)}
+                                      className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
+                                    >
+                                      <Folder size={11} className="text-sky-400 shrink-0" />
+                                      <span className="truncate flex-1 min-w-0">{subj.title}</span>
+                                    </Link>
+                                  </div>
+
+                                  {openSubject === subj._id && (
+                                    <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
+                                      {(subj.chapters || []).map((ch) => (
+                                        <Link
+                                          key={ch._id}
+                                          to={`/student/tests/${topic._id}?level=tests&subjectId=${subj._id}&chapterId=${ch._id}`}
+                                          onClick={() => setMobileOpen(false)}
+                                          className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
+                                        >
+                                          <FileText size={10} className="text-amber-400 shrink-0" />
+                                          <span className="truncate flex-1 min-w-0">{ch.title}</span>
+                                          <span className="ml-auto shrink-0 text-[9px] text-white/30">{ch.tests?.length || 0}</span>
+                                        </Link>
+                                      ))}
+                                      {(subj.chapters || []).length === 0 && (
+                                        <p className="px-2 py-1 text-[10px] text-white/30">No chapters</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {(topic.subjects || []).length === 0 && (
+                                <p className="px-2 py-1 text-[10px] text-white/30">No subjects</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="my-2 h-px bg-white/5" />
+            <SidebarLink to="/student/profile" icon={User} label="Profile" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           </nav>
         </div>
 
@@ -120,5 +245,25 @@ export default function StudentSidebar() {
         <Menu size={22} />
       </button>
     </>
+  );
+}
+
+function SidebarLink({ to, icon: Icon, label, collapsed, onClick }) {
+  return (
+    <NavLink
+      to={to}
+      onClick={onClick}
+      className={({ isActive }) =>
+        `group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+          isActive
+            ? "btn-gradient font-bold shadow-[0_6px_18px_rgba(0,186,124,0.3)]"
+            : "text-white/60 hover:bg-white/5 hover:text-white"
+        } ${collapsed ? "justify-center px-0" : ""}`
+      }
+      title={collapsed ? label : ""}
+    >
+      <Icon size={18} className="shrink-0" />
+      {!collapsed && <span>{label}</span>}
+    </NavLink>
   );
 }
