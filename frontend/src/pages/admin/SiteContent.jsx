@@ -10,6 +10,7 @@ import {
   updateAdminSiteContent,
   uploadSiteImage,
 } from "../../services/adminService";
+import { motion } from "framer-motion";
 import { normalizeYouTubeUrl } from "../../utils/youtube";
 
 // Empty scaffold used when the API can't be reached — admin can still author

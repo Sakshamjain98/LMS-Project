@@ -54,12 +54,12 @@ const Navbar = () => {
   const navLinks = [
     { name: "Home", id: "home" },
     { name: "About", id: "about" },
+    { name: "Features", id: "why-us" },
     { name: "Test Series", id: "test-series" },
-    { name: "Features", id: "features" },
-    { name: "News", id: "news" },
     { name: "Articles", id: "blog" },
+    { name: "News", id: "news" },
     { name: "Testimonials", id: "testimonials" },
-    { name: "Pricing", id: "pricing" },
+    // { name: "Pricing", id: "pricing" },
   ];
 
   const handleNavClick = (e, id) => {
