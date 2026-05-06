@@ -4,6 +4,7 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { Loader2, Save, ArrowLeft, Eye } from "lucide-react";
 import toast from "react-hot-toast";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import { createBlog, updateBlog, getBlogById } from "../../services/adminService";
 

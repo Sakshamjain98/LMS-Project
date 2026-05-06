@@ -11,7 +11,6 @@ import {
   Loader2,
   CheckCircle2,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import {
   getTeacherTestById,
   updateTeacherTest,
@@ -283,10 +282,7 @@ export default function TestEditor() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="space-y-6 min-w-0"
-    >
+    <div className="space-y-6 min-w-0 animate-fade-up">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3 min-w-0">
@@ -351,7 +347,7 @@ export default function TestEditor() {
           />
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -449,9 +445,11 @@ function DetailsTab({ form, onChange }) {
   );
 }
 
-function ConfigTab({ form, onChange }) {
-  if (!form) return null;
-  const Toggle = ({ id, value, onToggle, label, hint }) => (
+// Hoisted out of ConfigTab so it isn't re-created on every render — that
+// caused react-hooks/static-components ESLint errors and reset its DOM state
+// each keystroke.
+function ConfigToggle({ id, value, onToggle, label, hint }) {
+  return (
     <label htmlFor={id} className="flex items-start gap-3 rounded-xl border border-white/10 bg-dark-300 p-4 cursor-pointer hover:border-white/20 transition-colors">
       <input
         id={id}
@@ -466,6 +464,10 @@ function ConfigTab({ form, onChange }) {
       </div>
     </label>
   );
+}
+
+function ConfigTab({ form, onChange }) {
+  if (!form) return null;
   return (
     <div className="rounded-2xl glass-card p-5 md:p-6 space-y-5">
       <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
@@ -473,35 +475,35 @@ function ConfigTab({ form, onChange }) {
       </h3>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Toggle
+        <ConfigToggle
           id="cfg-shuffleQ"
           value={form.shuffleQuestions}
           onToggle={(v) => onChange({ ...form, shuffleQuestions: v })}
           label="Shuffle Questions"
           hint="Each student sees the questions in a different order."
         />
-        <Toggle
+        <ConfigToggle
           id="cfg-shuffleO"
           value={form.shuffleOptions}
           onToggle={(v) => onChange({ ...form, shuffleOptions: v })}
           label="Shuffle Options"
           hint="The four options of every MCQ are randomly ordered per attempt."
         />
-        <Toggle
+        <ConfigToggle
           id="cfg-proctored"
           value={form.isProctored}
           onToggle={(v) => onChange({ ...form, isProctored: v })}
           label="Proctored Mode"
           hint="Forces fullscreen, blocks copy/paste, detects tab-switches."
         />
-        <Toggle
+        <ConfigToggle
           id="cfg-showSol"
           value={form.showSolution}
           onToggle={(v) => onChange({ ...form, showSolution: v })}
           label="Show Solutions After Submit"
           hint="Reveal correct answers and explanations on the result page."
         />
-        <Toggle
+        <ConfigToggle
           id="cfg-review"
           value={form.allowReview}
           onToggle={(v) => onChange({ ...form, allowReview: v })}

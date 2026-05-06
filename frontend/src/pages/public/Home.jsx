@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
 import {
@@ -12,6 +13,7 @@ import {
   getPublicSiteContent,
   getPublicTestSeries,
 } from "../../services/studentService";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import {
   FaArrowRight,
@@ -33,7 +35,7 @@ import {
   FaHeadset,
   FaMedal,
 } from "react-icons/fa";
-import { normalizeYouTubeUrl } from "../admin/SiteContent";
+import { normalizeYouTubeUrl } from "../../utils/youtube";
 
 /* ─────────────────────────────────────────────────────────────
    Reusable primitives
@@ -487,6 +489,31 @@ const Home = () => {
     syncSubscription();
   }, [isAuthenticated, userRole]);
 
+  /* Auto-open the trial popup for anonymous visitors. We use a short
+     cooldown (1 hour, per browser session) so the popup fires reliably on
+     first visit but doesn't pester someone who refreshes every 30 seconds. */
+  useEffect(() => {
+    if (isAuthenticated) return;
+    const COOLDOWN_KEY = "trialPopupShownAt";
+    const COOLDOWN_MS = 60 * 60 * 1000; // 1h
+    let last = 0;
+    try { last = Number(localStorage.getItem(COOLDOWN_KEY) || 0); } catch { /* ignore */ }
+    if (Date.now() - last < COOLDOWN_MS) return;
+    const timer = setTimeout(() => {
+      setTrialModalOpen(true);
+      try { localStorage.setItem(COOLDOWN_KEY, String(Date.now())); } catch { /* ignore */ }
+    }, 1500); // short delay so the page can paint, then we nudge
+    return () => clearTimeout(timer);
+  }, [isAuthenticated]);
+
+  /* Listen for the navbar's Free Trial click. The Navbar dispatches a
+     `ps:open-trial-modal` event so it doesn't need to share state with us. */
+  useEffect(() => {
+    const handler = () => setTrialModalOpen(true);
+    window.addEventListener("ps:open-trial-modal", handler);
+    return () => window.removeEventListener("ps:open-trial-modal", handler);
+  }, []);
+
   /* ── Handlers ── */
 
   const handleGetStarted = () => {
@@ -623,7 +650,16 @@ const Home = () => {
 
   /* ── Derived data ── */
 
-  const pricingPlans = plans.length > 0 ? plans : FALLBACK_PLANS;
+  // The backend's `/payment/plans` filters out the FREE plan, so we re-attach
+  // it to the front of the list. Without this, the "Get Started Free" CTA
+  // never renders when the API is reachable, and the trial popup has no entry
+  // point in the pricing grid.
+  const FREE_PLAN_FALLBACK = FALLBACK_PLANS.find((p) => p.id === "FREE");
+  const pricingPlans = (() => {
+    if (plans.length === 0) return FALLBACK_PLANS;
+    const hasFree = plans.some((p) => p.id === "FREE" || p.price === 0 || p.price === "Free");
+    return hasFree ? plans : [FREE_PLAN_FALLBACK, ...plans];
+  })();
 
   return (
     <div className="bg-dark-400 text-white overflow-hidden">
@@ -679,7 +715,8 @@ const Home = () => {
               </p>
             </motion.div>
 
-            {/* CTA row */}
+            {/* CTA row — Free Trial CTA lives in the navbar; here we only keep
+                the primary login/get-started action and a jump to test series. */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={handleGetStarted}
@@ -1160,10 +1197,10 @@ const Home = () => {
           </div>
 
           <button
-            onClick={handleGetStarted}
+            onClick={isAuthenticated ? handleGetStarted : handleFreePlanActivation}
             className="inline-flex items-center gap-2.5 px-9 py-4 btn-gradient rounded-lg font-bold text-base hover:opacity-90 transition group"
           >
-            Start Learning Today
+            {isAuthenticated ? "Start Learning Today" : "Start Free Trial"}
             <FaArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </button>
 
@@ -1253,10 +1290,14 @@ const Home = () => {
         </div>
       </footer>
 
-      {/* Free-trial popup — fired from any "Get Started Free" CTA. */}
-      {trialModalOpen && (
+      {/* Free-trial popup — rendered through a portal so it escapes any parent
+          stacking context (overflow-hidden, transform, etc.) on Home. */}
+      {trialModalOpen && createPortal(
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-md px-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trial-modal-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md px-4"
           onClick={() => setTrialModalOpen(false)}
         >
           <div
@@ -1274,7 +1315,7 @@ const Home = () => {
             <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary">
               <FaPlay size={20} />
             </div>
-            <h3 className="text-2xl font-bold text-white">Try PS Classes free</h3>
+            <h3 id="trial-modal-title" className="text-2xl font-bold text-white">Try PS Classes free</h3>
             <p className="mt-2 text-sm text-white/60">
               Jump into our test series and attempt free mocks right now. Premium series unlock individually whenever you're ready.
             </p>
@@ -1291,7 +1332,8 @@ const Home = () => {
               {isAuthenticated ? "We'll take you to the test catalogue." : "We'll ask you to sign in first — it takes a few seconds."}
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

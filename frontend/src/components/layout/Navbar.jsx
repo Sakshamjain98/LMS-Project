@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaBars, FaTimes } from "react-icons/fa";
+import { FaBars, FaTimes, FaPlay } from "react-icons/fa";
 import { Zap, LogOut, LayoutDashboard } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
 import { getStudentSubscription } from "../../services/studentService";
+
+// Cross-component event used by Home.jsx to open the trial popup. Defined here
+// so the navbar (which doesn't share state with Home) can fire it.
+const OPEN_TRIAL_MODAL_EVENT = "ps:open-trial-modal";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -96,6 +100,19 @@ const Navbar = () => {
     localStorage.removeItem("userRole");
     localStorage.removeItem("subscriptionStatus");
     navigate("/login");
+  };
+
+  // Free Trial CTA — opens the trial popup on Home.jsx via a window event so
+  // we don't have to lift modal state across the component tree. If we're on
+  // any other route, jump to "/" first; the popup will follow on next paint.
+  const handleFreeTrialClick = () => {
+    setIsOpen(false);
+    if (!isHomePage) {
+      navigate("/");
+      setTimeout(() => window.dispatchEvent(new Event(OPEN_TRIAL_MODAL_EVENT)), 80);
+    } else {
+      window.dispatchEvent(new Event(OPEN_TRIAL_MODAL_EVENT));
+    }
   };
 
   useEffect(() => {
@@ -224,12 +241,21 @@ const Navbar = () => {
                 Logout
               </button>
             ) : (
-              <Link
-                to="/login"
-                className="px-6 py-2.5 btn-gradient rounded-lg text-base font-bold hover:opacity-90 transition"
-              >
-                Login
-              </Link>
+              <>
+                <button
+                  onClick={handleFreeTrialClick}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold border border-brand-primary/40 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition"
+                >
+                  <FaPlay size={11} />
+                  Free Trial
+                </button>
+                <Link
+                  to="/login"
+                  className="px-6 py-2.5 btn-gradient rounded-lg text-base font-bold hover:opacity-90 transition"
+                >
+                  Login
+                </Link>
+              </>
             )}
           </div>
 
@@ -303,13 +329,22 @@ const Navbar = () => {
               </button>
             </>
           ) : (
-            <Link
-              to="/login"
-              onClick={() => setIsOpen(false)}
-              className="block w-full text-center px-4 py-2.5 btn-gradient rounded-lg font-bold"
-            >
-              Login
-            </Link>
+            <>
+              <button
+                onClick={handleFreeTrialClick}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-bold border border-brand-primary/40 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition"
+              >
+                <FaPlay size={11} />
+                Free Trial
+              </button>
+              <Link
+                to="/login"
+                onClick={() => setIsOpen(false)}
+                className="block w-full text-center px-4 py-2.5 btn-gradient rounded-lg font-bold"
+              >
+                Login
+              </Link>
+            </>
           )}
         </div>
       </div>
