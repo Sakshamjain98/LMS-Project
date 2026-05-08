@@ -10,6 +10,7 @@ import {
   updateAdminSiteContent,
   uploadSiteImage,
 } from "../../services/adminService";
+import { motion as Motion } from "framer-motion";
 import { normalizeYouTubeUrl } from "../../utils/youtube";
 
 // Empty scaffold used when the API can't be reached — admin can still author
@@ -149,7 +150,7 @@ export default function SiteContent() {
   return (
     <div className="space-y-6">
       {offlineBanner}
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="rounded-3xl glass-panel ambient-glow p-7 md:p-8 relative overflow-hidden"
       >
@@ -173,7 +174,7 @@ export default function SiteContent() {
             {saving ? "Saving…" : "Save All Changes"}
           </button>
         </div>
-      </motion.div>
+      </Motion.div>
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 rounded-2xl glass-card p-1.5">
@@ -195,7 +196,7 @@ export default function SiteContent() {
       </div>
 
       {/* Body */}
-      <motion.div
+      <Motion.div
         key={tab}
         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
         className="rounded-2xl glass-card p-6"
@@ -210,7 +211,7 @@ export default function SiteContent() {
         {tab === "studentReviews"      && <ListEditor list={content.studentReviews || []}   onChange={(fn) => setList("studentReviews", fn)}       schema={studentReviewsSchema} title="Student review bento (with image)" />}
         {tab === "faq"                 && <ListEditor list={content.faq}                    onChange={(fn) => setList("faq", fn)}                  schema={faqSchema}           title="FAQ entries" />}
         {tab === "footer"              && <FooterForm  value={content.footer} onChange={(v) => set("footer", v)} />}
-      </motion.div>
+      </Motion.div>
     </div>
   );
 }
