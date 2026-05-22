@@ -213,6 +213,19 @@ export const getAvailableTests = asyncHandler(async (req, res) => {
   // Full hierarchy for the new category/exam browse flow
   const categories = await testSeriesService.getFullHierarchyTree({ publishedOnly: true });
 
+  const flatAitsSections = categories.flatMap((cat) =>
+    (cat.exams || []).flatMap((exam) =>
+      (exam.allIndiaTestSeries || []).map((aits) => ({
+        ...aits,
+        type: "aits",
+        examId: exam._id,
+        subjects: [],
+        tests: aits.tests || [],
+        isUnlocked: !aits.isPaid || subActive,
+      }))
+    )
+  );
+
   // Annotate isUnlocked on testSeries topics within the hierarchy
   const unlockedSetCopy = unlockedSet;
   const annotateTopicsInHierarchy = (cat) => ({
@@ -228,7 +241,7 @@ export const getAvailableTests = asyncHandler(async (req, res) => {
 
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
-    topics: annotatedTopics,
+    topics: [...annotatedTopics, ...flatAitsSections],
     categories: categories.map(annotateTopicsInHierarchy),
   });
 });

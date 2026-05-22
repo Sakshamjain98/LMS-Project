@@ -1,7 +1,6 @@
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import * as service from "./aits.service.js";
-import * as testService from "../test/test.service.js";
 
 export const getByExam = asyncHandler(async (req, res) => {
   const teacherId = req.user.role === "admin" ? null : req.user._id;
@@ -25,9 +24,6 @@ export const remove = asyncHandler(async (req, res) => {
 });
 
 export const createTest = asyncHandler(async (req, res) => {
-  const test = await testService.createTest(
-    { ...req.body, aitsId: req.params.aitsId, type: "aits" },
-    req.user._id
-  );
+  const test = await service.createAITSTest(req.params.aitsId, req.body, req.user._id);
   res.status(STATUS_CODES.CREATED).json({ success: true, message: "AITS test created", test });
 });

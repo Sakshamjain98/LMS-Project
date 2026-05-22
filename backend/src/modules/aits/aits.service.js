@@ -21,6 +21,11 @@ const normalizeTitle = (value, label) => {
   return t.slice(0, 120);
 };
 
+const normalizeNumber = (value, fallback = 0) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+};
+
 const cascadeDeleteTests = async (testIds = []) => {
   if (!testIds.length) return;
   await Promise.all([
@@ -133,8 +138,30 @@ export const createAITSTest = async (aitsId, payload, teacherId) => {
   }).lean();
   if (!aits) throw new ApiError(STATUS_CODES.NOT_FOUND, "AITS not found");
 
+  if (!payload?.title || payload.title.toString().trim().length < 3) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Title must be at least 3 characters");
+  }
+
+  if (payload?.duration !== undefined && Number(payload.duration) <= 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Duration must be greater than 0");
+  }
+
   return Test.create({
-    ...payload,
+    title: payload.title.toString().trim().slice(0, 100),
+    description: (payload.description || "").toString().trim().slice(0, 500),
+    duration: normalizeNumber(payload.duration, 60),
+    passingMarks: normalizeNumber(payload.passingMarks, 0),
+    startTime: payload.startTime || undefined,
+    endTime: payload.endTime || undefined,
+    instructions: (payload.instructions || "").toString().trim().slice(0, 1000),
+    attemptLimit: Number.isFinite(Number(payload.attemptLimit)) ? Math.max(Number(payload.attemptLimit), 0) : 0,
+    isProctored: payload.isProctored ?? false,
+    isPaid: payload.isPaid ?? false,
+    shuffleQuestions: Boolean(payload.shuffleQuestions),
+    shuffleOptions: Boolean(payload.shuffleOptions),
+    showSolution: payload.showSolution !== false,
+    allowReview: payload.allowReview !== false,
+    negativeMarking: Math.max(0, Number(payload.negativeMarking) || 0),
     aitsId: objAitsId,
     teacherId: objTeacherId,
     type: "aits",

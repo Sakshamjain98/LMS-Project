@@ -13,7 +13,7 @@ import {
   Layers,
   Folder,
   FileText,
-  Lock,
+  Tag,
 } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
 import { getAvailableTests } from "../../services/studentService";
@@ -27,10 +27,10 @@ export default function StudentSidebar() {
   });
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [seriesTree, setSeriesTree] = useState([]);
+  const [categoryTree, setCategoryTree] = useState([]);
   const [seriesExpanded, setSeriesExpanded] = useState(true);
-  const [openTopic, setOpenTopic] = useState(null);
-  const [openSubject, setOpenSubject] = useState(null);
+  const [openCategory, setOpenCategory] = useState(null);
+  const [openExam, setOpenExam] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -43,7 +43,7 @@ export default function StudentSidebar() {
   useEffect(() => {
     let active = true;
     getAvailableTests()
-      .then((res) => { if (active) setSeriesTree(res?.topics || []); })
+      .then((res) => { if (active) setCategoryTree(res?.categories || []); })
       .catch(() => {});
     return () => { active = false; };
   }, [location.pathname, location.search]);
@@ -71,7 +71,7 @@ export default function StudentSidebar() {
 
         <div className="relative flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/5 p-4 min-h-[72px]">
+          <div className="flex items-center justify-between border-b border-white/5 p-4 min-h-18">
             <button onClick={() => navigate("/")} className="flex items-center gap-2.5 hover:opacity-80 transition">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden shadow-[0_8px_24px_rgba(0,186,124,0.25)]">
                 <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
@@ -132,83 +132,83 @@ export default function StudentSidebar() {
                     All Series
                   </NavLink>
 
-                  {seriesTree.length === 0 ? (
+                  {categoryTree.length === 0 ? (
                     <p className="px-3 py-1.5 text-[11px] text-white/40">
                       No series available yet.
                     </p>
                   ) : (
-                    seriesTree.map((topic) => {
-                      const locked = topic.isPaid && !topic.isUnlocked;
+                    categoryTree.map((category) => {
+                      const categoryOpen = openCategory === category._id;
                       return (
-                        <div key={topic._id} className="min-w-0">
+                        <div key={category._id} className="min-w-0">
                           <div className="flex items-center min-w-0">
                             <button
-                              onClick={() => setOpenTopic((v) => (v === topic._id ? null : topic._id))}
+                              onClick={() => setOpenCategory((v) => (v === category._id ? null : category._id))}
                               className="shrink-0 rounded-md p-1 text-white/40 hover:text-white"
                             >
-                              <ChevronRight size={12} className={`transition-transform ${openTopic === topic._id ? "rotate-90" : ""}`} />
+                              <ChevronRight size={12} className={`transition-transform ${categoryOpen ? "rotate-90" : ""}`} />
                             </button>
-                            <Link
-                              to={`/student/tests/${topic._id}`}
-                              onClick={() => setMobileOpen(false)}
+                            <button
+                              onClick={() => setOpenCategory((v) => (v === category._id ? null : category._id))}
                               className="flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/70 hover:bg-white/5 hover:text-white"
                             >
-                              <Layers size={12} className="text-brand-primary shrink-0" />
-                              <span className="truncate flex-1 min-w-0">{topic.title}</span>
-                              {locked ? (
-                                <Lock size={10} className="shrink-0 text-amber-400" />
-                              ) : (
-                                <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
-                                  {topic.subjects?.length || 0}
-                                </span>
-                              )}
-                            </Link>
+                              <Tag size={12} className="text-brand-primary shrink-0" />
+                              <span className="truncate flex-1 min-w-0">{category.title}</span>
+                              <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
+                                {category.exams?.length || 0}
+                              </span>
+                            </button>
                           </div>
 
-                          {openTopic === topic._id && (
+                          {categoryOpen && (
                             <div className="mb-1 ml-5 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
-                              {(topic.subjects || []).map((subj) => (
-                                <div key={subj._id} className="min-w-0">
+                              {(category.exams || []).map((exam) => {
+                                const examOpen = openExam === exam._id;
+                                return (
+                                <div key={exam._id} className="min-w-0">
                                   <div className="flex items-center min-w-0">
                                     <button
-                                      onClick={() => setOpenSubject((v) => (v === subj._id ? null : subj._id))}
+                                      onClick={() => setOpenExam((v) => (v === exam._id ? null : exam._id))}
                                       className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
                                     >
-                                      <ChevronRight size={11} className={`transition-transform ${openSubject === subj._id ? "rotate-90" : ""}`} />
+                                      <ChevronRight size={11} className={`transition-transform ${examOpen ? "rotate-90" : ""}`} />
                                     </button>
-                                    <Link
-                                      to={`/student/tests/${topic._id}?level=chapters&subjectId=${subj._id}`}
-                                      onClick={() => setMobileOpen(false)}
+                                    <button
+                                      onClick={() => setOpenExam((v) => (v === exam._id ? null : exam._id))}
                                       className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
                                     >
                                       <Folder size={11} className="text-sky-400 shrink-0" />
-                                      <span className="truncate flex-1 min-w-0">{subj.title}</span>
-                                    </Link>
+                                      <span className="truncate flex-1 min-w-0">{exam.title}</span>
+                                      <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/35">
+                                        {exam.testSeries?.length || 0}
+                                      </span>
+                                    </button>
                                   </div>
 
-                                  {openSubject === subj._id && (
+                                  {examOpen && (
                                     <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
-                                      {(subj.chapters || []).map((ch) => (
+                                      {(exam.testSeries || []).map((series) => (
                                         <Link
-                                          key={ch._id}
-                                          to={`/student/tests/${topic._id}?level=tests&subjectId=${subj._id}&chapterId=${ch._id}`}
+                                          key={series._id}
+                                          to={`/student/tests/${series._id}`}
                                           onClick={() => setMobileOpen(false)}
                                           className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
                                         >
                                           <FileText size={10} className="text-amber-400 shrink-0" />
-                                          <span className="truncate flex-1 min-w-0">{ch.title}</span>
-                                          <span className="ml-auto shrink-0 text-[9px] text-white/30">{ch.tests?.length || 0}</span>
+                                          <span className="truncate flex-1 min-w-0">{series.title}</span>
+                                          <span className="ml-auto shrink-0 text-[9px] text-white/30">{series.tests?.length || 0}</span>
                                         </Link>
                                       ))}
-                                      {(subj.chapters || []).length === 0 && (
-                                        <p className="px-2 py-1 text-[10px] text-white/30">No chapters</p>
+                                      {(exam.testSeries || []).length === 0 && (
+                                        <p className="px-2 py-1 text-[10px] text-white/30">No test series</p>
                                       )}
                                     </div>
                                   )}
                                 </div>
-                              ))}
-                              {(topic.subjects || []).length === 0 && (
-                                <p className="px-2 py-1 text-[10px] text-white/30">No subjects</p>
+                                );
+                              })}
+                              {(category.exams || []).length === 0 && (
+                                <p className="px-2 py-1 text-[10px] text-white/30">No exams</p>
                               )}
                             </div>
                           )}

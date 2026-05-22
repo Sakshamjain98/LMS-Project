@@ -101,7 +101,10 @@ export default function StudentDashboard() {
     [currentCategory, selectedExamId]
   );
   const seriesForExam = useMemo(
-    () => (currentExam?.testSeries || []).slice(0, 6),
+    () => [
+      ...(currentExam?.testSeries || []),
+      ...(currentExam?.allIndiaTestSeries || []),
+    ].slice(0, 6),
     [currentExam]
   );
 
@@ -207,7 +210,7 @@ export default function StudentDashboard() {
                               <GraduationCap size={18} />
                             </div>
                             <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
-                              {exam.testSeries?.length || 0} series
+                              {(exam.testSeries?.length || 0) + (exam.allIndiaTestSeries?.length || 0)} series
                             </span>
                           </div>
                           <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
@@ -245,7 +248,7 @@ export default function StudentDashboard() {
                             key={topic._id}
                             topic={topic}
                             delay={idx * 50}
-                            onClick={() => navigate(`/student/tests/${topic._id}`)}
+                            onClick={() => navigate(Array.isArray(topic.tests) && !topic.subjects?.length ? "/student/tests" : `/student/tests/${topic._id}`)}
                           />
                         ))}
                       </div>
@@ -334,14 +337,30 @@ function MetricCard({ icon, label, value, isPercentage }) {
 
 function SeriesCard({ topic, onClick, delay = 0 }) {
   const stats = useMemo(() => {
+    const flatTests = Array.isArray(topic.tests) ? topic.tests : [];
+    const isAITS = topic.type === "aits" || flatTests.length > 0 && !topic.subjects?.length;
+
+    if (isAITS) {
+      const practice = flatTests.filter((test) => test.type !== "pyq").length;
+      const pyq = flatTests.filter((test) => test.type === "pyq").length;
+      return { subjects: 0, chapters: 0, tests: flatTests.length, practice, pyq, isAITS: true };
+    }
+
     let tests = 0;
+    let practice = 0;
+    let pyq = 0;
     let chapters = 0;
     const subjects = topic.subjects?.length || 0;
     topic.subjects?.forEach((s) => {
       chapters += s.chapters?.length || 0;
-      s.chapters?.forEach((c) => { tests += c.tests?.length || 0; });
+      s.chapters?.forEach((c) => {
+        const chapterTests = c.tests || [];
+        tests += chapterTests.length;
+        practice += chapterTests.filter((test) => test.type !== "pyq").length;
+        pyq += chapterTests.filter((test) => test.type === "pyq").length;
+      });
     });
-    return { subjects, chapters, tests };
+    return { subjects, chapters, tests, practice, pyq, isAITS: false };
   }, [topic]);
 
   const locked = topic.isPaid && !topic.isUnlocked;
@@ -386,8 +405,20 @@ function SeriesCard({ topic, onClick, delay = 0 }) {
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
         <StatMini label="Subjects" value={stats.subjects} />
         <StatMini label="Chapters" value={stats.chapters} />
-        <StatMini label="Tests" value={stats.tests} accent />
+        <StatMini label={stats.isAITS ? "Tests" : stats.pyq > 0 ? "Practice / PYQ" : "Tests"} value={stats.isAITS ? stats.tests : stats.pyq > 0 ? `${stats.practice} / ${stats.pyq}` : stats.tests} accent />
       </div>
+
+      {!stats.isAITS && stats.pyq > 0 && (
+        <div className="text-[11px] text-white/40">
+          {stats.practice} practice · {stats.pyq} PYQ
+        </div>
+      )}
+
+      {stats.isAITS && (
+        <div className="text-[11px] font-bold uppercase tracking-wider text-purple-300">
+          AITS Section
+        </div>
+      )}
 
       <div className="mt-auto inline-flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold bg-brand-primary/10 text-brand-primary">
         <span>{locked ? `Unlock for ₹${Number(topic.price || 0).toLocaleString()}` : "Open Series"}</span>
