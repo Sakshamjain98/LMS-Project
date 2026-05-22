@@ -83,15 +83,15 @@ export default function StudentSidebar() {
       )}
 
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 flex flex-col overflow-clip transition-all duration-300 z-30 shrink-0 ${
+        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 grid grid-rows-[auto_1fr_auto] transition-all duration-300 z-30 shrink-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Ambient glow */}
+        {/* Ambient glow — clipped by the viewport, not the aside */}
         <div className="pointer-events-none absolute -top-16 -left-12 h-40 w-40 rounded-full bg-brand-primary/20 blur-3xl" />
 
-        {/* Header */}
-        <div className="relative shrink-0 flex items-center justify-between border-b border-white/5 p-4">
+        {/* Header — row 1 (auto height) */}
+        <div className="relative flex items-center justify-between border-b border-white/5 p-4">
           <button onClick={() => navigate("/")} className="flex items-center gap-2.5 hover:opacity-80 transition">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden shadow-[0_8px_24px_rgba(0,186,124,0.25)]">
               <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
@@ -112,8 +112,8 @@ export default function StudentSidebar() {
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="custom-scrollbar relative flex-1 min-h-0 min-w-0 space-y-1.5 px-3 py-3 overflow-y-auto">
+        {/* Nav — row 2 (1fr = fills all remaining space); overflow-y-auto enables scroll */}
+        <nav className="custom-scrollbar min-h-0 overflow-y-auto space-y-1.5 px-3 py-3">
           <SidebarLink to="/student/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
 
           {/* Test Series — collapsible hierarchy */}
@@ -303,8 +303,8 @@ export default function StudentSidebar() {
           <SidebarLink to="/student/profile" icon={User} label="Profile" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
         </nav>
 
-        {/* Logout */}
-        <div className="relative shrink-0 border-t border-white/5 p-3">
+        {/* Logout — row 3 (auto height) */}
+        <div className="relative border-t border-white/5 p-3">
           <button
             onClick={handleLogout}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/10 ${collapsed ? "justify-center px-0" : ""}`}
