@@ -7,11 +7,30 @@ const storage = new CloudinaryStorage({
   params: async (req, file) => {
     try {
       const isCSV = file.mimetype === "text/csv" || file.mimetype === "application/vnd.ms-excel";
-      
+      const isPDF = file.mimetype === "application/pdf";
+      const isImage = file.mimetype.startsWith("image/");
+      const isCourseRoute = req.originalUrl?.includes("/courses");
+
+      let folder = "pharmacist-shubham/others";
+      let resource_type = "auto";
+
+      if (isCSV) {
+        folder = "pharmacist-shubham/test-csvs";
+        resource_type = "raw";
+      } else if (isCourseRoute && isPDF) {
+        folder = "pharmacist-shubham/course-notes";
+        resource_type = "raw";
+      } else if (isCourseRoute && isImage) {
+        folder = "pharmacist-shubham/course-thumbnails";
+        resource_type = "image";
+      } else if (isPDF) {
+        folder = "pharmacist-shubham/pdfs";
+        resource_type = "raw";
+      }
+
       return {
-        folder: isCSV ? "pharmacist-shubham/test-csvs" : "pharmacist-shubham/others",
-        // CRITICAL: CSV must be 'raw'. 'auto' often fails for CSVs on Cloudinary
-        resource_type: isCSV ? "raw" : "auto", 
+        folder,
+        resource_type,
         public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
       };
     } catch (error) {

@@ -64,7 +64,7 @@ export default function StudentSidebar() {
       )}
 
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 flex flex-col transition-all duration-300 z-30 shrink-0 ${
+        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 flex flex-col overflow-hidden transition-all duration-300 z-30 shrink-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >

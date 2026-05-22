@@ -7,8 +7,14 @@ import {
 import { getPublicCourses, getMultipleCourseProgress } from "../../services/courseService";
 import { getPublicExamCategories } from "../../services/studentService";
 
+function cloudinaryOptimize(url, w = 500, h = 280) {
+  if (!url || !url.includes("cloudinary.com/")) return url;
+  return url.replace("/upload/", `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
+}
+
 function CourseCard({ course, progress, onClick }) {
   const pct = progress?.percentage ?? null;
+  const thumbUrl = cloudinaryOptimize(course.thumbnail?.url);
   return (
     <button
       onClick={onClick}
@@ -16,8 +22,8 @@ function CourseCard({ course, progress, onClick }) {
     >
       {/* Thumbnail */}
       <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-36 relative">
-        {course.thumbnail?.url ? (
-          <img src={course.thumbnail.url} alt={course.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+        {thumbUrl ? (
+          <img src={thumbUrl} alt={course.title} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
         ) : (
           <div className="flex h-full items-center justify-center">
             <BookOpen size={32} className="text-white/15" />
@@ -137,7 +143,7 @@ export default function StudentCourses() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-7xl px-6 py-8 md:px-10 md:py-10 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-white flex items-center gap-3">

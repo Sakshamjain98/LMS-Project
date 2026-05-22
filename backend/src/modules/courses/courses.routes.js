@@ -55,6 +55,16 @@ router.get(
   })
 );
 
+// GET /api/courses/admin/:courseId/full — full course tree for admin (no access check)
+router.get(
+  "/admin/:courseId/full",
+  authorize("teacher", "admin"),
+  asyncHandler(async (req, res) => {
+    const tree = await svc.getCourseTree(req.params.courseId);
+    res.json({ success: true, course: tree });
+  })
+);
+
 // POST /api/courses — create course
 router.post(
   "/",

@@ -1352,13 +1352,25 @@ function PublicCoursesSection({ onGetStarted }) {
   );
 }
 
+// Apply Cloudinary auto-optimize transform to any Cloudinary URL
+function cloudinaryOptimize(url, w = 600, h = 340) {
+  if (!url || !url.includes("cloudinary.com/")) return url;
+  return url.replace("/upload/", `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
+}
+
 function PublicCourseCard({ course, onGetStarted }) {
+  const thumbUrl = cloudinaryOptimize(course.thumbnail?.url);
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 p-5 backdrop-blur-sm transition-all hover:border-brand-primary/25 hover:shadow-xl hover:shadow-brand-primary/5">
       {/* Thumbnail */}
-      <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-36 relative">
-        {course.thumbnail?.url ? (
-          <img src={course.thumbnail.url} alt={course.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-40 relative">
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt={course.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
         ) : (
           <div className="flex h-full items-center justify-center">
             <FaBook size={28} className="text-white/15" />

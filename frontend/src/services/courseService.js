@@ -33,6 +33,15 @@ export const getAdminCourseHierarchy = async () => {
   }
 };
 
+export const getAdminCourseTree = async (courseId) => {
+  try {
+    const res = await api.get(`/courses/admin/${courseId}/full`);
+    return res.data.course;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch course tree" };
+  }
+};
+
 export const createCourse = async (formData) => {
   try {
     // Do NOT set Content-Type manually — axios reads the FormData boundary and sets it automatically.

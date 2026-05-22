@@ -9,7 +9,8 @@ import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import {
-  getAdminCourseHierarchy, createCourse, updateCourse, deleteCourse,
+  getAdminCourseHierarchy, getAdminCourseTree,
+  createCourse, updateCourse, deleteCourse,
   createSubject, updateSubject, deleteSubject,
   createChapter, updateChapter, deleteChapter,
   createRichTextNote, createPdfNote, updateNote, deleteNote,
@@ -515,6 +516,9 @@ function ChapterContentPanel({ chapter, onRefresh }) {
 export default function CourseManager() {
   const [hierarchy, setHierarchy] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Full course tree (notes/videos/tests) for the selected course — loaded on demand
+  const [fullCourseTree, setFullCourseTree] = useState(null);
+  const [loadingTree, setLoadingTree] = useState(false);
 
   // Sidebar open state (mirrors AdminLayout pattern)
   const [openCategory, setOpenCategory] = useState(null);
@@ -542,37 +546,60 @@ export default function CourseManager() {
     finally { setLoading(false); }
   }, []);
 
+  const fetchFullTree = useCallback(async (courseId) => {
+    if (!courseId) return;
+    setLoadingTree(true);
+    try {
+      const tree = await getAdminCourseTree(courseId);
+      setFullCourseTree(tree);
+    } catch { toast.error("Failed to load course content"); }
+    finally { setLoadingTree(false); }
+  }, []);
+
   useEffect(() => { fetchHierarchy(); }, [fetchHierarchy]);
+
+  // Reload full tree whenever selected course changes
+  useEffect(() => {
+    if (selectedCourseId) fetchFullTree(selectedCourseId);
+    else setFullCourseTree(null);
+  }, [selectedCourseId, fetchFullTree]);
 
   const allExams = hierarchy.flatMap((cat) => cat.exams || []);
   const allCourses = allExams.flatMap((e) => e.courses || []);
+  // For sidebar display, use hierarchy (lightweight with counts)
   const selectedCourse = allCourses.find((c) => c._id === selectedCourseId);
-  const selectedSubject = selectedCourse?.subjects?.find((s) => s._id === selectedSubjectId);
+  // For content panel, use fullCourseTree (has notes/videos/tests arrays)
+  const selectedSubject = fullCourseTree?.subjects?.find((s) => s._id === selectedSubjectId);
   const selectedChapter = selectedSubject?.chapters?.find((ch) => ch._id === selectedChapterId);
+
+  const refreshAll = useCallback(() => {
+    fetchHierarchy();
+    if (selectedCourseId) fetchFullTree(selectedCourseId);
+  }, [fetchHierarchy, fetchFullTree, selectedCourseId]);
 
   const handleDeleteCourse = async (id) => {
     if (!window.confirm("Delete course and all content?")) return;
-    try { await deleteCourse(id); toast.success("Deleted"); if (selectedCourseId === id) { setSelectedCourseId(null); setSelectedSubjectId(null); setSelectedChapterId(null); } fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await deleteCourse(id); toast.success("Deleted"); if (selectedCourseId === id) { setSelectedCourseId(null); setSelectedSubjectId(null); setSelectedChapterId(null); setFullCourseTree(null); } fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleSaveSubject = async (title) => {
-    try { await createSubject(addingSubjectFor, { title }); toast.success("Subject added"); setAddingSubjectFor(null); fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await createSubject(addingSubjectFor, { title }); toast.success("Subject added"); setAddingSubjectFor(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleUpdateSubject = async (id, title) => {
-    try { await updateSubject(id, { title }); toast.success("Updated"); setEditingSubject(null); fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await updateSubject(id, { title }); toast.success("Updated"); setEditingSubject(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleDeleteSubject = async (id) => {
     if (!window.confirm("Delete subject + chapters?")) return;
-    try { await deleteSubject(id); toast.success("Deleted"); if (selectedSubjectId === id) { setSelectedSubjectId(null); setSelectedChapterId(null); } fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await deleteSubject(id); toast.success("Deleted"); if (selectedSubjectId === id) { setSelectedSubjectId(null); setSelectedChapterId(null); } refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleSaveChapter = async (title) => {
-    try { await createChapter(addingChapterFor, { title }); toast.success("Chapter added"); setAddingChapterFor(null); fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await createChapter(addingChapterFor, { title }); toast.success("Chapter added"); setAddingChapterFor(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleUpdateChapter = async (id, title) => {
-    try { await updateChapter(id, { title }); toast.success("Updated"); setEditingChapter(null); fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await updateChapter(id, { title }); toast.success("Updated"); setEditingChapter(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
   const handleDeleteChapter = async (id) => {
     if (!window.confirm("Delete chapter + content?")) return;
-    try { await deleteChapter(id); toast.success("Deleted"); if (selectedChapterId === id) setSelectedChapterId(null); fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
+    try { await deleteChapter(id); toast.success("Deleted"); if (selectedChapterId === id) setSelectedChapterId(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
 
   if (loading) {
@@ -777,13 +804,12 @@ export default function CourseManager() {
         {/* Course selected, no chapter */}
         {selectedCourseId && !selectedChapterId && selectedCourse && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BookOpen size={20} className="text-brand-primary" />
-                <div>
-                  <h2 className="font-bold text-lg text-white">{selectedCourse.title}</h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-xs font-semibold ${selectedCourse.status === "published" ? "text-emerald-400" : "text-white/40"}`}>{selectedCourse.status}</span>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <BookOpen size={20} className="text-brand-primary shrink-0" />
+                <div className="min-w-0">
+                  <h2 className="font-bold text-lg text-white truncate">{selectedCourse.title}</h2>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {selectedCourse.isPaid && <span className="text-xs text-amber-400 font-semibold">₹{selectedCourse.price}</span>}
                   </div>
                 </div>
@@ -792,6 +818,25 @@ export default function CourseManager() {
                 <Settings size={14} /> Edit Course
               </Btn>
             </div>
+
+            {/* Publish status callout */}
+            {selectedCourse.status !== "published" ? (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <EyeOff size={14} className="text-amber-400 shrink-0" />
+                  <p className="text-sm text-amber-300 font-semibold">This course is in <span className="uppercase">Draft</span> — students cannot see it.</p>
+                </div>
+                <Btn variant="ghost" className="text-amber-400 hover:text-amber-300 text-xs py-1 px-3 border border-amber-500/30 hover:bg-amber-500/10 shrink-0"
+                  onClick={() => setCourseModal({ course: selectedCourse })}>
+                  Publish
+                </Btn>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-2">
+                <Globe size={13} className="text-emerald-400 shrink-0" />
+                <p className="text-xs text-emerald-400 font-semibold">Published — visible to students</p>
+              </div>
+            )}
 
             {/* Subject count summary */}
             <div className="grid grid-cols-3 gap-3">
@@ -814,25 +859,33 @@ export default function CourseManager() {
         )}
 
         {/* Chapter selected — show content panel */}
-        {selectedChapterId && selectedChapter && (
+        {selectedChapterId && (
           <div className="space-y-4">
             {/* Breadcrumb */}
             <div className="flex items-center gap-1.5 text-xs text-white/40 flex-wrap">
               <button onClick={() => { setSelectedChapterId(null); setSelectedSubjectId(null); }} className="hover:text-white transition-colors">{selectedCourse?.title}</button>
               <ChevronRight size={10} />
-              <span className="text-white/60">{selectedSubject?.title}</span>
+              <span className="text-white/60">{fullCourseTree?.subjects?.find((s) => s._id === selectedSubjectId)?.title || "..."}</span>
               <ChevronRight size={10} />
-              <span className="text-white font-semibold">{selectedChapter.title}</span>
+              <span className="text-white font-semibold">{selectedChapter?.title || "..."}</span>
             </div>
 
-            <ChapterContentPanel chapter={selectedChapter} onRefresh={fetchHierarchy} />
+            {loadingTree ? (
+              <div className="flex h-40 items-center justify-center">
+                <Loader2 size={22} className="animate-spin text-brand-primary" />
+              </div>
+            ) : selectedChapter ? (
+              <ChapterContentPanel chapter={selectedChapter} onRefresh={refreshAll} />
+            ) : (
+              <p className="text-sm text-white/40 py-8 text-center">Chapter not found. It may have been deleted.</p>
+            )}
           </div>
         )}
       </div>
 
       {/* Course modal */}
       {courseModal !== null && (
-        <CourseFormModal course={courseModal.course} exams={allExams} onClose={() => setCourseModal(null)} onSaved={() => { setCourseModal(null); fetchHierarchy(); }} />
+        <CourseFormModal course={courseModal.course} exams={allExams} onClose={() => setCourseModal(null)} onSaved={() => { setCourseModal(null); refreshAll(); }} />
       )}
     </div>
   );

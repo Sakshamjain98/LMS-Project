@@ -315,6 +315,7 @@ export default function CourseLearning() {
   const allChapters = course.subjects?.flatMap((s) => s.chapters || []) || [];
 
   return (
+    <div className="mx-auto w-full max-w-7xl px-6 py-8 md:px-10 md:py-10">
     <div className="flex gap-6">
       {/* ── Sidebar: Chapter Tree ── */}
       <aside className="w-64 shrink-0">
@@ -326,78 +327,81 @@ export default function CourseLearning() {
             <ArrowLeft size={14} /> All Courses
           </button>
 
-          <div className="rounded-2xl border border-white/8 bg-white/2 p-4 space-y-2">
-            {/* Course title + progress */}
-            <div className="pb-3 mb-1 border-b border-white/5">
-              <div className="flex items-center gap-2 mb-2">
+          <div
+            className="rounded-2xl border border-white/8 bg-white/2 flex flex-col overflow-hidden"
+            style={{ maxHeight: "calc(100vh - 7rem)" }}
+          >
+            {/* Fixed header: course title + progress */}
+            <div className="shrink-0 p-4 border-b border-white/5 space-y-2">
+              <div className="flex items-center gap-2">
                 <BookOpen size={14} className="text-brand-primary shrink-0" />
                 <h2 className="text-sm font-bold text-white line-clamp-2">{course.title}</h2>
               </div>
               <ProgressBar percentage={progress.percentage} />
-              <p className="mt-1 text-[11px] text-white/40">
+              <p className="text-[11px] text-white/40">
                 {progress.completedCount} / {progress.totalChapters} chapters done
               </p>
               {progress.percentage === 100 && (
-                <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-brand-primary/10 px-3 py-1.5">
+                <div className="flex items-center gap-1.5 rounded-xl bg-brand-primary/10 px-3 py-1.5">
                   <Trophy size={12} className="text-brand-primary" />
                   <span className="text-xs font-bold text-brand-primary">Course Complete!</span>
                 </div>
               )}
+              {!hasAccess && course.isPaid && (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2">
+                  <Lock size={12} className="text-amber-400 shrink-0" />
+                  <p className="text-[11px] text-amber-400">Preview only</p>
+                </div>
+              )}
             </div>
 
-            {/* Access badge */}
-            {!hasAccess && course.isPaid && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2">
-                <Lock size={12} className="text-amber-400 shrink-0" />
-                <p className="text-[11px] text-amber-400">Preview only</p>
-              </div>
-            )}
+            {/* Scrollable chapter list */}
+            <div className="custom-scrollbar flex-1 overflow-y-auto px-3 py-3 space-y-1 min-h-0">
+              {(course.subjects || []).map((sub) => (
+                <div key={sub._id}>
+                  <button
+                    onClick={() => setOpenSubjectId(openSubjectId === sub._id ? null : sub._id)}
+                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                  >
+                    <ChevronDown size={13} className={`transition-transform text-white/30 shrink-0 ${openSubjectId === sub._id ? "" : "-rotate-90"}`} />
+                    <span className="flex-1 truncate font-medium">{sub.title}</span>
+                    <span className="text-[10px] text-white/30">{sub.chapters?.length || 0}</span>
+                  </button>
 
-            {/* Subjects → Chapters */}
-            {(course.subjects || []).map((sub) => (
-              <div key={sub._id}>
-                <button
-                  onClick={() => setOpenSubjectId(openSubjectId === sub._id ? null : sub._id)}
-                  className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  <ChevronDown size={13} className={`transition-transform text-white/30 shrink-0 ${openSubjectId === sub._id ? "" : "-rotate-90"}`} />
-                  <span className="flex-1 truncate font-medium">{sub.title}</span>
-                  <span className="text-[10px] text-white/30">{sub.chapters?.length || 0}</span>
-                </button>
-
-                {openSubjectId === sub._id && (
-                  <div className="ml-5 space-y-0.5 border-l border-white/5 pl-2">
-                    {(sub.chapters || []).map((ch) => {
-                      const locked = ch.locked;
-                      const done = progress.completedChapterIds.includes(ch._id);
-                      return (
-                        <button
-                          key={ch._id}
-                          onClick={() => !locked && setSelectedChapterId(ch._id)}
-                          disabled={locked}
-                          className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-all ${locked ? "cursor-not-allowed opacity-40" : ""} ${selectedChapterId === ch._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
-                        >
-                          {locked ? (
-                            <Lock size={10} className="shrink-0 text-white/30" />
-                          ) : done ? (
-                            <CheckCircle2 size={10} className="shrink-0 text-brand-primary" />
-                          ) : (
-                            <Circle size={10} className="shrink-0 text-white/20" />
-                          )}
-                          <span className="flex-1 truncate">{ch.title}</span>
-                          {!locked && (
-                            <div className="flex gap-1 ml-auto">
-                              {(ch.notes?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.notes.length}📄</span>}
-                              {(ch.videos?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.videos.length}▶</span>}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
+                  {openSubjectId === sub._id && (
+                    <div className="ml-5 space-y-0.5 border-l border-white/5 pl-2">
+                      {(sub.chapters || []).map((ch) => {
+                        const locked = ch.locked;
+                        const done = progress.completedChapterIds.includes(ch._id);
+                        return (
+                          <button
+                            key={ch._id}
+                            onClick={() => !locked && setSelectedChapterId(ch._id)}
+                            disabled={locked}
+                            className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-all ${locked ? "cursor-not-allowed opacity-40" : ""} ${selectedChapterId === ch._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
+                          >
+                            {locked ? (
+                              <Lock size={10} className="shrink-0 text-white/30" />
+                            ) : done ? (
+                              <CheckCircle2 size={10} className="shrink-0 text-brand-primary" />
+                            ) : (
+                              <Circle size={10} className="shrink-0 text-white/20" />
+                            )}
+                            <span className="flex-1 truncate">{ch.title}</span>
+                            {!locked && (
+                              <div className="flex gap-1 ml-auto">
+                                {(ch.notes?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.notes.length}📄</span>}
+                                {(ch.videos?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.videos.length}▶</span>}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </aside>
@@ -484,6 +488,7 @@ export default function CourseLearning() {
           </>
         )}
       </main>
+    </div>
     </div>
   );
 }
