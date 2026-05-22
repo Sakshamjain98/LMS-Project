@@ -686,6 +686,7 @@ export const createTestFromCSV = async (req, res, next) => {
           isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
           attemptLimit: Number.isFinite(Number(req.body.attemptLimit)) ? Number(req.body.attemptLimit) : 0,
           isProctored: req.body.isProctored === "true" || req.body.isProctored === true,
+          type: ["practice", "pyq"].includes(req.body.type) ? req.body.type : "practice",
         };
 
         const createdTest = await createTest(testPayload, req.user._id);

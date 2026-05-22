@@ -110,12 +110,13 @@ export const createTest = async (data, teacherId) => {
     allowReview:      payload.allowReview !== false,
     negativeMarking:  Math.max(0, Number(payload.negativeMarking) || 0),
 
+    // Preserve the test type (practice | pyq) chosen by admin. Default to "practice".
+    type: ["practice", "pyq"].includes(payload.type) ? payload.type : "practice",
+
     teacherId: objTeacherId,
     topicId: hierarchy.topic._id,
     subjectId: hierarchy.subject._id,
     chapterId: hierarchy.chapter._id,
-    // Tests created via the admin UI go straight to published — admins create
-    // intentionally and the student flow gates by status === "published".
     status: "published",
   });
 };
@@ -192,6 +193,13 @@ export const updateTest = async (testId, updateData, teacherId) => {
     updateData.topicId = hierarchy.topic._id;
     updateData.subjectId = hierarchy.subject._id;
     updateData.chapterId = hierarchy.chapter._id;
+  }
+
+  // Sanitize type — only allow valid enum values; reject "aits" (managed separately)
+  if (updateData.type !== undefined) {
+    if (!["practice", "pyq"].includes(updateData.type)) {
+      delete updateData.type;
+    }
   }
 
   return Test.findOneAndUpdate(
