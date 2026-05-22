@@ -9,6 +9,8 @@ import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
 import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
 import Test from "../../models/test.model.js";
+import Course from "../../models/course.model.js";
+import CourseSubject from "../../models/courseSubject.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 
@@ -142,6 +144,42 @@ router.get(
       .limit(limit)
       .lean();
     res.json({ success: true, news });
+  })
+);
+
+// Public courses list for the landing page (published only, with subject counts).
+router.get(
+  "/courses",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 8, 50);
+    const filter = { status: "published" };
+    if (req.query.examId) filter.examId = req.query.examId;
+
+    const courses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).limit(limit).lean();
+    const courseIds = courses.map((c) => c._id);
+
+    const subjectCounts = courseIds.length
+      ? await CourseSubject.aggregate([
+          { $match: { courseId: { $in: courseIds } } },
+          { $group: { _id: "$courseId", count: { $sum: 1 } } },
+        ])
+      : [];
+    const subjectCountMap = new Map(subjectCounts.map((r) => [r._id.toString(), r.count]));
+
+    const out = courses.map((c) => ({
+      _id: c._id,
+      title: c.title,
+      description: c.description,
+      slug: c.slug,
+      examId: c.examId,
+      isPaid: c.isPaid,
+      price: c.price,
+      thumbnail: c.thumbnail,
+      tags: c.tags,
+      subjectsCount: subjectCountMap.get(c._id.toString()) || 0,
+    }));
+
+    res.json({ success: true, courses: out });
   })
 );
 

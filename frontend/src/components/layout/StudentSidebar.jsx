@@ -14,6 +14,8 @@ import {
   Folder,
   FileText,
   Tag,
+  BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
 import { getAvailableTests } from "../../services/studentService";
@@ -62,38 +64,37 @@ export default function StudentSidebar() {
       )}
 
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 flex flex-col justify-between transition-all duration-300 z-30 shrink-0 ${
+        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarWidth} glass-panel border-r border-white/10 flex flex-col transition-all duration-300 z-30 shrink-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Ambient glow */}
         <div className="pointer-events-none absolute -top-16 -left-12 h-40 w-40 rounded-full bg-brand-primary/20 blur-3xl" />
 
-        <div className="relative flex h-full flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/5 p-4 min-h-18">
-            <button onClick={() => navigate("/")} className="flex items-center gap-2.5 hover:opacity-80 transition">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden shadow-[0_8px_24px_rgba(0,186,124,0.25)]">
-                <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
-              </div>
-              {!collapsed && <span className="text-white font-bold text-base tracking-tight">PS <span className="text-brand-primary">Classes</span></span>}
-            </button>
+        {/* Header — fixed height, never scrolls */}
+        <div className="relative shrink-0 flex items-center justify-between border-b border-white/5 p-4">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2.5 hover:opacity-80 transition">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden shadow-[0_8px_24px_rgba(0,186,124,0.25)]">
+              <img src={logo} alt="PS Classes" className="h-full w-full object-contain" />
+            </div>
+            {!collapsed && <span className="text-white font-bold text-base tracking-tight">PS <span className="text-brand-primary">Classes</span></span>}
+          </button>
 
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className={`hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:bg-white/5 hover:text-white transition ${collapsed ? "mx-auto" : ""}`}
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className={`hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-white/50 hover:bg-white/5 hover:text-white transition ${collapsed ? "mx-auto" : ""}`}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
 
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/60 hover:text-white p-2">
-              <X size={22} />
-            </button>
-          </div>
+          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/60 hover:text-white p-2">
+            <X size={22} />
+          </button>
+        </div>
 
-          {/* Nav — scrolls only the tree section so the rest of the sidebar stays put. */}
-          <nav className="custom-scrollbar flex-1 min-w-0 space-y-1.5 px-3 py-3 overflow-y-auto">
+        {/* Nav — flex-1 + overflow-y-auto makes this the scrollable region */}
+        <nav className="custom-scrollbar relative flex-1 min-h-0 min-w-0 space-y-1.5 px-3 py-3 overflow-y-auto">
             <SidebarLink to="/student/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
 
             {/* Test Series — collapsible hierarchy (mirrors the admin sidebar pattern) */}
@@ -177,7 +178,7 @@ export default function StudentSidebar() {
                                       onClick={() => setOpenExam((v) => (v === exam._id ? null : exam._id))}
                                       className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
                                     >
-                                      <Folder size={11} className="text-sky-400 shrink-0" />
+                                      <GraduationCap size={11} className="text-sky-400 shrink-0" />
                                       <span className="truncate flex-1 min-w-0">{exam.title}</span>
                                       <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/35">
                                         {exam.testSeries?.length || 0}
@@ -220,13 +221,13 @@ export default function StudentSidebar() {
               )}
             </div>
 
+            <SidebarLink to="/student/courses" icon={BookOpen} label="Courses" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
             <div className="my-2 h-px bg-white/5" />
             <SidebarLink to="/student/profile" icon={User} label="Profile" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           </nav>
-        </div>
 
-        {/* Logout */}
-        <div className="relative border-t border-white/5 p-3">
+        {/* Logout — fixed at bottom, never scrolls */}
+        <div className="relative shrink-0 border-t border-white/5 p-3">
           <button
             onClick={handleLogout}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/10 ${collapsed ? "justify-center px-0" : ""}`}

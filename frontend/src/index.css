@@ -158,6 +158,44 @@ html, body, #root {
   color: #fff;
 }
 
+/* ---- Quill content viewer (student note reader) ---- */
+.quill-content {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.quill-content > * + * { margin-top: 0.9em; }
+.quill-content h1, .quill-content h2, .quill-content h3 { color: #fff; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.4em; }
+.quill-content h1 { font-size: 1.6rem; }
+.quill-content h2 { font-size: 1.3rem; }
+.quill-content h3 { font-size: 1.1rem; }
+.quill-content strong, .quill-content b { color: #fff; font-weight: 600; }
+.quill-content a { color: var(--color-brand-primary); text-decoration: underline; }
+.quill-content ul, .quill-content ol { padding-left: 1.4rem; margin: 0.75em 0; }
+.quill-content ul { list-style: disc; }
+.quill-content ol { list-style: decimal; }
+.quill-content li { margin: 0.3em 0; }
+.quill-content li::marker { color: var(--color-brand-primary); }
+.quill-content blockquote {
+  border-left: 3px solid var(--color-brand-primary);
+  background: rgba(0,186,124,0.06);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.75rem 1rem;
+  margin: 1.25em 0;
+  font-style: italic;
+  color: rgba(255,255,255,0.9);
+}
+.quill-content pre, .quill-content code {
+  background: rgba(255,255,255,0.06);
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.88em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.quill-content pre { padding: 0.75rem 1rem; display: block; margin: 1em 0; overflow-x: auto; }
+.quill-content img { max-width: 100%; border-radius: 0.75rem; margin: 1em auto; display: block; }
+
 /* ---- Article preview HTML (landing) ---- */
 .prose.prose-invert h1, .prose.prose-invert h2, .prose.prose-invert h3 { color: #fff; }
 .prose.prose-invert a { color: var(--color-brand-primary); }

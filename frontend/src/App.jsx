@@ -17,6 +17,8 @@ import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentTests from "./pages/student/StudentTest";
 import StudentSeriesDetail from "./pages/student/SeriesDetail";
 import StudentProfile from "./pages/student/StudentProfile";
+import StudentCourses from "./pages/student/StudentCourses";
+import CourseLearning from "./pages/student/CourseLearning";
 
 /* Layouts */
 import StudentLayout from "./pages/student/StudentLayout";
@@ -35,6 +37,7 @@ import AdminTestEditor from "./pages/admin/TestEditor";
 import AdminTestSeriesAnalytics from "./pages/admin/TestSeriesAnalytics";
 import AdminSiteContent from "./pages/admin/SiteContent";
 import AdminBlogEditor from "./pages/admin/BlogEditor";
+import CourseManager from "./pages/admin/CourseManager";
 
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -97,6 +100,8 @@ function App() {
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="tests" element={<StudentTests />} />
           <Route path="tests/:topicId" element={<StudentSeriesDetail />} />
+          <Route path="courses" element={<StudentCourses />} />
+          <Route path="courses/:courseId" element={<CourseLearning />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 
@@ -120,6 +125,7 @@ function App() {
           <Route path="test-series" element={<AdminTestSeries />} />
           <Route path="test-series/:topicId/analytics" element={<AdminTestSeriesAnalytics />} />
           <Route path="test-series/test/:testId" element={<AdminTestEditor />} />
+          <Route path="courses" element={<CourseManager />} />
           <Route path="site-content" element={<AdminSiteContent />} />
           <Route path="create-admin" element={<CreateAdmin />} />
           <Route path="profile" element={<AdminProfile />} />

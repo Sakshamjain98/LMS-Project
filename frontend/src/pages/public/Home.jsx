@@ -8,6 +8,7 @@ import {
   getPublicTestSeries,
   getPublicExamCategories,
 } from "../../services/studentService";
+import { getPublicCourses } from "../../services/courseService";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import {
@@ -616,8 +617,7 @@ const Home = () => {
       ══════════════════════════════════════════ */}
       <PublicTestSeriesSection onGetStarted={handleGetStarted} />
 
-
-
+      <PublicCoursesSection onGetStarted={handleGetStarted} />
 
 
       {/* ══════════════════════════════════════════
@@ -1301,6 +1301,93 @@ function TestSeriesPublicCard({ series: s, idx, onAction }) {
         className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
       >
         {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Attempt Free Test"}
+        <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Public Courses Section ──────────────────────────────────────────────────
+
+function PublicCoursesSection({ onGetStarted }) {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    getPublicCourses(6)
+      .then((res) => { if (active) setCourses(res?.courses || []); })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  if (!loading && courses.length === 0) return null;
+
+  return (
+    <Section id="courses" className="border-t border-dark-100">
+      <SectionHeading
+        eyebrow="Course Library"
+        title="Master every topic with structured courses"
+        subtitle="Expert-crafted notes, video lectures, and practice tests — all in one place."
+      />
+      {loading ? (
+        <SeriesLoadingSkeleton />
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {courses.map((course) => (
+            <PublicCourseCard key={course._id} course={course} onGetStarted={onGetStarted} />
+          ))}
+        </div>
+      )}
+      <div className="mt-10 flex justify-center">
+        <button
+          onClick={onGetStarted}
+          className="inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-8 py-3 text-sm font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all"
+        >
+          Explore All Courses <FaArrowRight size={12} />
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+function PublicCourseCard({ course, onGetStarted }) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 p-5 backdrop-blur-sm transition-all hover:border-brand-primary/25 hover:shadow-xl hover:shadow-brand-primary/5">
+      {/* Thumbnail */}
+      <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-36 relative">
+        {course.thumbnail?.url ? (
+          <img src={course.thumbnail.url} alt={course.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <FaBook size={28} className="text-white/15" />
+          </div>
+        )}
+        <span className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold shadow ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-brand-primary/80 text-dark-400"}`}>
+          {course.isPaid ? `₹${Number(course.price || 0).toLocaleString()}` : "FREE"}
+        </span>
+      </div>
+
+      <h3 className="font-bold text-white line-clamp-2 mb-1 group-hover:text-brand-primary transition-colors">{course.title}</h3>
+
+      {course.tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {course.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/50">{tag}</span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-[11px] text-white/50 mb-4">
+        <span>{course.subjectsCount || 0} subjects</span>
+      </div>
+
+      <button
+        onClick={onGetStarted}
+        className="w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+      >
+        {course.isPaid ? `Enroll for ₹${Number(course.price || 0).toLocaleString()}` : "Start Learning Free"}
         <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
       </button>
     </div>

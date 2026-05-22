@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Tag,
   Trophy,
+  BookOpen,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { getTeacherFullHierarchy } from "../../services/teacherService";
@@ -53,6 +54,7 @@ export default function AdminLayout() {
   const [openTopic, setOpenTopic] = useState(null);
   const [openSubject, setOpenSubject] = useState(null);
   const [seriesExpanded, setSeriesExpanded] = useState(true);
+  const [coursesExpanded, setCoursesExpanded] = useState(false);
 
   const [user] = useState(() => {
     const userStr = localStorage.getItem("user");
@@ -318,6 +320,27 @@ export default function AdminLayout() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Courses section */}
+          <div className="mt-1">
+            <NavLink
+              to="/admin/courses"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `group flex w-full items-center justify-between rounded-xl px-4 py-2.5 transition-colors ${
+                  isActive
+                    ? "bg-brand-primary/15 text-brand-primary"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                } ${collapsed ? "justify-center px-0" : ""}`
+              }
+              title={collapsed ? "Courses" : ""}
+            >
+              <span className="flex items-center gap-3">
+                <BookOpen size={18} />
+                {!collapsed && <span className="text-sm font-semibold">Courses</span>}
+              </span>
+            </NavLink>
           </div>
 
           <div className="my-2 h-px bg-white/5" />
