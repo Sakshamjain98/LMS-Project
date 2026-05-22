@@ -233,6 +233,145 @@ export const getTeacherTestSeries = async () => {
   }
 };
 
+export const getTeacherFullHierarchy = async () => {
+  try {
+    const res = await api.get("/teacher/test-series/hierarchy");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch hierarchy failed" };
+  }
+};
+
+// ================= EXAM CATEGORIES =================
+export const getExamCategories = async () => {
+  try {
+    const res = await api.get("/teacher/exam-categories");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch exam categories failed" };
+  }
+};
+
+export const createExamCategory = async (payload) => {
+  try {
+    const res = await api.post("/teacher/exam-categories", payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create exam category failed" };
+  }
+};
+
+export const updateExamCategory = async (categoryId, payload) => {
+  try {
+    const res = await api.put(`/teacher/exam-categories/${categoryId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update exam category failed" };
+  }
+};
+
+export const deleteExamCategory = async (categoryId) => {
+  try {
+    const res = await api.delete(`/teacher/exam-categories/${categoryId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete exam category failed" };
+  }
+};
+
+// ================= EXAMS =================
+export const getExams = async (categoryId = null) => {
+  try {
+    const params = categoryId ? { categoryId } : {};
+    const res = await api.get("/teacher/exams", { params });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch exams failed" };
+  }
+};
+
+export const createExam = async (payload) => {
+  try {
+    const res = await api.post("/teacher/exams", payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create exam failed" };
+  }
+};
+
+export const updateExam = async (examId, payload) => {
+  try {
+    const res = await api.put(`/teacher/exams/${examId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update exam failed" };
+  }
+};
+
+export const deleteExam = async (examId) => {
+  try {
+    const res = await api.delete(`/teacher/exams/${examId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete exam failed" };
+  }
+};
+
+export const assignTestSeriesToExam = async (topicId, examId) => {
+  try {
+    const res = await api.patch(`/teacher/test-series/topics/${topicId}/assign-exam`, { examId });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Assign test series failed" };
+  }
+};
+
+// ================= AITS =================
+export const getAITSByExam = async (examId) => {
+  try {
+    const res = await api.get(`/teacher/aits/exam/${examId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Fetch AITS failed" };
+  }
+};
+
+export const createAITS = async (payload) => {
+  try {
+    const res = await api.post("/teacher/aits", payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create AITS failed" };
+  }
+};
+
+export const updateAITS = async (aitsId, payload) => {
+  try {
+    const res = await api.put(`/teacher/aits/${aitsId}`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Update AITS failed" };
+  }
+};
+
+export const deleteAITS = async (aitsId) => {
+  try {
+    const res = await api.delete(`/teacher/aits/${aitsId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Delete AITS failed" };
+  }
+};
+
+export const createAITSTest = async (aitsId, payload) => {
+  try {
+    const res = await api.post(`/teacher/aits/${aitsId}/tests`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Create AITS test failed" };
+  }
+};
+
 export const getTopicAnalytics = async (topicId) => {
   try {
     const res = await api.get(`/teacher/test-series/topics/${topicId}/analytics`);

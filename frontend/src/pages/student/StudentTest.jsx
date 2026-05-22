@@ -14,6 +14,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
+  Tag,
 } from "lucide-react";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
@@ -36,9 +38,7 @@ const isLiveTest = (test) => {
 
 const getSeriesStats = (topic) => {
   if (!topic) return { total: 0, live: 0, subjects: 0, chapters: 0 };
-  let total = 0;
-  let live = 0;
-  let chapters = 0;
+  let total = 0, live = 0, chapters = 0;
   const subjects = topic.subjects?.length || 0;
   topic.subjects?.forEach((subject) => {
     chapters += subject.chapters?.length || 0;
@@ -71,18 +71,22 @@ const ensureRazorpayLoaded = () =>
 
 export default function StudentTests() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("series"); // 'series' | 'results'
+  const [activeTab, setActiveTab] = useState("series");
 
-  const [topics, setTopics] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Drill-down: null = top level
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedExamId, setSelectedExamId] = useState(null);
+
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [resultsPage, setResultsPage] = useState(1);
   const [unlockingId, setUnlockingId] = useState(null);
-
   const [activeResultId, setActiveResultId] = useState(null);
 
   const loadData = async () => {
@@ -90,11 +94,11 @@ export default function StudentTests() {
     setError("");
     try {
       const [testsRes, attemptsRes, sub] = await Promise.all([
-        getAvailableTests().catch(() => ({ topics: [] })),
+        getAvailableTests().catch(() => ({ topics: [], categories: [] })),
         getMyAttempts().catch(() => ({ data: [] })),
         getStudentSubscription().catch(() => null),
       ]);
-      setTopics(testsRes.topics || []);
+      setCategories(testsRes.categories || []);
       setAttempts(attemptsRes.data || []);
       setSubscription(sub || null);
     } catch {
@@ -104,9 +108,7 @@ export default function StudentTests() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const subActive =
     subscription?.status === "ACTIVE" &&
@@ -115,37 +117,63 @@ export default function StudentTests() {
 
   const isTopicUnlocked = (topic) => {
     if (!topic?.isPaid) return true;
-    if (topic.isUnlocked) return true; // server-annotated
+    if (topic.isUnlocked) return true;
     if (subActive) return true;
     return false;
   };
 
-  const totalTests = useMemo(
-    () => topics.reduce((sum, t) => sum + getSeriesStats(t).total, 0),
-    [topics]
+  // Aggregate stats
+  const totalExams = useMemo(
+    () => categories.reduce((sum, c) => sum + (c.exams?.length || 0), 0),
+    [categories]
   );
-  const totalLive = useMemo(
-    () => topics.reduce((sum, t) => sum + getSeriesStats(t).live, 0),
-    [topics]
-  );
-  const freeSeriesCount = useMemo(
-    () => topics.filter((t) => !t.isPaid).length,
-    [topics]
-  );
-
-  const filteredTopics = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return topics;
-    return topics.filter((t) =>
-      [t.title, t.description].filter(Boolean).some((s) => s.toLowerCase().includes(q))
+  const { totalTests, totalLive } = useMemo(() => {
+    let tests = 0, live = 0;
+    categories.forEach((cat) =>
+      (cat.exams || []).forEach((exam) =>
+        (exam.testSeries || []).forEach((ts) => {
+          const s = getSeriesStats(ts);
+          tests += s.total;
+          live += s.live;
+        })
+      )
     );
-  }, [topics, search]);
+    return { totalTests: tests, totalLive: live };
+  }, [categories]);
 
-  const paginatedTopics = useMemo(() => {
+  // Current drill-down nodes
+  const currentCategory = useMemo(
+    () => categories.find((c) => c._id === selectedCategoryId) || null,
+    [categories, selectedCategoryId]
+  );
+  const currentExam = useMemo(
+    () => (currentCategory?.exams || []).find((e) => e._id === selectedExamId) || null,
+    [currentCategory, selectedExamId]
+  );
+
+  const drillLevel = !selectedCategoryId ? 0 : !selectedExamId ? 1 : 2;
+
+  // Items at current level, filtered by search
+  const visibleItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filter = (arr) =>
+      !q
+        ? arr
+        : arr.filter((item) =>
+            [item.title, item.description]
+              .filter(Boolean)
+              .some((s) => s.toLowerCase().includes(q))
+          );
+    if (drillLevel === 0) return filter(categories);
+    if (drillLevel === 1) return filter(currentCategory?.exams || []);
+    return filter(currentExam?.testSeries || []);
+  }, [categories, currentCategory, currentExam, drillLevel, search]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+  const paginatedItems = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredTopics.slice(start, start + PAGE_SIZE);
-  }, [filteredTopics, page]);
-  const totalPages = Math.max(1, Math.ceil(filteredTopics.length / PAGE_SIZE));
+    return visibleItems.slice(start, start + PAGE_SIZE);
+  }, [visibleItems, page]);
 
   const paginatedAttempts = useMemo(() => {
     const start = (resultsPage - 1) * PAGE_SIZE;
@@ -153,16 +181,9 @@ export default function StudentTests() {
   }, [attempts, resultsPage]);
   const resultsTotalPages = Math.max(1, Math.ceil(attempts.length / PAGE_SIZE));
 
-  // Reset to page 1 when search changes.
+  useEffect(() => { setPage(1); }, [search, selectedCategoryId, selectedExamId]);
   useEffect(() => {
-    setPage(1);
-  }, [search]);
-
-  // Force the user away from "results" if they have nothing to show.
-  useEffect(() => {
-    if (attempts.length === 0 && activeTab === "results") {
-      setActiveTab("series");
-    }
+    if (attempts.length === 0 && activeTab === "results") setActiveTab("series");
   }, [attempts.length, activeTab]);
 
   const hasAttempts = attempts.length > 0;
@@ -174,12 +195,10 @@ export default function StudentTests() {
     try {
       await ensureRazorpayLoaded();
       const order = await createTopicOrder(topic._id);
-
       if (order?.alreadyUnlocked) {
         await loadData();
         return;
       }
-
       const onSuccess = async (response) => {
         try {
           await verifyTopicPayment(topic._id, {
@@ -194,8 +213,6 @@ export default function StudentTests() {
           setUnlockingId(null);
         }
       };
-
-      // Dev mode: bypass real Razorpay UI.
       if (typeof order.orderId === "string" && order.orderId.startsWith("dev_")) {
         return onSuccess({
           razorpay_order_id: order.orderId,
@@ -203,7 +220,6 @@ export default function StudentTests() {
           razorpay_signature: "mock_signature",
         });
       }
-
       const rzp = new window.Razorpay({
         key: order.razorpayKeyId,
         amount: order.amountInPaise,
@@ -230,14 +246,32 @@ export default function StudentTests() {
     return <TestResult attemptId={activeResultId} onBack={() => setActiveResultId(null)} />;
   }
 
+  // Breadcrumb trail
+  const breadcrumbs = [];
+  if (selectedCategoryId) {
+    breadcrumbs.push({
+      label: "All Categories",
+      onClick: () => { setSelectedCategoryId(null); setSelectedExamId(null); setSearch(""); },
+    });
+    if (currentCategory) {
+      breadcrumbs.push({
+        label: currentCategory.title,
+        onClick: selectedExamId ? () => { setSelectedExamId(null); setSearch(""); } : null,
+      });
+    }
+    if (selectedExamId && currentExam) {
+      breadcrumbs.push({ label: currentExam.title, onClick: null });
+    }
+  }
+
   return (
     <>
       <StudentNavbar />
       <div className="min-h-screen pb-16" style={{ fontFamily: '"Space Grotesk", "DM Sans", sans-serif' }}>
         {/* HERO */}
         <div className="relative overflow-hidden border-b border-white/5">
-          <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-brand-primary/20 blur-3xl"></div>
-          <div className="pointer-events-none absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-brand-primary/10 blur-3xl"></div>
+          <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-brand-primary/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-brand-primary/10 blur-3xl" />
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/60">
               <Sparkles size={12} className="text-brand-primary" />
@@ -245,11 +279,11 @@ export default function StudentTests() {
             </div>
             <h1 className="mt-4 text-3xl font-bold text-white md:text-4xl">Test Series Hub</h1>
             <p className="mt-2 text-sm text-gray-400 md:text-base">
-              Browse the full hierarchy and start practising. Drill into a series to see its subjects, chapters, and tests.
+              Browse by exam category, drill into a series, and start practising.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatPill label="Series Available" value={topics.length} />
-              <StatPill label="Free Series" value={freeSeriesCount} />
+              <StatPill label="Categories" value={categories.length} />
+              <StatPill label="Exams" value={totalExams} />
               <StatPill label="Total Tests" value={totalTests} />
               <StatPill label="Live Now" value={totalLive} />
             </div>
@@ -265,7 +299,7 @@ export default function StudentTests() {
         )}
 
         <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">
-          {/* Tabs — analytics tab is hidden until the student has at least one attempt */}
+          {/* Tabs */}
           <div className="mb-8 flex gap-3 rounded-2xl border border-white/10 bg-white/5 p-2">
             <TabBtn icon={ClipboardList} active={activeTab === "series"} onClick={() => setActiveTab("series")}>
               Browse Series
@@ -282,15 +316,19 @@ export default function StudentTests() {
               <Loader2 size={20} className="animate-spin text-brand-primary mr-2" /> Loading…
             </div>
           ) : activeTab === "series" ? (
-            <SeriesTable
-              topics={paginatedTopics}
-              totalCount={filteredTopics.length}
+            <BrowseView
+              drillLevel={drillLevel}
+              items={paginatedItems}
+              totalCount={visibleItems.length}
               search={search}
               onSearch={setSearch}
+              breadcrumbs={breadcrumbs}
+              onSelectCategory={(id) => { setSelectedCategoryId(id); setSelectedExamId(null); setSearch(""); }}
+              onSelectExam={(id) => { setSelectedExamId(id); setSearch(""); }}
+              onOpenSeries={(ts) => navigate(`/student/tests/${ts._id}`)}
               isUnlocked={isTopicUnlocked}
               unlockingId={unlockingId}
               onUnlock={handleUnlock}
-              onOpen={(topic) => navigate(`/student/tests/${topic._id}`)}
               page={page}
               totalPages={totalPages}
               onPageChange={setPage}
@@ -308,6 +346,262 @@ export default function StudentTests() {
         </div>
       </div>
     </>
+  );
+}
+
+function BrowseView({
+  drillLevel,
+  items,
+  totalCount,
+  search,
+  onSearch,
+  breadcrumbs,
+  onSelectCategory,
+  onSelectExam,
+  onOpenSeries,
+  isUnlocked,
+  unlockingId,
+  onUnlock,
+  page,
+  totalPages,
+  onPageChange,
+}) {
+  const levelLabel = ["Exam Categories", "Exams", "Test Series"][drillLevel];
+
+  return (
+    <div className="space-y-4">
+      {/* Breadcrumb + search bar */}
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl glass-card p-4">
+        {breadcrumbs.length > 0 && (
+          <nav className="flex flex-wrap items-center gap-1 text-xs text-white/50 min-w-0">
+            {breadcrumbs.map((crumb, i) => (
+              <span key={i} className="flex items-center gap-1 min-w-0">
+                {i > 0 && <ChevronRight size={11} className="shrink-0 text-white/30" />}
+                {crumb.onClick ? (
+                  <button
+                    onClick={crumb.onClick}
+                    className="hover:text-brand-primary transition-colors truncate"
+                  >
+                    {crumb.label}
+                  </button>
+                ) : (
+                  <span className="text-white font-semibold truncate">{crumb.label}</span>
+                )}
+              </span>
+            ))}
+          </nav>
+        )}
+        <div className="relative min-w-52 flex-1 ml-auto">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+          <input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder={`Search ${levelLabel.toLowerCase()}…`}
+            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
+          />
+        </div>
+      </div>
+
+      {/* Level label */}
+      <div className="flex items-center gap-2 px-1">
+        <LevelIcon level={drillLevel} />
+        <h2 className="text-base font-bold text-white">{levelLabel}</h2>
+        <span className="ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/40">{totalCount}</span>
+      </div>
+
+      {/* Categories and exams as cards; test series as table */}
+      {drillLevel < 2 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-white/40">
+              <FileText size={36} className="mb-3 text-white/20" />
+              <p className="text-sm">
+                {totalCount === 0
+                  ? `No ${levelLabel.toLowerCase()} available yet — check back soon.`
+                  : "No results match your search."}
+              </p>
+            </div>
+          ) : (
+            items.map((item, idx) =>
+              drillLevel === 0 ? (
+                <CategoryCard key={item._id} category={item} idx={idx} onClick={() => onSelectCategory(item._id)} />
+              ) : (
+                <ExamCard key={item._id} exam={item} idx={idx} onClick={() => onSelectExam(item._id)} />
+              )
+            )
+          )}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl glass-card">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/3">
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Test Series</th>
+                  <th className="hidden px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50 md:table-cell">Description</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Stats</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Access</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest text-white/50">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center text-sm text-white/40">
+                      <FileText className="mx-auto mb-3 text-white/20" size={36} />
+                      {totalCount === 0 ? "No test series in this exam." : "No series match your search."}
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((ts, idx) => {
+                    const stats = getSeriesStats(ts);
+                    const unlocked = isUnlocked(ts);
+                    const isUnlocking = unlockingId === ts._id;
+                    return (
+                      <tr
+                        key={ts._id}
+                        className="transition-colors hover:bg-white/4 animate-fade-up"
+                        style={{ animationDelay: `${idx * 25}ms` }}
+                      >
+                        <td className="px-6 py-4 text-sm font-semibold text-white">
+                          <button
+                            onClick={() => onOpenSeries(ts)}
+                            className="flex items-center gap-2 text-left hover:text-brand-primary"
+                          >
+                            <Layers size={14} className="text-brand-primary shrink-0" />
+                            <span className="wrap-break-word">{ts.title}</span>
+                          </button>
+                        </td>
+                        <td className="hidden px-6 py-4 text-sm text-white/50 md:table-cell">
+                          <span className="line-clamp-2 wrap-break-word">{ts.description || "—"}</span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-white/60 whitespace-nowrap">
+                          <span className="font-bold text-white">{stats.subjects}</span> subj ·{" "}
+                          <span className="font-bold text-white">{stats.chapters}</span> ch ·{" "}
+                          <span className="font-bold text-white">{stats.total}</span> tests
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          {ts.isPaid ? (
+                            unlocked ? (
+                              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
+                                Unlocked
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
+                                <Lock size={10} /> ₹{Number(ts.price || 0).toLocaleString()}
+                              </span>
+                            )
+                          ) : (
+                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
+                              Free
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {ts.isPaid && !unlocked && (
+                              <button
+                                disabled={isUnlocking}
+                                onClick={() => onUnlock(ts)}
+                                className="inline-flex items-center gap-1.5 rounded-lg btn-gradient px-3 py-2 text-xs font-bold disabled:opacity-50"
+                              >
+                                {isUnlocking ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />}
+                                {isUnlocking ? "Processing…" : `Unlock ₹${Number(ts.price || 0).toLocaleString()}`}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onOpenSeries(ts)}
+                              className="inline-flex items-center gap-1.5 rounded-lg glass-pill px-3 py-2 text-xs font-bold text-white/80 hover:text-white"
+                            >
+                              View <ArrowRight size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <Pagination page={page} totalPages={totalPages} onChange={onPageChange} totalCount={totalCount} pageSize={PAGE_SIZE} />
+    </div>
+  );
+}
+
+function LevelIcon({ level }) {
+  if (level === 0) return <Tag size={16} className="text-purple-400" />;
+  if (level === 1) return <GraduationCap size={16} className="text-sky-400" />;
+  return <Layers size={16} className="text-brand-primary" />;
+}
+
+function CategoryCard({ category, idx, onClick }) {
+  const examCount = category.exams?.length || 0;
+  const seriesCount = (category.exams || []).reduce(
+    (sum, e) => sum + (e.testSeries?.length || 0),
+    0
+  );
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-2xl glass-card p-5 transition-all hover:border-brand-primary/30 hover:bg-white/5 animate-fade-up"
+      style={{ animationDelay: `${idx * 40}ms` }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
+          <Tag size={18} />
+        </div>
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/40">
+          {examCount} exam{examCount !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+        {category.title}
+      </h3>
+      {category.description && (
+        <p className="mt-1 text-xs text-white/50 line-clamp-2">{category.description}</p>
+      )}
+      <div className="mt-3 flex items-center justify-between text-[11px] text-white/40">
+        <span>{seriesCount} series</span>
+        <span className="flex items-center gap-1 text-brand-primary group-hover:gap-2 transition-all">
+          Explore <ArrowRight size={11} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function ExamCard({ exam, idx, onClick }) {
+  const seriesCount = exam.testSeries?.length || 0;
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-2xl glass-card p-5 transition-all hover:border-brand-primary/30 hover:bg-white/5 animate-fade-up"
+      style={{ animationDelay: `${idx * 40}ms` }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400">
+          <GraduationCap size={18} />
+        </div>
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/40">
+          {seriesCount} series
+        </span>
+      </div>
+      <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+        {exam.title}
+      </h3>
+      {exam.description && (
+        <p className="mt-1 text-xs text-white/50 line-clamp-2">{exam.description}</p>
+      )}
+      <div className="mt-3 flex items-center justify-end text-[11px] text-brand-primary">
+        <span className="flex items-center gap-1 group-hover:gap-2 transition-all">
+          View Series <ArrowRight size={11} />
+        </span>
+      </div>
+    </button>
   );
 }
 
@@ -334,136 +628,6 @@ function StatPill({ label, value }) {
   );
 }
 
-function SeriesTable({
-  topics,
-  totalCount,
-  search,
-  onSearch,
-  isUnlocked,
-  unlockingId,
-  onUnlock,
-  onOpen,
-  page,
-  totalPages,
-  onPageChange,
-}) {
-  return (
-    <div className="space-y-4">
-      {/* Search bar — mirrors the admin TestSeries search */}
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl glass-card p-4">
-        <div className="relative min-w-[260px] flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
-          <input
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search test series..."
-            className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
-          />
-        </div>
-      </div>
-
-      {/* Hierarchy table */}
-      <div className="overflow-hidden rounded-2xl glass-card">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.03]">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Test Series</th>
-                <th className="hidden px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50 md:table-cell">Description</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Stats</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Access</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest text-white/50">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {topics.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-sm text-white/40">
-                    <FileText className="mx-auto mb-3 text-white/20" size={36} />
-                    {totalCount === 0
-                      ? "No test series available yet — check back soon."
-                      : "No series match your search."}
-                  </td>
-                </tr>
-              ) : (
-                topics.map((topic, idx) => {
-                  const stats = getSeriesStats(topic);
-                  const unlocked = isUnlocked(topic);
-                  const isUnlocking = unlockingId === topic._id;
-                  return (
-                    <tr
-                      key={topic._id}
-                      className="transition-colors hover:bg-white/[0.04] animate-fade-up"
-                      style={{ animationDelay: `${idx * 25}ms` }}
-                    >
-                      <td className="px-6 py-4 text-sm font-semibold text-white">
-                        <button
-                          onClick={() => onOpen(topic)}
-                          className="flex items-center gap-2 text-left hover:text-brand-primary"
-                        >
-                          <Layers size={14} className="text-brand-primary shrink-0" />
-                          <span className="break-words">{topic.title}</span>
-                        </button>
-                      </td>
-                      <td className="hidden px-6 py-4 text-sm text-white/50 md:table-cell">
-                        <span className="line-clamp-2 break-words">{topic.description || "—"}</span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-white/60 whitespace-nowrap">
-                        <span className="font-bold text-white">{stats.subjects}</span> subj ·{" "}
-                        <span className="font-bold text-white">{stats.chapters}</span> ch ·{" "}
-                        <span className="font-bold text-white">{stats.total}</span> tests
-                      </td>
-                      <td className="px-6 py-4 text-xs">
-                        {topic.isPaid ? (
-                          unlocked ? (
-                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
-                              Unlocked
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
-                              <Lock size={10} /> ₹{Number(topic.price || 0).toLocaleString()}
-                            </span>
-                          )
-                        ) : (
-                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
-                            Free
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {topic.isPaid && !unlocked && (
-                            <button
-                              disabled={isUnlocking}
-                              onClick={() => onUnlock(topic)}
-                              className="inline-flex items-center gap-1.5 rounded-lg btn-gradient px-3 py-2 text-xs font-bold disabled:opacity-50"
-                            >
-                              {isUnlocking ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />}
-                              {isUnlocking ? "Processing…" : `Unlock ₹${Number(topic.price || 0).toLocaleString()}`}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => onOpen(topic)}
-                            className="inline-flex items-center gap-1.5 rounded-lg glass-pill px-3 py-2 text-xs font-bold text-white/80 hover:text-white"
-                          >
-                            View <ArrowRight size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <Pagination page={page} totalPages={totalPages} onChange={onPageChange} totalCount={totalCount} pageSize={PAGE_SIZE} />
-    </div>
-  );
-}
-
 function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, onView }) {
   return (
     <div className="space-y-4">
@@ -471,7 +635,7 @@ function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, on
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/10 bg-white/[0.03]">
+              <tr className="border-b border-white/10 bg-white/3">
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Test</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Date</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Score</th>
@@ -481,7 +645,7 @@ function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, on
             </thead>
             <tbody className="divide-y divide-white/5">
               {attempts.map((a) => (
-                <tr key={a._id} className="transition-colors hover:bg-white/[0.04]">
+                <tr key={a._id} className="transition-colors hover:bg-white/4">
                   <td className="px-6 py-4 text-sm font-semibold text-white">
                     {a.testId?.title || `Test Attempt #${a._id.slice(0, 6)}`}
                   </td>
@@ -515,7 +679,6 @@ function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, on
           </table>
         </div>
       </div>
-
       <Pagination page={page} totalPages={totalPages} onChange={onPageChange} totalCount={totalCount} pageSize={PAGE_SIZE} />
     </div>
   );

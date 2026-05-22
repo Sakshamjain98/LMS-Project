@@ -3,6 +3,8 @@ import * as adminService from "../admin/admin.service.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import News from "../../models/news.model.js";
 import Blog from "../../models/blog.model.js";
+import ExamCategory from "../../models/examCategory.model.js";
+import Exam from "../../models/exam.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
 import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
@@ -35,8 +37,10 @@ router.get(
 router.get(
   "/test-series",
   asyncHandler(async (req, res) => {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 6, 24);
-    const topics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 6, 50);
+    const filter = {};
+    if (req.query.examId) filter.examId = req.query.examId;
+    const topics = await TestSeriesTopic.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
     if (topics.length === 0) {
       return res.json({ success: true, topics: [] });
     }
@@ -78,6 +82,42 @@ router.get(
   })
 );
 
+
+// Public exam categories with exam list + series counts (for landing page navigation).
+router.get(
+  "/exam-categories",
+  asyncHandler(async (_req, res) => {
+    const categories = await ExamCategory.find({}).sort({ order: 1, createdAt: 1 }).lean();
+    if (!categories.length) return res.json({ success: true, categories: [] });
+
+    const exams = await Exam.find({ examCategoryId: { $in: categories.map((c) => c._id) } })
+      .sort({ order: 1, createdAt: 1 })
+      .lean();
+
+    // Attach series count per exam so cards can display it without a second request.
+    const examIds = exams.map((e) => e._id);
+    const seriesCounts = await TestSeriesTopic.aggregate([
+      { $match: { examId: { $in: examIds } } },
+      { $group: { _id: "$examId", count: { $sum: 1 } } },
+    ]);
+    const countByExam = new Map(seriesCounts.map((r) => [r._id.toString(), r.count]));
+
+    const examsByCat = new Map();
+    exams.forEach((e) => {
+      const list = examsByCat.get(e.examCategoryId.toString()) || [];
+      list.push({ ...e, seriesCount: countByExam.get(e._id.toString()) || 0 });
+      examsByCat.set(e.examCategoryId.toString(), list);
+    });
+
+    res.json({
+      success: true,
+      categories: categories.map((c) => ({
+        ...c,
+        exams: examsByCat.get(c._id.toString()) || [],
+      })),
+    });
+  })
+);
 
 // Public list of published blogs/articles for the landing page
 router.get(

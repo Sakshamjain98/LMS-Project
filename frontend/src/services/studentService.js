@@ -194,11 +194,22 @@ export const getPublicArticleById = async (id) => {
   }
 };
 
-export const getPublicTestSeries = async (limit = 6) => {
+export const getPublicTestSeries = async (limit = 6, examId = null) => {
   try {
-    const res = await api.get("/public/test-series", { params: { limit } });
+    const params = { limit };
+    if (examId) params.examId = examId;
+    const res = await api.get("/public/test-series", { params });
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Failed to fetch test series" };
+  }
+};
+
+export const getPublicExamCategories = async () => {
+  try {
+    const res = await api.get("/public/exam-categories");
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch exam categories" };
   }
 };

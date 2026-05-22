@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getStudentProfile,
@@ -8,6 +8,7 @@ import {
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
   ChevronRight,
+  ChevronLeft,
   CircleAlert,
   Clock,
   FileText,
@@ -21,15 +22,21 @@ import {
   ShieldAlert,
   CheckCircle2,
   PlayCircle,
+  Tag,
+  GraduationCap,
 } from "lucide-react";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [attempts, setAttempts] = useState([]);
-  const [topics, setTopics] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Hierarchy drill-down state for the "Test Series" section
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedExamId, setSelectedExamId] = useState(null);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -38,11 +45,13 @@ export default function StudentDashboard() {
         const [profRes, attemptsRes, testsRes] = await Promise.all([
           getStudentProfile().catch(() => ({})),
           getMyAttempts().catch(() => ({ data: [] })),
-          getAvailableTests().catch(() => ({ topics: [] })),
+          getAvailableTests().catch(() => ({ topics: [], categories: [] })),
         ]);
         setProfile(profRes.user || {});
         setAttempts(Array.isArray(attemptsRes.data) ? attemptsRes.data : []);
-        setTopics(Array.isArray(testsRes.topics) ? testsRes.topics : []);
+        const cats = Array.isArray(testsRes.categories) ? testsRes.categories : [];
+        setCategories(cats);
+        if (cats.length > 0) setSelectedCategoryId(cats[0]._id);
       } catch {
         setError("Failed to load some dashboard components.");
       } finally {
@@ -82,16 +91,19 @@ export default function StudentDashboard() {
     (a) => a.status === "submitted" || a.status === "evaluated"
   ).slice(0, 6);
 
-  // Featured series — show free + unlocked series first, top 6.
-  const featuredSeries = useMemo(() => {
-    const list = [...topics];
-    list.sort((a, b) => {
-      const aOpen = !a.isPaid || a.isUnlocked ? 0 : 1;
-      const bOpen = !b.isPaid || b.isUnlocked ? 0 : 1;
-      return aOpen - bOpen;
-    });
-    return list.slice(0, 6);
-  }, [topics]);
+  // Derived hierarchy nodes
+  const currentCategory = useMemo(
+    () => categories.find((c) => c._id === selectedCategoryId) || null,
+    [categories, selectedCategoryId]
+  );
+  const currentExam = useMemo(
+    () => (currentCategory?.exams || []).find((e) => e._id === selectedExamId) || null,
+    [currentCategory, selectedExamId]
+  );
+  const seriesForExam = useMemo(
+    () => (currentExam?.testSeries || []).slice(0, 6),
+    [currentExam]
+  );
 
   if (loading) {
     return (
@@ -142,27 +154,107 @@ export default function StudentDashboard() {
             <MetricCard icon={<LineChart size={22} />} label="Average Score" value={`${averageScore}%`} isPercentage />
           </div>
 
-          {/* Featured Series — card grid */}
-          <DashboardSection
-            title="Your Test Series"
-            actionLabel="Browse all"
-            actionTo="/student/tests"
-          >
-            {featuredSeries.length === 0 ? (
+          {/* Test Series — Category → Exam → Series hierarchy */}
+          <section>
+            <div className="mb-5 flex items-end justify-between">
+              <h2 className="text-xl font-bold text-white tracking-tight">Test Series</h2>
+              <Link
+                to="/student/tests"
+                className="group flex items-center text-sm font-semibold text-brand-primary hover:text-brand-primary/80"
+              >
+                Browse all
+                <ChevronRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </div>
+
+            {categories.length === 0 ? (
               <EmptyState title="No test series available yet" actionTo="/student/tests" actionLabel="Browse Catalog" />
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {featuredSeries.map((topic, idx) => (
-                  <SeriesCard
-                    key={topic._id}
-                    topic={topic}
-                    delay={idx * 50}
-                    onClick={() => navigate(`/student/tests/${topic._id}`)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Category tabs */}
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat._id}
+                      onClick={() => { setSelectedCategoryId(cat._id); setSelectedExamId(null); }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${
+                        selectedCategoryId === cat._id
+                          ? "btn-gradient border-transparent"
+                          : "bg-dark-200 border-white/5 text-white/60 hover:border-brand-primary/30 hover:text-white"
+                      }`}
+                    >
+                      <Tag size={11} />
+                      {cat.title}
+                    </button>
+                  ))}
+                </div>
+
+                {!selectedExamId ? (
+                  /* Exam grid */
+                  (currentCategory?.exams || []).length === 0 ? (
+                    <EmptyState title="No exams in this category yet" actionTo="/student/tests" actionLabel="Browse All" />
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {(currentCategory.exams || []).map((exam, idx) => (
+                        <button
+                          key={exam._id}
+                          onClick={() => setSelectedExamId(exam._id)}
+                          style={{ animationDelay: `${idx * 40}ms` }}
+                          className="group text-left animate-fade-up rounded-2xl border border-white/5 bg-dark-200 p-5 transition-colors hover:border-brand-primary/40 hover:bg-dark-100/60 flex flex-col gap-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+                              <GraduationCap size={18} />
+                            </div>
+                            <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
+                              {exam.testSeries?.length || 0} series
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+                            {exam.title}
+                          </h3>
+                          <div className="mt-auto inline-flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold bg-white/5 text-white/60 group-hover:bg-brand-primary/10 group-hover:text-brand-primary transition-colors">
+                            <span>View Series</span>
+                            <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  /* Series grid for selected exam */
+                  <>
+                    <div className="flex items-center gap-2 mb-4 text-sm">
+                      <button
+                        onClick={() => setSelectedExamId(null)}
+                        className="flex items-center gap-1.5 text-brand-primary hover:opacity-80 font-semibold transition"
+                      >
+                        <ChevronLeft size={14} />
+                        {currentCategory?.title}
+                      </button>
+                      <ChevronRight size={12} className="text-white/30" />
+                      <span className="text-white font-bold">{currentExam?.title}</span>
+                    </div>
+
+                    {seriesForExam.length === 0 ? (
+                      <EmptyState title="No test series in this exam yet" actionTo="/student/tests" actionLabel="Browse All" />
+                    ) : (
+                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {seriesForExam.map((topic, idx) => (
+                          <SeriesCard
+                            key={topic._id}
+                            topic={topic}
+                            delay={idx * 50}
+                            onClick={() => navigate(`/student/tests/${topic._id}`)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
-          </DashboardSection>
+          </section>
 
           {/* Continue Tests — card grid */}
           {continueTests.length > 0 && (

@@ -18,9 +18,12 @@ import {
   FileText,
   PenSquare,
   LayoutTemplate,
+  GraduationCap,
+  Tag,
+  Trophy,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { getTeacherTestSeries } from "../../services/teacherService";
+import { getTeacherFullHierarchy } from "../../services/teacherService";
 import logo from "../../assets/icons/logo.png";
 
 // 1. Dashboard, 2. Users, 3. Payments, 4. News, 5. Blogs,
@@ -43,7 +46,10 @@ export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem("adminSidebarCollapsed") || "false"); } catch { return false; }
   });
-  const [seriesTree, setSeriesTree] = useState([]);
+  // New hierarchy: categories → exams → series
+  const [categories, setCategories] = useState([]);
+  const [openCategory, setOpenCategory] = useState(null);
+  const [openExam, setOpenExam] = useState(null);
   const [openTopic, setOpenTopic] = useState(null);
   const [openSubject, setOpenSubject] = useState(null);
   const [seriesExpanded, setSeriesExpanded] = useState(true);
@@ -63,8 +69,8 @@ export default function AdminLayout() {
 
   useEffect(() => {
     let active = true;
-    getTeacherTestSeries()
-      .then((res) => { if (active) setSeriesTree(res?.topics || []); })
+    getTeacherFullHierarchy()
+      .then((res) => { if (active) setCategories(res?.categories || []); })
       .catch(() => {});
     return () => { active = false; };
   }, [location.pathname, location.search]);
@@ -81,8 +87,8 @@ export default function AdminLayout() {
   return (
     <div className="bg-dark-400 min-h-screen relative font-sans text-white">
       {/* Gradient ambient background — top-left + bottom-right only. */}
-      <div className="pointer-events-none fixed -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-brand-primary/20 blur-3xl animate-float-slow" />
-      <div className="pointer-events-none fixed -bottom-32 -right-24 h-[28rem] w-[28rem] rounded-full bg-brand-primary/20 blur-3xl" />
+      <div className="pointer-events-none fixed -top-32 -left-24 h-112 w-md rounded-full bg-brand-primary/20 blur-3xl animate-float-slow" />
+      <div className="pointer-events-none fixed -bottom-32 -right-24 h-112 w-md rounded-full bg-brand-primary/20 blur-3xl" />
 
       {/* Mobile toggle */}
       <button
@@ -132,7 +138,7 @@ export default function AdminLayout() {
             <NavItem key={item.path} item={item} collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           ))}
 
-          {/* Test Series — collapsible hierarchy */}
+          {/* Test Series hierarchy: Category → Exam → Series */}
           <div className="mt-1">
             <button
               onClick={() => setSeriesExpanded((v) => !v)}
@@ -154,6 +160,7 @@ export default function AdminLayout() {
 
             {!collapsed && seriesExpanded && (
               <div className="mt-1 space-y-0.5 pl-2 pr-1">
+                {/* All categories top-level link */}
                 <NavLink
                   to="/admin/test-series"
                   onClick={() => setMobileOpen(false)}
@@ -164,80 +171,146 @@ export default function AdminLayout() {
                   }
                   end
                 >
-                  <Layers size={13} className="text-brand-primary" />
-                  All Series
+                  <Tag size={13} className="text-purple-400" />
+                  All Categories
                 </NavLink>
 
-                {seriesTree.length === 0 ? (
-                  <p className="px-3 py-1.5 text-[11px] text-white/40">No series yet — create one →</p>
+                {categories.length === 0 ? (
+                  <p className="px-3 py-1.5 text-[11px] text-white/40">No categories yet — create one →</p>
                 ) : (
-                  seriesTree.map((topic) => (
-                    <div key={topic._id} className="min-w-0">
+                  categories.map((cat) => (
+                    <div key={cat._id} className="min-w-0">
+                      {/* Category row */}
                       <div className="flex items-center min-w-0">
                         <button
-                          onClick={() => setOpenTopic((v) => (v === topic._id ? null : topic._id))}
+                          onClick={() => setOpenCategory((v) => (v === cat._id ? null : cat._id))}
                           className="shrink-0 rounded-md p-1 text-white/40 hover:text-white"
                         >
-                          <ChevronRight size={12} className={`transition-transform ${openTopic === topic._id ? "rotate-90" : ""}`} />
+                          <ChevronRight size={12} className={`transition-transform ${openCategory === cat._id ? "rotate-90" : ""}`} />
                         </button>
                         <Link
-                          to={`/admin/test-series?level=subjects&topicId=${topic._id}`}
+                          to={`/admin/test-series?level=exams&categoryId=${cat._id}`}
                           onClick={() => setMobileOpen(false)}
                           className="flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/70 hover:bg-white/5 hover:text-white"
                         >
-                          <Layers size={12} className="text-brand-primary shrink-0" />
-                          <span className="truncate flex-1 min-w-0">{topic.title}</span>
+                          <Tag size={11} className="text-purple-400 shrink-0" />
+                          <span className="truncate flex-1 min-w-0">{cat.title}</span>
                           <span className="ml-auto shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
-                            {topic.subjects?.length || 0}
+                            {cat.exams?.length || 0}
                           </span>
                         </Link>
                       </div>
 
-                      {openTopic === topic._id && (
+                      {/* Exams under category */}
+                      {openCategory === cat._id && (
                         <div className="mb-1 ml-5 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
-                          {(topic.subjects || []).map((subj) => (
-                            <div key={subj._id} className="min-w-0">
+                          {(cat.exams || []).length === 0 ? (
+                            <p className="px-2 py-1 text-[10px] text-white/30">No exams</p>
+                          ) : (cat.exams || []).map((exam) => (
+                            <div key={exam._id} className="min-w-0">
+                              {/* Exam row */}
                               <div className="flex items-center min-w-0">
                                 <button
-                                  onClick={() => setOpenSubject((v) => (v === subj._id ? null : subj._id))}
+                                  onClick={() => setOpenExam((v) => (v === exam._id ? null : exam._id))}
                                   className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
                                 >
-                                  <ChevronRight size={11} className={`transition-transform ${openSubject === subj._id ? "rotate-90" : ""}`} />
+                                  <ChevronRight size={11} className={`transition-transform ${openExam === exam._id ? "rotate-90" : ""}`} />
                                 </button>
                                 <Link
-                                  to={`/admin/test-series?level=chapters&topicId=${topic._id}&subjectId=${subj._id}`}
+                                  to={`/admin/test-series?level=series&categoryId=${cat._id}&examId=${exam._id}`}
                                   onClick={() => setMobileOpen(false)}
                                   className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/60 hover:bg-white/5 hover:text-white"
                                 >
-                                  <Folder size={11} className="text-sky-400 shrink-0" />
-                                  <span className="truncate flex-1 min-w-0">{subj.title}</span>
+                                  <GraduationCap size={11} className="text-sky-400 shrink-0" />
+                                  <span className="truncate flex-1 min-w-0">{exam.title}</span>
                                 </Link>
                               </div>
 
-                              {openSubject === subj._id && (
+                              {/* Test series + AITS under exam */}
+                              {openExam === exam._id && (
                                 <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
-                                  {(subj.chapters || []).map((ch) => (
-                                    <Link
-                                      key={ch._id}
-                                      to={`/admin/test-series?level=tests&topicId=${topic._id}&subjectId=${subj._id}&chapterId=${ch._id}`}
-                                      onClick={() => setMobileOpen(false)}
-                                      className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
-                                    >
-                                      <FileText size={10} className="text-amber-400 shrink-0" />
-                                      <span className="truncate flex-1 min-w-0">{ch.title}</span>
-                                      <span className="ml-auto shrink-0 text-[9px] text-white/30">{ch.tests?.length || 0}</span>
-                                    </Link>
+                                  {/* Test series list (loaded via topics filtered by examId) */}
+                                  {(exam.testSeries || []).map((ts) => (
+                                    <div key={ts._id} className="min-w-0">
+                                      <div className="flex items-center min-w-0">
+                                        <button
+                                          onClick={() => setOpenTopic((v) => (v === ts._id ? null : ts._id))}
+                                          className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
+                                        >
+                                          <ChevronRight size={10} className={`transition-transform ${openTopic === ts._id ? "rotate-90" : ""}`} />
+                                        </button>
+                                        <Link
+                                          to={`/admin/test-series?level=subjects&categoryId=${cat._id}&examId=${exam._id}&topicId=${ts._id}`}
+                                          onClick={() => setMobileOpen(false)}
+                                          className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
+                                        >
+                                          <Layers size={10} className="text-brand-primary shrink-0" />
+                                          <span className="truncate flex-1 min-w-0">{ts.title}</span>
+                                          <span className="ml-auto shrink-0 text-[9px] text-white/30">{ts.subjects?.length || 0}</span>
+                                        </Link>
+                                      </div>
+
+                                      {/* Subjects under test series */}
+                                      {openTopic === ts._id && (
+                                        <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
+                                          {(ts.subjects || []).map((subj) => (
+                                            <div key={subj._id} className="min-w-0">
+                                              <div className="flex items-center min-w-0">
+                                                <button
+                                                  onClick={() => setOpenSubject((v) => (v === subj._id ? null : subj._id))}
+                                                  className="shrink-0 rounded-md p-1 text-white/30 hover:text-white"
+                                                >
+                                                  <ChevronRight size={10} className={`transition-transform ${openSubject === subj._id ? "rotate-90" : ""}`} />
+                                                </button>
+                                                <Link
+                                                  to={`/admin/test-series?level=chapters&categoryId=${cat._id}&examId=${exam._id}&topicId=${ts._id}&subjectId=${subj._id}`}
+                                                  onClick={() => setMobileOpen(false)}
+                                                  className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[10px] text-white/40 hover:bg-white/5 hover:text-white"
+                                                >
+                                                  <Folder size={9} className="text-teal-400 shrink-0" />
+                                                  <span className="truncate flex-1 min-w-0">{subj.title}</span>
+                                                </Link>
+                                              </div>
+                                              {openSubject === subj._id && (
+                                                <div className="ml-3 space-y-0.5 border-l border-white/5 pl-2 min-w-0">
+                                                  {(subj.chapters || []).map((ch) => (
+                                                    <Link
+                                                      key={ch._id}
+                                                      to={`/admin/test-series?level=tests&categoryId=${cat._id}&examId=${exam._id}&topicId=${ts._id}&subjectId=${subj._id}&chapterId=${ch._id}`}
+                                                      onClick={() => setMobileOpen(false)}
+                                                      className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[10px] text-white/40 hover:bg-white/5 hover:text-white"
+                                                    >
+                                                      <FileText size={9} className="text-amber-400 shrink-0" />
+                                                      <span className="truncate flex-1 min-w-0">{ch.title}</span>
+                                                      <span className="ml-auto shrink-0 text-[9px] text-white/30">{ch.tests?.length || 0}</span>
+                                                    </Link>
+                                                  ))}
+                                                  {!(subj.chapters || []).length && <p className="px-2 py-1 text-[9px] text-white/25">No chapters</p>}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {!(ts.subjects || []).length && <p className="px-2 py-1 text-[10px] text-white/30">No subjects</p>}
+                                        </div>
+                                      )}
+                                    </div>
                                   ))}
-                                  {(subj.chapters || []).length === 0 && (
-                                    <p className="px-2 py-1 text-[10px] text-white/30">No chapters</p>
-                                  )}
+
+                                  {/* AITS shortcut */}
+                                  <Link
+                                    to={`/admin/test-series?level=exams&categoryId=${cat._id}&examId=${exam._id}&aitsView=1`}
+                                    onClick={() => setMobileOpen(false)}
+                                    className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-amber-300/60 hover:bg-white/5 hover:text-amber-300"
+                                  >
+                                    <Trophy size={10} className="text-amber-400 shrink-0" />
+                                    <span className="truncate flex-1 min-w-0">AITS</span>
+                                  </Link>
+
+                                  {!(exam.testSeries || []).length && <p className="px-2 py-1 text-[10px] text-white/30">No test series</p>}
                                 </div>
                               )}
                             </div>
                           ))}
-                          {(topic.subjects || []).length === 0 && (
-                            <p className="px-2 py-1 text-[10px] text-white/30">No subjects</p>
-                          )}
                         </div>
                       )}
                     </div>
@@ -255,7 +328,7 @@ export default function AdminLayout() {
         </nav>
 
         {/* Profile + logout */}
-        <div className="border-t border-white/5 bg-white/[0.02] p-3">
+        <div className="border-t border-white/5 bg-white/2 p-3">
           {!collapsed && (
             <div className="mb-2 flex items-center gap-3 px-3 py-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary text-base font-bold shrink-0">

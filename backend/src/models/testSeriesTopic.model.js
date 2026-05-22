@@ -5,6 +5,8 @@ const testSeriesTopicSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 1000 },
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    // Optional parent exam — set when a test series belongs to a structured exam hierarchy.
+    examId: { type: mongoose.Schema.Types.ObjectId, ref: "Exam", default: null, index: true },
     // Pricing lives on the test series (topic), not on the individual test.
     // A topic is either free for all students or sold as a single bundle at `price`.
     isPaid: { type: Boolean, default: false },

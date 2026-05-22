@@ -188,15 +188,14 @@ export const paidNotes = asyncHandler(async (req, res) => {
 });
 
 export const getAvailableTests = asyncHandler(async (req, res) => {
-  const topics = await testSeriesService.getStudentSeriesTree();
-
-  // Annotate each paid topic with whether the current student has unlocked it
-  // (either via active premium subscription or a per-topic purchase).
   const userId = req.user._id;
   const sub = await service.getUserSubscription(userId);
   const subActive =
     sub?.status === "ACTIVE" && sub?.plan && sub.plan !== "FREE" &&
     (!sub.endDate || new Date(sub.endDate) > new Date());
+
+  // Flat topic list for backward-compatible `topics` key (used by SeriesDetail)
+  const topics = await testSeriesService.getStudentSeriesTree();
 
   const paidTopicIds = topics.filter((t) => t.isPaid).map((t) => t._id);
   const accessDocs = paidTopicIds.length
@@ -206,14 +205,31 @@ export const getAvailableTests = asyncHandler(async (req, res) => {
     : [];
   const unlockedSet = new Set(accessDocs.map((a) => a.topicId.toString()));
 
-  const annotated = topics.map((topic) => ({
+  const annotatedTopics = topics.map((topic) => ({
     ...topic,
     isUnlocked: !topic.isPaid || subActive || unlockedSet.has(topic._id.toString()),
   }));
 
+  // Full hierarchy for the new category/exam browse flow
+  const categories = await testSeriesService.getFullHierarchyTree({ publishedOnly: true });
+
+  // Annotate isUnlocked on testSeries topics within the hierarchy
+  const unlockedSetCopy = unlockedSet;
+  const annotateTopicsInHierarchy = (cat) => ({
+    ...cat,
+    exams: (cat.exams || []).map((exam) => ({
+      ...exam,
+      testSeries: (exam.testSeries || []).map((ts) => ({
+        ...ts,
+        isUnlocked: !ts.isPaid || subActive || unlockedSetCopy.has(ts._id?.toString()),
+      })),
+    })),
+  });
+
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
-    topics: annotated,
+    topics: annotatedTopics,
+    categories: categories.map(annotateTopicsInHierarchy),
   });
 });
 

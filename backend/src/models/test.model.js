@@ -13,6 +13,10 @@ const testSchema = new mongoose.Schema(
     topicId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesTopic", index: true },
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesSubject", index: true },
     chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "TestSeriesChapter", index: true },
+    // AITS tests: set aitsId instead of chapterId/subjectId/topicId.
+    aitsId: { type: mongoose.Schema.Types.ObjectId, ref: "AllIndiaTestSeries", default: null, index: true },
+    // "practice" = regular chapter test, "pyq" = past-year question test, "aits" = All India Test Series
+    type: { type: String, enum: ["practice", "pyq", "aits"], default: "practice", index: true },
     questions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Question" }],
     status: {
       type: String,

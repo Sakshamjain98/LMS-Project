@@ -69,6 +69,7 @@ export default function SeriesDetail() {
   const selectedChapterId = params.get("chapterId") || null;
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [testTypeTab, setTestTypeTab] = useState("practice"); // "practice" | "pyq"
 
   const updateUrl = (next) => {
     const merged = {
@@ -144,16 +145,19 @@ export default function SeriesDetail() {
     [chapters, selectedChapterId]
   );
   const tests = useMemo(() => selectedChapter?.tests || [], [selectedChapter]);
+  const practiceTests = useMemo(() => tests.filter((t) => t.type !== "pyq"), [tests]);
+  const pyqTests = useMemo(() => tests.filter((t) => t.type === "pyq"), [tests]);
+  const hasPyq = pyqTests.length > 0;
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     let rows = [];
     if (level === "subjects") rows = subjects;
     else if (level === "chapters") rows = chapters;
-    else rows = tests;
+    else rows = testTypeTab === "pyq" ? pyqTests : practiceTests;
     if (!q) return rows;
     return rows.filter((r) => (r.title || "").toLowerCase().includes(q));
-  }, [level, subjects, chapters, tests, search]);
+  }, [level, subjects, chapters, practiceTests, pyqTests, testTypeTab, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
@@ -163,7 +167,11 @@ export default function SeriesDetail() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, level, selectedSubjectId, selectedChapterId]);
+  }, [search, level, selectedSubjectId, selectedChapterId, testTypeTab]);
+
+  useEffect(() => {
+    setTestTypeTab("practice");
+  }, [selectedChapterId]);
 
   // Breadcrumb pieces for the hero
   const breadcrumbs = [
@@ -180,7 +188,13 @@ export default function SeriesDetail() {
   }
 
   const headerTitle =
-    level === "subjects" ? "Subjects" : level === "chapters" ? "Chapters" : "Tests";
+    level === "subjects"
+      ? "Subjects"
+      : level === "chapters"
+      ? "Chapters"
+      : testTypeTab === "pyq"
+      ? "PYQ Tests"
+      : "Practice Tests";
 
   const goBack = () => {
     if (level === "tests") updateUrl({ level: "chapters", chapterId: null });
@@ -391,6 +405,29 @@ export default function SeriesDetail() {
                 </div>
               </div>
 
+              {/* Practice / PYQ type tabs — only visible at tests level when PYQ tests exist */}
+              {level === "tests" && (hasPyq || practiceTests.length > 0) && (
+                <div className="mt-4 flex gap-2 rounded-2xl border border-white/10 bg-white/5 p-1.5">
+                  <TestTypeTabBtn
+                    active={testTypeTab === "practice"}
+                    onClick={() => setTestTypeTab("practice")}
+                    count={practiceTests.length}
+                  >
+                    Practice Tests
+                  </TestTypeTabBtn>
+                  {hasPyq && (
+                    <TestTypeTabBtn
+                      active={testTypeTab === "pyq"}
+                      onClick={() => setTestTypeTab("pyq")}
+                      count={pyqTests.length}
+                      variant="pyq"
+                    >
+                      PYQ Tests
+                    </TestTypeTabBtn>
+                  )}
+                </div>
+              )}
+
               <div className="mt-4 flex flex-wrap items-center gap-4 rounded-2xl glass-card p-4">
                 <div className="relative min-w-65 flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
@@ -456,7 +493,12 @@ export default function SeriesDetail() {
                             );
                           }
                           if (level === "chapters") {
-                            const ts = row.tests?.length || 0;
+                            const allTests = row.tests || [];
+                            const practiceCount = allTests.filter((t) => t.type !== "pyq").length;
+                            const pyqCount = allTests.filter((t) => t.type === "pyq").length;
+                            const meta = pyqCount > 0
+                              ? `${practiceCount} practice · ${pyqCount} PYQ`
+                              : `${allTests.length} test${allTests.length === 1 ? "" : "s"}`;
                             return (
                               <HierarchyRow
                                 key={row._id}
@@ -464,7 +506,7 @@ export default function SeriesDetail() {
                                 title={row.title}
                                 description={row.description}
                                 icon={<Folder size={14} className="text-amber-400" />}
-                                meta={`${ts} test${ts === 1 ? "" : "s"}`}
+                                meta={meta}
                                 onOpen={() => updateUrl({ level: "tests", chapterId: row._id })}
                               />
                             );
@@ -560,6 +602,36 @@ function HierarchyRow({ idx, title, description, icon, meta, onOpen }) {
   );
 }
 
+function TestTypeTabBtn({ active, onClick, count, variant = "practice", children }) {
+  const activeClass =
+    variant === "pyq"
+      ? "bg-purple-500/20 text-purple-200 border border-purple-500/40"
+      : "btn-gradient";
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-colors inline-flex items-center justify-center gap-2 ${
+        active ? activeClass : "text-white/60 hover:text-white"
+      }`}
+    >
+      {children}
+      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white/20" : "bg-white/5 text-white/40"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function TypeBadge({ type }) {
+  if (type === "pyq")
+    return (
+      <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-300">
+        PYQ
+      </span>
+    );
+  return null;
+}
+
 function TestRow({ idx, test, isUnlocked, attemptInfo, onStart, onViewResult }) {
   const latestAttempt = attemptInfo?.latest;
   const attemptCount = attemptInfo?.count || 0;
@@ -579,9 +651,10 @@ function TestRow({ idx, test, isUnlocked, attemptInfo, onStart, onViewResult }) 
       style={{ animationDelay: `${idx * 25}ms` }}
     >
       <td className="px-6 py-4 text-sm font-semibold text-white">
-        <div className="flex items-center gap-2">
-          <FileText size={14} className="text-brand-primary shrink-0" />
+        <div className="flex flex-wrap items-center gap-2">
+          <FileText size={14} className={test.type === "pyq" ? "text-purple-400 shrink-0" : "text-brand-primary shrink-0"} />
           <span className="wrap-break-word">{test.title}</span>
+          <TypeBadge type={test.type} />
         </div>
       </td>
       <td className="hidden px-6 py-4 text-sm text-white/50 md:table-cell">

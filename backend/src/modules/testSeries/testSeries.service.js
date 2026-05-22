@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
 import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
+import ExamCategory from "../../models/examCategory.model.js";
+import Exam from "../../models/exam.model.js";
+import AllIndiaTestSeries from "../../models/allIndiaTestSeries.model.js";
 import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import TestAttempt from "../../models/testAttempt.model.js";
@@ -45,11 +48,37 @@ const cascadeDeleteTests = async (testIds = []) => {
   await Test.deleteMany({ _id: { $in: testIds } });
 };
 
+export const assignTopicToExam = async (topicId, examId, teacherId) => {
+  const objTopicId = validateObjectId(topicId, "topicId");
+  const objTeacherId = validateObjectId(teacherId, "teacherId");
+
+  let examObjId = null;
+  if (examId) {
+    examObjId = validateObjectId(examId, "examId");
+    const exam = await (await import("../../models/exam.model.js")).default.findById(examObjId).lean();
+    if (!exam) throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
+  }
+
+  const updated = await TestSeriesTopic.findOneAndUpdate(
+    { _id: objTopicId, teacherId: objTeacherId },
+    { $set: { examId: examObjId } },
+    { new: true }
+  ).lean();
+
+  if (!updated) throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
+  return updated;
+};
+
 export const createTopic = async (payload, teacherId) => {
   const title = normalizeTitle(payload?.title, "Topic title");
   const description = normalizeDescription(payload?.description);
   const isPaid = Boolean(payload?.isPaid);
   const price = Math.max(0, Number(payload?.price) || 0);
+
+  let examId = null;
+  if (payload?.examId) {
+    examId = validateObjectId(payload.examId, "examId");
+  }
 
   return TestSeriesTopic.create({
     title,
@@ -57,6 +86,7 @@ export const createTopic = async (payload, teacherId) => {
     isPaid,
     price: isPaid ? price : 0,
     teacherId: validateObjectId(teacherId, "teacherId"),
+    examId,
   });
 };
 
@@ -523,7 +553,7 @@ export const getStudentSeriesTree = async () => {
 
   const tests = chapterIds.length
     ? await Test.find({ chapterId: { $in: chapterIds }, status: "published" })
-        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit")
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit type")
         .sort({ createdAt: -1 })
         .lean()
     : [];
@@ -562,4 +592,149 @@ export const getStudentSeriesTree = async () => {
     ...topic,
     subjects: subjectsByTopic.get(topic._id.toString()) || [],
   }));
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full hierarchy: ExamCategory → Exam → (TestSeries + AITS) for admin/student.
+// publishedOnly: true  → student view (only published tests, AITS unlocked)
+// publishedOnly: false → admin/teacher view (all statuses)
+// teacherId: if set, filter to that teacher's content only
+// ─────────────────────────────────────────────────────────────────────────────
+export const getFullHierarchyTree = async ({ publishedOnly = false, teacherId = null } = {}) => {
+  const categories = await ExamCategory.find({}).sort({ order: 1, createdAt: 1 }).lean();
+
+  const exams = await Exam.find({}).sort({ order: 1, createdAt: 1 }).lean();
+
+  const topicQuery = {};
+  if (teacherId) topicQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const topics = await TestSeriesTopic.find(topicQuery).sort({ createdAt: -1 }).lean();
+
+  const topicIds = topics.map((t) => t._id);
+  const subjectQuery = { topicId: { $in: topicIds } };
+  if (teacherId) subjectQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const subjects = topicIds.length
+    ? await TestSeriesSubject.find(subjectQuery).sort({ createdAt: 1 }).lean()
+    : [];
+
+  const subjectIds = subjects.map((s) => s._id);
+  const chapterQuery = { subjectId: { $in: subjectIds } };
+  if (teacherId) chapterQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const chapters = subjectIds.length
+    ? await TestSeriesChapter.find(chapterQuery).sort({ createdAt: 1 }).lean()
+    : [];
+
+  const chapterIds = chapters.map((c) => c._id);
+  const testQuery = { chapterId: { $in: chapterIds } };
+  if (publishedOnly) testQuery.status = "published";
+  if (teacherId) testQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const tests = chapterIds.length
+    ? await Test.find(testQuery)
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit type createdAt")
+        .sort({ createdAt: -1 })
+        .lean()
+    : [];
+
+  // AITS
+  const aitsQuery = {};
+  if (teacherId) aitsQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const aitsList = await AllIndiaTestSeries.find(aitsQuery).sort({ order: 1, createdAt: 1 }).lean();
+  const aitsIds = aitsList.map((a) => a._id);
+  const aitsTestQuery = { aitsId: { $in: aitsIds }, type: "aits" };
+  if (publishedOnly) aitsTestQuery.status = "published";
+  if (teacherId) aitsTestQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  const aitsTests = aitsIds.length
+    ? await Test.find(aitsTestQuery)
+        .select("title description status totalMarks duration startTime endTime aitsId questions isPaid isProctored attemptLimit type createdAt")
+        .sort({ createdAt: -1 })
+        .lean()
+    : [];
+
+  // --- Build maps ---
+  const testsByChapter = new Map();
+  tests.forEach((t) => {
+    const list = testsByChapter.get(t.chapterId?.toString()) || [];
+    list.push(t);
+    testsByChapter.set(t.chapterId?.toString(), list);
+  });
+
+  const chaptersBySubject = new Map();
+  chapters.forEach((c) => {
+    const allTests = testsByChapter.get(c._id.toString()) || [];
+    const practiceTests = allTests.filter((t) => t.type !== "pyq");
+    const pyqTests = allTests.filter((t) => t.type === "pyq");
+    const list = chaptersBySubject.get(c.subjectId.toString()) || [];
+    list.push({ ...c, tests: allTests, practiceTests, pyqTests });
+    chaptersBySubject.set(c.subjectId.toString(), list);
+  });
+
+  const subjectsByTopic = new Map();
+  subjects.forEach((s) => {
+    const list = subjectsByTopic.get(s.topicId.toString()) || [];
+    list.push({ ...s, chapters: chaptersBySubject.get(s._id.toString()) || [] });
+    subjectsByTopic.set(s.topicId.toString(), list);
+  });
+
+  const aitsTestsByAits = new Map();
+  aitsTests.forEach((t) => {
+    const list = aitsTestsByAits.get(t.aitsId?.toString()) || [];
+    list.push(t);
+    aitsTestsByAits.set(t.aitsId?.toString(), list);
+  });
+
+  const aitsByExam = new Map();
+  aitsList.forEach((a) => {
+    const list = aitsByExam.get(a.examId.toString()) || [];
+    list.push({ ...a, tests: aitsTestsByAits.get(a._id.toString()) || [] });
+    aitsByExam.set(a.examId.toString(), list);
+  });
+
+  const topicsByExam = new Map();
+  // Topics with an examId go under their exam; orphan topics (no examId) go under a virtual exam.
+  const orphanTopics = [];
+  topics.forEach((topic) => {
+    if (topic.examId) {
+      const list = topicsByExam.get(topic.examId.toString()) || [];
+      list.push({ ...topic, subjects: subjectsByTopic.get(topic._id.toString()) || [] });
+      topicsByExam.set(topic.examId.toString(), list);
+    } else {
+      orphanTopics.push({ ...topic, subjects: subjectsByTopic.get(topic._id.toString()) || [] });
+    }
+  });
+
+  const examsByCat = new Map();
+  exams.forEach((exam) => {
+    const list = examsByCat.get(exam.examCategoryId.toString()) || [];
+    list.push({
+      ...exam,
+      testSeries: topicsByExam.get(exam._id.toString()) || [],
+      allIndiaTestSeries: aitsByExam.get(exam._id.toString()) || [],
+    });
+    examsByCat.set(exam.examCategoryId.toString(), list);
+  });
+
+  const result = categories.map((cat) => ({
+    ...cat,
+    exams: examsByCat.get(cat._id.toString()) || [],
+  }));
+
+  // Append orphan topics (existing data before the hierarchy migration) as a synthetic category
+  if (orphanTopics.length) {
+    result.push({
+      _id: "uncategorized",
+      title: "Uncategorized",
+      description: "Test series not yet assigned to an exam",
+      slug: "uncategorized",
+      exams: [
+        {
+          _id: "uncategorized-exam",
+          title: "Uncategorized",
+          slug: "uncategorized-exam",
+          testSeries: orphanTopics,
+          allIndiaTestSeries: [],
+        },
+      ],
+    });
+  }
+
+  return result;
 };

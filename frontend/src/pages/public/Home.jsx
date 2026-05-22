@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
 import {
@@ -6,6 +6,7 @@ import {
   getPublicNews,
   getPublicSiteContent,
   getPublicTestSeries,
+  getPublicExamCategories,
 } from "../../services/studentService";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -28,6 +29,10 @@ import {
   FaChartLine,
   FaHeadset,
   FaMedal,
+  FaChevronLeft,
+  FaChevronRight,
+  FaLayerGroup,
+  FaSpinner,
 } from "react-icons/fa";
 import { normalizeYouTubeUrl } from "../../utils/youtube";
 
@@ -92,7 +97,7 @@ const TestimonialCard = ({ text, author, role, rating }) => (
     </div>
     <p className="text-gray-300 text-sm leading-relaxed mb-5">"{text}"</p>
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary text-xs font-bold flex-shrink-0">
+      <div className="w-9 h-9 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary text-xs font-bold shrink-0">
         {author[0]}
       </div>
       <div>
@@ -161,7 +166,7 @@ const PricingCard = ({
         <ul className="space-y-2.5 mb-8 flex-1">
           {plan.features.map((feature, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-gray-300">
-              <FaCheckCircle className="text-brand-primary mt-0.5 flex-shrink-0" size={13} />
+              <FaCheckCircle className="text-brand-primary mt-0.5 shrink-0" size={13} />
               {feature}
             </li>
           ))}
@@ -324,7 +329,6 @@ const Home = () => {
   const [articles, setArticles] = useState([]);
   const [news, setNews] = useState([]);
   const [cms, setCms] = useState(null);
-  const [seriesList, setSeriesList] = useState([]);
 
   const isAuthenticated = !!localStorage.getItem("token");
   const userRole = localStorage.getItem("userRole");
@@ -351,9 +355,6 @@ const Home = () => {
     getPublicSiteContent()
       .then((res) => setCms(res?.data || null))
       .catch(() => setCms(null));
-    getPublicTestSeries(6)
-      .then((res) => setSeriesList(res?.topics || []))
-      .catch(() => setSeriesList([]));
   }, []);
 
   /* CMS-driven content with static fallbacks. */
@@ -611,91 +612,9 @@ const Home = () => {
         </Section>
       )}
       {/* ══════════════════════════════════════════
-          TEST SERIES (NEW)
+          TEST SERIES — 3-level hierarchy
       ══════════════════════════════════════════ */}
-      <Section id="test-series" className="relative border-t border-dark-100 overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-brand-primary/10 blur-3xl" />
-          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-brand-primary/10 blur-3xl" />
-        </div>
-
-        <SectionHeading
-          eyebrow="Practice & Excel"
-          title="All-India Test Series"
-          subtitle="Mock exams with All India Rank, chapter-wise analytics, and real-exam pacing — built by pharmacy faculty."
-        />
-
-        {seriesList.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-16 text-center text-sm text-gray-400 mb-12">
-            No test series published yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {seriesList.map((s, i) => (
-              <div
-                key={s._id}
-                className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
-                style={{ animationDelay: `${i * 80}ms` }}
-              >
-                <span
-                  className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                    s.isPaid
-                      ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
-                      : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-                  }`}
-                >
-                  {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
-                </span>
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
-                  <FaMedal size={20} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
-                    Test Series
-                  </p>
-                  <h3 className="mt-1 text-lg font-bold text-white break-words">{s.title}</h3>
-                  {s.description && (
-                    <p className="mt-1.5 text-sm text-gray-400 leading-relaxed line-clamp-2 break-words">
-                      {s.description}
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-                  <div>
-                    <p className="text-base font-bold text-white">{s.testsCount}</p>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
-                  </div>
-                  <div>
-                    <p className="text-base font-bold text-white">{s.subjectsCount}</p>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Subjects</p>
-                  </div>
-                  <div>
-                    <p className="text-base font-bold text-brand-primary">{s.chaptersCount}</p>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Chapters</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleGetStarted}
-                  className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
-                >
-                  {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Attempt Free Test"}
-                  <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="text-center">
-          <button
-            onClick={handleGetStarted}
-            className="inline-flex items-center gap-2 px-7 py-3 btn-gradient rounded-lg font-bold text-sm hover:opacity-90 transition"
-          >
-            Browse All Test Series
-            <FaArrowRight size={13} />
-          </button>
-        </div>
-      </Section>
+      <PublicTestSeriesSection onGetStarted={handleGetStarted} />
 
 
 
@@ -727,9 +646,9 @@ const Home = () => {
                       className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-dark-200 to-dark-300" />
+                    <div className="absolute inset-0 bg-linear-to-br from-dark-200 to-dark-300" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/30 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4">
                     {r.rating > 0 && (
                       <div className="flex gap-0.5 mb-1.5">
@@ -1055,7 +974,7 @@ const Home = () => {
               aria-label={label}
               className={`
                 relative w-8 h-8 rounded-lg flex items-center justify-center
-                bg-gradient-to-br ${gradient}
+                bg-linear-to-br ${gradient}
                 text-white shadow-lg
                 hover:scale-110 hover:shadow-xl
                 transition-all duration-200
@@ -1158,5 +1077,261 @@ const Home = () => {
     </div>
   );
 };
+
+/* ─────────────────────────────────────────────────────────────
+   Public Test Series Section — 3-level Category → Exam → Series
+───────────────────────────────────────────────────────────── */
+
+function PublicTestSeriesSection({ onGetStarted }) {
+  const [categories, setCategories] = useState([]);
+  const [catLoading, setCatLoading] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedExamId, setSelectedExamId] = useState(null);
+  const [examSeries, setExamSeries] = useState([]);
+  const [seriesLoading, setSeriesLoading] = useState(false);
+
+  useEffect(() => {
+    getPublicExamCategories()
+      .then((res) => {
+        const cats = res?.categories || [];
+        setCategories(cats);
+        if (cats.length > 0) setSelectedCategoryId(cats[0]._id);
+      })
+      .catch(() => {})
+      .finally(() => setCatLoading(false));
+  }, []);
+
+  const fetchSeries = useCallback((examId) => {
+    setSeriesLoading(true);
+    getPublicTestSeries(20, examId)
+      .then((res) => setExamSeries(res?.topics || []))
+      .catch(() => setExamSeries([]))
+      .finally(() => setSeriesLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedExamId) { setExamSeries([]); return; }
+    fetchSeries(selectedExamId);
+  }, [selectedExamId, fetchSeries]);
+
+  const currentCategory = categories.find((c) => c._id === selectedCategoryId) || null;
+  const currentExam = selectedExamId
+    ? (currentCategory?.exams || []).find((e) => e._id === selectedExamId) || null
+    : null;
+  const examsToShow = currentCategory?.exams || [];
+
+  return (
+    <Section id="test-series" className="relative border-t border-dark-100 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 -left-16 h-72 w-72 rounded-full bg-brand-primary/10 blur-3xl" />
+        <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-brand-primary/10 blur-3xl" />
+      </div>
+
+      <SectionHeading
+        eyebrow="Practice & Excel"
+        title="Browse Test Series"
+        subtitle="Pick your exam category, choose an exam, and start practising with real-exam pacing, chapter-wise analytics, and All-India Rank."
+      />
+
+      {catLoading ? (
+        <CatLoadingSkeleton />
+      ) : categories.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-16 text-center text-sm text-gray-400 mb-10">
+          No test series published yet — check back soon.
+        </div>
+      ) : (
+        <>
+          {/* ── Category tabs ── */}
+          <div className="flex flex-wrap gap-2 mb-8">
+            {categories.map((cat) => (
+              <button
+                key={cat._id}
+                onClick={() => { setSelectedCategoryId(cat._id); setSelectedExamId(null); }}
+                className={`px-5 py-2 rounded-full text-sm font-bold border transition-all ${
+                  selectedCategoryId === cat._id
+                    ? "btn-gradient border-transparent shadow-lg shadow-brand-primary/20"
+                    : "bg-dark-200 border-dark-100 text-gray-400 hover:border-brand-primary/40 hover:text-white"
+                }`}
+              >
+                {cat.title}
+                <span className="ml-1.5 text-[10px] opacity-60">
+                  ({cat.exams?.length || 0})
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {!selectedExamId ? (
+            /* ── Exam cards ── */
+            examsToShow.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-12 text-center text-sm text-gray-500 mb-10">
+                No exams in this category yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
+                {examsToShow.map((exam, i) => (
+                  <ExamPublicCard
+                    key={exam._id}
+                    exam={exam}
+                    idx={i}
+                    onClick={() => setSelectedExamId(exam._id)}
+                  />
+                ))}
+              </div>
+            )
+          ) : (
+            /* ── Test series cards for selected exam ── */
+            <>
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-2 mb-6 text-sm">
+                <button
+                  onClick={() => setSelectedExamId(null)}
+                  className="flex items-center gap-1.5 text-brand-primary hover:opacity-80 font-semibold transition"
+                >
+                  <FaChevronLeft size={11} />
+                  {currentCategory?.title}
+                </button>
+                <FaChevronRight size={11} className="text-gray-600" />
+                <span className="text-white font-bold">{currentExam?.title}</span>
+              </div>
+
+              {seriesLoading ? (
+                <SeriesLoadingSkeleton />
+              ) : examSeries.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-12 text-center text-sm text-gray-500 mb-10">
+                  No test series for this exam yet — check back soon.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                  {examSeries.map((s, i) => (
+                    <TestSeriesPublicCard key={s._id} series={s} idx={i} onAction={onGetStarted} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      <div className="text-center mt-4">
+        <button
+          onClick={onGetStarted}
+          className="inline-flex items-center gap-2 px-7 py-3 btn-gradient rounded-lg font-bold text-sm hover:opacity-90 transition"
+        >
+          Browse All Test Series
+          <FaArrowRight size={13} />
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+function ExamPublicCard({ exam, idx, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${idx * 60}ms` }}
+      className="group text-left rounded-2xl bg-dark-200 border border-dark-100 p-5 hover:border-brand-primary/40 hover:bg-dark-100/80 transition-all animate-fade-up flex flex-col gap-3"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
+        <FaGraduationCap size={18} />
+      </div>
+      <div className="min-w-0">
+        <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+          {exam.title}
+        </h3>
+        <p className="text-[11px] text-gray-500 mt-1">
+          {exam.seriesCount || 0} series
+        </p>
+      </div>
+      <div className="mt-auto flex items-center justify-end text-[11px] text-brand-primary">
+        <span className="flex items-center gap-1 group-hover:gap-2 transition-all">
+          Explore <FaArrowRight size={9} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function TestSeriesPublicCard({ series: s, idx, onAction }) {
+  return (
+    <div
+      className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
+      style={{ animationDelay: `${idx * 80}ms` }}
+    >
+      <span
+        className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+          s.isPaid
+            ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
+            : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+        }`}
+      >
+        {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
+      </span>
+      <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
+        <FaMedal size={20} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
+          Test Series
+        </p>
+        <h3 className="mt-1 text-lg font-bold text-white wrap-break-word">{s.title}</h3>
+        {s.description && (
+          <p className="mt-1.5 text-sm text-gray-400 leading-relaxed line-clamp-2 wrap-break-word">
+            {s.description}
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+        <div>
+          <p className="text-base font-bold text-white">{s.testsCount || 0}</p>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
+        </div>
+        <div>
+          <p className="text-base font-bold text-white">{s.subjectsCount || 0}</p>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500">Subjects</p>
+        </div>
+        <div>
+          <p className="text-base font-bold text-brand-primary">{s.chaptersCount || 0}</p>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500">Chapters</p>
+        </div>
+      </div>
+      <button
+        onClick={onAction}
+        className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+      >
+        {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Attempt Free Test"}
+        <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
+      </button>
+    </div>
+  );
+}
+
+function CatLoadingSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse mb-10">
+      <div className="flex gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-9 w-28 rounded-full bg-dark-200" />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <div key={i} className="h-36 rounded-2xl bg-dark-200" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SeriesLoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse mb-10">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="h-64 rounded-2xl bg-dark-200" />
+      ))}
+    </div>
+  );
+}
 
 export default Home;

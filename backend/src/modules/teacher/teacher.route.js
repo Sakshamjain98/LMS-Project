@@ -6,6 +6,9 @@ import { upload } from "../../middlewares/upload.middleware.js";
 
 import * as analyticsController from "../analytics/analytics.controller.js";
 import * as testSeriesController from "../testSeries/testSeries.controller.js";
+import examCategoryRoutes from "../examCategory/examCategory.routes.js";
+import examRoutes from "../exam/exam.routes.js";
+import aitsRoutes from "../aits/aits.routes.js";
 
 const router = express.Router();
 
@@ -129,8 +132,15 @@ router.get(
   analyticsController.getQuestionAnalytics
 );
 
+// ========== EXAM CATEGORIES / EXAMS / AITS ==========
+router.use("/exam-categories", examCategoryRoutes);
+router.use("/exams", examRoutes);
+router.use("/aits", aitsRoutes);
+
 // ========== TEST SERIES ==========
 router.get("/test-series", testSeriesController.getSeriesTree);
+// Full hierarchy (categories → exams → series → subjects → chapters → tests + AITS)
+router.get("/test-series/hierarchy", testSeriesController.getFullHierarchy);
 router.post("/test-series/topics", testSeriesController.createTopic);
 router.put("/test-series/topics/:topicId", testSeriesController.updateTopic);
 router.delete("/test-series/topics/:topicId", testSeriesController.deleteTopic);
@@ -145,6 +155,9 @@ router.delete("/test-series/chapters/:chapterId", testSeriesController.deleteCha
 
 router.post("/test-series/chapters/:chapterId/tests", testSeriesController.createTestInChapter);
 router.get("/test-series/topics/:topicId/analytics", testSeriesController.getTopicAnalytics);
+
+// Assign a test series (topic) to an exam
+router.patch("/test-series/topics/:topicId/assign-exam", testSeriesController.assignTopicToExam);
 
 // ========== PERFORMANCE ==========
 router.get("/performance", controller.studentPerformance);

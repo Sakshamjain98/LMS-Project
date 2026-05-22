@@ -11,6 +11,14 @@ export const getSeriesTree = asyncHandler(async (req, res) => {
   });
 });
 
+export const getFullHierarchy = asyncHandler(async (req, res) => {
+  const tree = await seriesService.getFullHierarchyTree({
+    publishedOnly: false,
+    teacherId: req.user._id,
+  });
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, categories: tree });
+});
+
 export const createTopic = asyncHandler(async (req, res) => {
   const topic = await seriesService.createTopic(req.body, req.user._id);
   res.status(STATUS_CODES.CREATED).json({
@@ -105,4 +113,13 @@ export const createTestInChapter = asyncHandler(async (req, res) => {
 export const getTopicAnalytics = asyncHandler(async (req, res) => {
   const data = await seriesService.getTopicAnalytics(req.params.topicId, req.user._id);
   res.status(STATUS_CODES.SUCCESS).json({ success: true, ...data });
+});
+
+export const assignTopicToExam = asyncHandler(async (req, res) => {
+  const topic = await seriesService.assignTopicToExam(
+    req.params.topicId,
+    req.body.examId,
+    req.user._id
+  );
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Test series assigned", topic });
 });
