@@ -14,7 +14,9 @@ import {
   Search,
   Layers,
   ShieldAlert,
+  Zap,
 } from "lucide-react";
+import { formatDuration } from "./TestResult";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
   getAvailableTests,
@@ -134,6 +136,10 @@ export default function SeriesDetail() {
     }, {});
   }, [attempts]);
 
+  // Detect All India Test Series: type="aits" or no subjects but has direct tests
+  const isAits = topic?.type === "aits" || (topic?.subjects?.length === 0 && (topic?.tests?.length ?? 0) > 0);
+  const aitsTests = useMemo(() => topic?.tests || [], [topic]);
+
   const subjects = useMemo(() => topic?.subjects || [], [topic]);
   const selectedSubject = useMemo(
     () => subjects.find((s) => s._id === selectedSubjectId) || null,
@@ -152,12 +158,18 @@ export default function SeriesDetail() {
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     let rows = [];
-    if (level === "subjects") rows = subjects;
-    else if (level === "chapters") rows = chapters;
-    else rows = testTypeTab === "pyq" ? pyqTests : practiceTests;
+    if (isAits) {
+      rows = aitsTests;
+    } else if (level === "subjects") {
+      rows = subjects;
+    } else if (level === "chapters") {
+      rows = chapters;
+    } else {
+      rows = testTypeTab === "pyq" ? pyqTests : practiceTests;
+    }
     if (!q) return rows;
     return rows.filter((r) => (r.title || "").toLowerCase().includes(q));
-  }, [level, subjects, chapters, practiceTests, pyqTests, testTypeTab, search]);
+  }, [isAits, aitsTests, level, subjects, chapters, practiceTests, pyqTests, testTypeTab, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
@@ -317,6 +329,11 @@ export default function SeriesDetail() {
                 <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      {isAits && (
+                        <span className="rounded-full bg-yellow-500/15 border border-yellow-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-yellow-300 inline-flex items-center gap-1.5">
+                          <Zap size={10} /> All India Test Series
+                        </span>
+                      )}
                       {topic.isPaid ? (
                         isUnlocked ? (
                           <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
@@ -343,15 +360,21 @@ export default function SeriesDetail() {
                       <p className="mt-2 max-w-2xl text-sm text-white/60 wrap-break-word">{topic.description}</p>
                     )}
                     <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/60">
-                      <Pill label="Subjects" value={subjects.length} />
-                      <Pill label="Chapters" value={subjects.reduce((n, s) => n + (s.chapters?.length || 0), 0)} />
-                      <Pill
-                        label="Tests"
-                        value={subjects.reduce(
-                          (n, s) => n + (s.chapters || []).reduce((m, c) => m + (c.tests?.length || 0), 0),
-                          0
-                        )}
-                      />
+                      {isAits ? (
+                        <Pill label="Tests" value={aitsTests.length} />
+                      ) : (
+                        <>
+                          <Pill label="Subjects" value={subjects.length} />
+                          <Pill label="Chapters" value={subjects.reduce((n, s) => n + (s.chapters?.length || 0), 0)} />
+                          <Pill
+                            label="Tests"
+                            value={subjects.reduce(
+                              (n, s) => n + (s.chapters || []).reduce((m, c) => m + (c.tests?.length || 0), 0),
+                              0
+                            )}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -375,56 +398,71 @@ export default function SeriesDetail() {
                 </div>
               </div>
 
-              {/* Drill-down toolbar — mirrors the admin TestSeries.jsx layout */}
-              <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-white">{headerTitle}</h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/50">
-                    {breadcrumbs.map((b, i) => (
-                      <span key={`${b.label}-${i}`} className="inline-flex items-center gap-1.5">
+              {/* Drill-down toolbar — hidden for AITS (flat list mode) */}
+              {!isAits && (
+                <>
+                  <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">{headerTitle}</h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/50">
+                        {breadcrumbs.map((b, i) => (
+                          <span key={`${b.label}-${i}`} className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={b.onClick}
+                              className="rounded-full glass-pill px-2 py-0.5 text-white/80 hover:text-white"
+                            >
+                              {b.label}
+                            </button>
+                            {i < breadcrumbs.length - 1 && <ChevronRight size={11} />}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {level !== "subjects" && (
                         <button
-                          onClick={b.onClick}
-                          className="rounded-full glass-pill px-2 py-0.5 text-white/80 hover:text-white"
+                          onClick={goBack}
+                          className="rounded-xl glass-pill px-4 py-2 text-sm font-medium text-white/80 hover:text-white"
                         >
-                          {b.label}
+                          ← Back
                         </button>
-                        {i < breadcrumbs.length - 1 && <ChevronRight size={11} />}
-                      </span>
-                    ))}
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {level !== "subjects" && (
-                    <button
-                      onClick={goBack}
-                      className="rounded-xl glass-pill px-4 py-2 text-sm font-medium text-white/80 hover:text-white"
-                    >
-                      ← Back
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Practice / PYQ type tabs — only visible at tests level when PYQ tests exist */}
-              {level === "tests" && (hasPyq || practiceTests.length > 0) && (
-                <div className="mt-4 flex gap-2 rounded-2xl border border-white/10 bg-white/5 p-1.5">
-                  <TestTypeTabBtn
-                    active={testTypeTab === "practice"}
-                    onClick={() => setTestTypeTab("practice")}
-                    count={practiceTests.length}
-                  >
-                    Practice Tests
-                  </TestTypeTabBtn>
-                  {hasPyq && (
-                    <TestTypeTabBtn
-                      active={testTypeTab === "pyq"}
-                      onClick={() => setTestTypeTab("pyq")}
-                      count={pyqTests.length}
-                      variant="pyq"
-                    >
-                      PYQ Tests
-                    </TestTypeTabBtn>
+                  {/* Practice / PYQ type tabs */}
+                  {level === "tests" && (hasPyq || practiceTests.length > 0) && (
+                    <div className="mt-4 flex gap-2 rounded-2xl border border-white/10 bg-white/5 p-1.5">
+                      <TestTypeTabBtn
+                        active={testTypeTab === "practice"}
+                        onClick={() => setTestTypeTab("practice")}
+                        count={practiceTests.length}
+                      >
+                        Practice Tests
+                      </TestTypeTabBtn>
+                      {hasPyq && (
+                        <TestTypeTabBtn
+                          active={testTypeTab === "pyq"}
+                          onClick={() => setTestTypeTab("pyq")}
+                          count={pyqTests.length}
+                          variant="pyq"
+                        >
+                          PYQ Tests
+                        </TestTypeTabBtn>
+                      )}
+                    </div>
                   )}
+                </>
+              )}
+
+              {/* AITS header label */}
+              {isAits && (
+                <div className="mt-8 flex items-center gap-2">
+                  <Zap size={18} className="text-yellow-400" />
+                  <h2 className="text-xl font-bold text-white">All India Tests</h2>
+                  <span className="rounded-full bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 text-[11px] font-bold text-yellow-300">
+                    {aitsTests.length} Tests
+                  </span>
                 </div>
               )}
 
@@ -440,25 +478,25 @@ export default function SeriesDetail() {
                 </div>
               </div>
 
-              {/* Hierarchy table */}
+              {/* Hierarchy / AITS table */}
               <div className="mt-4 overflow-hidden rounded-2xl glass-card">
                 <div className="overflow-x-auto custom-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-white/10 bg-white/3">
                         <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">
-                          {headerTitle.replace(/s$/, "")}
+                          {isAits ? "Test" : headerTitle.replace(/s$/, "")}
                         </th>
                         <th className="hidden px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50 md:table-cell">
                           Description
                         </th>
-                        {level === "tests" && (
+                        {(isAits || level === "tests") && (
                           <>
                             <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Info</th>
-                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Status</th>
+                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Attempts</th>
                           </>
                         )}
-                        {level !== "tests" && (
+                        {!isAits && level !== "tests" && (
                           <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Items</th>
                         )}
                         <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest text-white/50">
@@ -472,14 +510,31 @@ export default function SeriesDetail() {
                           <td colSpan={5} className="px-6 py-16 text-center text-sm text-white/40">
                             <FileText className="mx-auto mb-3 text-white/20" size={36} />
                             {filteredRows.length === 0 && search
-                              ? `No ${headerTitle.toLowerCase()} match your search.`
+                              ? `No tests match your search.`
+                              : isAits
+                              ? "No tests in this All India Test Series yet."
                               : `No ${headerTitle.toLowerCase()} here yet.`}
                           </td>
                         </tr>
                       ) : (
                         paginatedRows.map((row, idx) => {
+                          // AITS or tests level — always render TestRow
+                          if (isAits || level === "tests") {
+                            return (
+                              <TestRow
+                                key={row._id}
+                                idx={idx}
+                                test={row}
+                                isUnlocked={isUnlocked}
+                                attemptInfo={attemptsByTest[row._id]}
+                                onStart={() => handleStartTest(row._id)}
+                                onViewResult={(id) => handleViewResult(id)}
+                              />
+                            );
+                          }
                           if (level === "subjects") {
                             const ch = row.chapters?.length || 0;
+                            const totalTests = (row.chapters || []).reduce((n, c) => n + (c.tests?.length || 0), 0);
                             return (
                               <HierarchyRow
                                 key={row._id}
@@ -487,7 +542,7 @@ export default function SeriesDetail() {
                                 title={row.title}
                                 description={row.description}
                                 icon={<Folder size={14} className="text-sky-400" />}
-                                meta={`${ch} chapter${ch === 1 ? "" : "s"}`}
+                                meta={`${ch} chapter${ch === 1 ? "" : "s"} · ${totalTests} tests`}
                                 onOpen={() => updateUrl({ level: "chapters", subjectId: row._id, chapterId: null })}
                               />
                             );
@@ -511,18 +566,7 @@ export default function SeriesDetail() {
                               />
                             );
                           }
-                          // level === "tests"
-                          return (
-                            <TestRow
-                              key={row._id}
-                              idx={idx}
-                              test={row}
-                              isUnlocked={isUnlocked}
-                              attemptInfo={attemptsByTest[row._id]}
-                              onStart={() => handleStartTest(row._id)}
-                              onViewResult={(id) => handleViewResult(id)}
-                            />
-                          );
+                          return null;
                         })
                       )}
                     </tbody>
@@ -668,7 +712,7 @@ function TestRow({ idx, test, isUnlocked, attemptInfo, onStart, onViewResult }) 
           </span>
           <span className="inline-flex items-center gap-1">
             <Clock size={11} className="text-brand-primary/70" />
-            {test.duration || 0}m
+            {test.duration ? formatDuration(test.duration * 60) : "—"}
           </span>
           {test.isProctored && (
             <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
