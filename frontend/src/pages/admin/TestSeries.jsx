@@ -309,6 +309,8 @@ export default function AdminTestSeries() {
         title: data.title || "", description: data.description || "",
         isPaid: Boolean(data.isPaid), price: Number(data.price) || 0, examId: data.examId || "",
       });
+      setModalState({ isOpen: true, type, mode, editId: data._id });
+      return;
     } else {
       setEntityForm({ ...emptyEntityForm, examId: selectedExamId || "" });
     }
@@ -353,23 +355,25 @@ export default function AdminTestSeries() {
   const handleUpdateEntity = async () => {
     if (!entityForm.title.trim()) return;
     setActionLoading(true);
+    const editId = modalState.editId;
     try {
       if (aitsView && !selectedAitsId) {
-        await updateAITS(/* edited aits id from confirmState or modal context */ null, entityForm);
+        await updateAITS(editId, entityForm);
+        await fetchAITS(selectedExamId);
       } else if (level === "categories") {
-        await updateExamCategory(selectedCategoryId, entityForm);
+        await updateExamCategory(editId, entityForm);
         await fetchData();
       } else if (level === "exams") {
-        await updateExam(selectedExamId, entityForm);
+        await updateExam(editId, entityForm);
         await fetchExams(selectedCategoryId);
       } else if (level === "series") {
-        await updateTestSeriesTopic(selectedTopicId, entityForm);
+        await updateTestSeriesTopic(editId, entityForm);
         await fetchData();
       } else if (level === "subjects") {
-        await updateTestSeriesSubject(selectedSubjectId, entityForm);
+        await updateTestSeriesSubject(editId, entityForm);
         await fetchData();
       } else if (level === "chapters") {
-        await updateTestSeriesChapter(selectedChapterId, entityForm);
+        await updateTestSeriesChapter(editId, entityForm);
         await fetchData();
       }
       closeModal();
