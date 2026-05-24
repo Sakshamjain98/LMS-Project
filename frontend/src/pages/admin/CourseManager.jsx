@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-  BookOpen, Plus, ChevronRight, Trash2, Pencil, Check, X,
+  BookOpen, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, Check, X,
   FileText, Video, Link2, Loader2, Upload, Eye,
   GraduationCap, Folder, Tag, Search, DollarSign, Globe, EyeOff,
-  ChevronDown, Layers, Settings,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
@@ -18,23 +18,101 @@ import {
   linkTestToChapter, unlinkTestFromChapter,
 } from "../../services/courseService";
 import api from "../../services/api";
+import ConfirmationModal from "../../components/ui/ConfirmationModal";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Level definitions ────────────────────────────────────────────────────────
 
-const QUILL_MODULES = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ["bold", "italic", "underline", "strike"],
-    [{ list: "ordered" }, { list: "bullet" }],
-    ["blockquote", "code-block"],
-    ["link"],
-    [{ color: [] }, { background: [] }],
-    ["clean"],
-  ],
+const LEVEL_LABELS = {
+  categories: "Exam Categories",
+  exams: "Exams",
+  courses: "Courses",
+  subjects: "Subjects",
+  chapters: "Chapters",
 };
-const QUILL_FORMATS = ["header","bold","italic","underline","strike","list","blockquote","code-block","link","color","background"];
 
-// ─── UI Atoms ─────────────────────────────────────────────────────────────────
+const LEVEL_ICON = {
+  categories: Tag,
+  exams: GraduationCap,
+  courses: BookOpen,
+  subjects: Folder,
+  chapters: FileText,
+};
+
+const ICON_COLOR = {
+  categories: "text-purple-400",
+  exams: "text-sky-400",
+  courses: "text-brand-primary",
+  subjects: "text-teal-400",
+  chapters: "text-amber-400",
+};
+
+const PAGE_SIZE = 10;
+
+// ─── Shared field styles ──────────────────────────────────────────────────────
+
+const fi = "w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-brand-primary focus:outline-none transition-colors";
+
+// ─── UI primitives ────────────────────────────────────────────────────────────
+
+function FieldLabel({ label, hint, required, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70">
+        {label}{required && <span className="text-red-400">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-[11px] text-white/40">{hint}</p>}
+    </div>
+  );
+}
+
+function PaginationBar({ page, totalPages, totalCount, pageSize, onChange }) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/60">
+      <span>
+        Showing <span className="font-bold text-white">{start}</span>–
+        <span className="font-bold text-white">{end}</span> of{" "}
+        <span className="font-bold text-white">{totalCount}</span>
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
+        >
+          <ChevronLeft size={12} /> Prev
+        </button>
+        <span className="px-2 font-semibold text-white">{page} / {totalPages}</span>
+        <button
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
+        >
+          Next <ChevronRight size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Modal({ isOpen, title, onClose, children }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="w-full max-w-xl rounded-2xl glass-panel p-6 animate-fade-up">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function Btn({ children, onClick, variant = "primary", className = "", disabled, type = "button" }) {
   const base = "inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-40";
@@ -44,20 +122,10 @@ function Btn({ children, onClick, variant = "primary", className = "", disabled,
     danger: "text-red-400 hover:bg-red-500/10",
     outline: "border border-white/10 text-white/80 hover:bg-white/5",
   };
-  return <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${v[variant]} ${className}`}>{children}</button>;
-}
-
-function InlineInput({ value, onSave, onCancel, placeholder }) {
-  const [val, setVal] = useState(value);
   return (
-    <form onSubmit={(e) => { e.preventDefault(); val.trim() && onSave(val.trim()); }} className="flex items-center gap-1.5 flex-1 min-w-0">
-      <input
-        autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder}
-        className="flex-1 min-w-0 rounded-lg border border-brand-primary/40 bg-white/5 px-2.5 py-1.5 text-xs text-white placeholder-white/30 outline-none focus:border-brand-primary"
-      />
-      <button type="submit" disabled={!val.trim()} className="rounded-md bg-brand-primary/20 p-1 text-brand-primary disabled:opacity-30 hover:bg-brand-primary/30"><Check size={12} /></button>
-      <button type="button" onClick={onCancel} className="rounded-md p-1 text-white/40 hover:bg-white/5"><X size={12} /></button>
-    </form>
+    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${v[variant]} ${className}`}>
+      {children}
+    </button>
   );
 }
 
@@ -78,8 +146,8 @@ function TestPicker({ onLink, existingTestIds = [] }) {
       .finally(() => setLoading(false));
   }, [open]);
 
-  const filtered = tests.filter((t) =>
-    !existingTestIds.includes(String(t._id)) && t.title.toLowerCase().includes(query.toLowerCase())
+  const filtered = tests.filter(
+    (t) => !existingTestIds.includes(String(t._id)) && t.title.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -91,25 +159,40 @@ function TestPicker({ onLink, existingTestIds = [] }) {
         <div className="absolute right-0 top-10 z-30 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2">
             <Search size={13} className="text-white/40" />
-            <input autoFocus placeholder="Search tests..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1 bg-transparent text-xs text-white placeholder-white/30 outline-none" />
+            <input
+              autoFocus
+              placeholder="Search tests..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 bg-transparent text-xs text-white placeholder-white/30 outline-none"
+            />
           </div>
           {loading ? (
-            <div className="flex justify-center py-3"><Loader2 size={18} className="animate-spin text-brand-primary" /></div>
+            <div className="flex justify-center py-3">
+              <Loader2 size={18} className="animate-spin text-brand-primary" />
+            </div>
           ) : filtered.length === 0 ? (
             <p className="py-3 text-center text-xs text-white/40">No tests found</p>
           ) : (
             <div className="max-h-48 overflow-y-auto space-y-0.5">
               {filtered.map((t) => (
-                <button key={t._id} onClick={() => { onLink(t._id); setOpen(false); setQuery(""); }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-white/70 hover:bg-white/5 hover:text-white">
-                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${t.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>{t.type?.toUpperCase()}</span>
+                <button
+                  key={t._id}
+                  onClick={() => { onLink(t._id); setOpen(false); setQuery(""); }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                >
+                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${t.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
+                    {t.type?.toUpperCase()}
+                  </span>
                   <span className="flex-1 truncate">{t.title}</span>
                 </button>
               ))}
             </div>
           )}
           <div className="mt-2 border-t border-white/5 pt-2">
-            <Btn variant="ghost" className="w-full justify-center text-xs" onClick={() => setOpen(false)}>Cancel</Btn>
+            <Btn variant="ghost" className="w-full justify-center text-xs" onClick={() => setOpen(false)}>
+              Cancel
+            </Btn>
           </div>
         </div>
       )}
@@ -118,6 +201,19 @@ function TestPicker({ onLink, existingTestIds = [] }) {
 }
 
 // ─── Note Editor Drawer ───────────────────────────────────────────────────────
+
+const QUILL_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["blockquote", "code-block"],
+    ["link"],
+    [{ color: [] }, { background: [] }],
+    ["clean"],
+  ],
+};
+const QUILL_FORMATS = ["header","bold","italic","underline","strike","list","blockquote","code-block","link","color","background"];
 
 function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
   const isEdit = Boolean(note);
@@ -159,8 +255,11 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
         toast.success("Note created");
       }
       onSaved();
-    } catch (err) { toast.error(err?.message || "Failed to save note"); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err?.message || "Failed to save note");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -168,20 +267,33 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
       <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-dark-300 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
           <h3 className="font-bold text-white">{isEdit ? "Edit Note" : "New Note"}</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white"><X size={16} /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
+            <X size={16} />
+          </button>
         </div>
         <div className="p-6 space-y-5">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-white/60">Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Note title..." className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-brand-primary" />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Note title..."
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-brand-primary"
+            />
           </div>
           {!isEdit && (
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-white/60">Type</label>
               <div className="flex gap-3">
-                {["rich_text","pdf"].map((t) => (
-                  <button key={t} type="button" onClick={() => setType(t)}
-                    className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${type === t ? "border-brand-primary bg-brand-primary/10 text-brand-primary" : "border-white/10 text-white/50 hover:border-white/20"}`}>
+                {["rich_text", "pdf"].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setType(t)}
+                    className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${
+                      type === t ? "border-brand-primary bg-brand-primary/10 text-brand-primary" : "border-white/10 text-white/50 hover:border-white/20"
+                    }`}
+                  >
                     {t === "rich_text" ? <><FileText size={14} /> Rich Text</> : <><Upload size={14} /> PDF</>}
                   </button>
                 ))}
@@ -192,7 +304,15 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-white/60">Content</label>
               <div className="quill-dark">
-                <ReactQuill theme="snow" value={content} onChange={setContent} modules={QUILL_MODULES} formats={QUILL_FORMATS} style={{ minHeight: 260 }} placeholder="Write your notes..." />
+                <ReactQuill
+                  theme="snow"
+                  value={content}
+                  onChange={setContent}
+                  modules={QUILL_MODULES}
+                  formats={QUILL_FORMATS}
+                  style={{ minHeight: 260 }}
+                  placeholder="Write your notes..."
+                />
               </div>
             </div>
           ) : (
@@ -205,7 +325,10 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
                   <a href={note.fileUrl} target="_blank" rel="noreferrer" className="ml-auto text-xs text-brand-primary hover:underline">View</a>
                 </div>
               )}
-              <div onClick={() => fileRef.current?.click()} className="cursor-pointer rounded-xl border-2 border-dashed border-white/10 hover:border-brand-primary/40 p-6 text-center transition-colors">
+              <div
+                onClick={() => fileRef.current?.click()}
+                className="cursor-pointer rounded-xl border-2 border-dashed border-white/10 hover:border-brand-primary/40 p-6 text-center transition-colors"
+              >
                 <Upload size={24} className="mx-auto mb-2 text-white/30" />
                 <p className="text-sm text-white/50">{pdfFile ? pdfFile.name : "Click to select PDF"}</p>
                 <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => setPdfFile(e.target.files[0] || null)} />
@@ -213,7 +336,10 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
             </div>
           )}
           <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div onClick={() => setAllowDownload((v) => !v)} className={`relative h-5 w-9 rounded-full transition-colors ${allowDownload ? "bg-brand-primary" : "bg-white/10"}`}>
+            <div
+              onClick={() => setAllowDownload((v) => !v)}
+              className={`relative h-5 w-9 rounded-full transition-colors ${allowDownload ? "bg-brand-primary" : "bg-white/10"}`}
+            >
               <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${allowDownload ? "translate-x-4" : "translate-x-0"}`} />
             </div>
             <span className="text-sm text-white/70">Allow download</span>
@@ -222,7 +348,8 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
         <div className="flex justify-end gap-3 border-t border-white/5 px-6 py-4">
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           <Btn onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {isEdit ? "Update" : "Create"}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {isEdit ? "Update" : "Create"}
           </Btn>
         </div>
       </div>
@@ -249,8 +376,11 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
       else await createVideo(chapterId, { title, youtubeUrl: url, description: desc });
       toast.success(isEdit ? "Video updated" : "Video added");
       onSaved();
-    } catch (err) { toast.error(err?.message || "Failed to save video"); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err?.message || "Failed to save video");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -258,7 +388,9 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-dark-300 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
           <h3 className="font-bold text-white">{isEdit ? "Edit Video" : "Add Video"}</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5"><X size={16} /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5">
+            <X size={16} />
+          </button>
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -278,7 +410,8 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
         <div className="flex justify-end gap-3 border-t border-white/5 px-6 py-4">
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           <Btn onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {isEdit ? "Update" : "Add"}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {isEdit ? "Update" : "Add"}
           </Btn>
         </div>
       </div>
@@ -316,8 +449,11 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
       else await createCourse(fd);
       toast.success(isEdit ? "Course updated" : "Course created");
       onSaved();
-    } catch (err) { toast.error(err?.message || "Failed to save"); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err?.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -325,57 +461,70 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
       <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-dark-300 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
           <h3 className="font-bold text-white">{isEdit ? "Edit Course" : "New Course"}</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5"><X size={16} /></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/40 hover:bg-white/5">
+            <X size={16} />
+          </button>
         </div>
         <div className="p-6 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/60">Title *</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title..." className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-brand-primary" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/60">Exam *</label>
-            <select value={examId} onChange={(e) => setExamId(e.target.value)} className="w-full rounded-xl border border-white/10 bg-dark-400 px-4 py-2.5 text-sm text-white outline-none focus:border-brand-primary">
+          <FieldLabel label="Title" required>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title..." className={fi} />
+          </FieldLabel>
+          <FieldLabel label="Exam" required>
+            <select value={examId} onChange={(e) => setExamId(e.target.value)} className={fi}>
+              <option value="">Select exam...</option>
               {exams.map((e) => <option key={e._id} value={e._id}>{e.title}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/60">Description</label>
+          </FieldLabel>
+          <FieldLabel label="Description">
             <div className="quill-dark">
-              <ReactQuill theme="snow" value={description} onChange={setDescription} modules={{ toolbar: [[{ header: [1, 2, false] }], ["bold", "italic"], ["link"], ["clean"]] }} style={{ minHeight: 120 }} placeholder="Course description..." />
+              <ReactQuill
+                theme="snow"
+                value={description}
+                onChange={setDescription}
+                modules={{ toolbar: [[{ header: [1, 2, false] }], ["bold", "italic"], ["link"], ["clean"]] }}
+                style={{ minHeight: 120 }}
+                placeholder="Course description..."
+              />
             </div>
-          </div>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="mb-1.5 block text-xs font-semibold text-white/60">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-xl border border-white/10 bg-dark-400 px-4 py-2.5 text-sm text-white outline-none">
+          </FieldLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <FieldLabel label="Status">
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className={fi}>
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </select>
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 cursor-pointer mb-2">
-                <div onClick={() => setIsPaid((v) => !v)} className={`relative h-5 w-9 rounded-full transition-colors ${isPaid ? "bg-brand-primary" : "bg-white/10"}`}>
+            </FieldLabel>
+            <div className="flex flex-col justify-end">
+              <label className="flex items-center gap-3 cursor-pointer select-none rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5">
+                <div
+                  onClick={() => setIsPaid((v) => !v)}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${isPaid ? "bg-brand-primary" : "bg-white/10"}`}
+                >
                   <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isPaid ? "translate-x-4" : "translate-x-0"}`} />
                 </div>
-                <span className="text-sm text-white/70 whitespace-nowrap">Paid</span>
+                <span className="text-sm text-white/70">Paid course</span>
               </label>
             </div>
           </div>
           {isPaid && (
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-white/60">Price (₹)</label>
-              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-brand-primary" />
-            </div>
+            <FieldLabel label="Price (₹)" required>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" placeholder="999" className={fi} />
+            </FieldLabel>
           )}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-white/60">Thumbnail</label>
-            <input type="file" accept="image/*" onChange={(e) => setThumb(e.target.files[0] || null)} className="text-sm text-white/60 file:mr-3 file:rounded-lg file:border-0 file:bg-white/5 file:px-3 file:py-1.5 file:text-xs file:text-white/70 hover:file:bg-white/10" />
-          </div>
+          <FieldLabel label="Thumbnail">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setThumb(e.target.files[0] || null)}
+              className="text-sm text-white/60 file:mr-3 file:rounded-lg file:border-0 file:bg-white/5 file:px-3 file:py-1.5 file:text-xs file:text-white/70 hover:file:bg-white/10"
+            />
+          </FieldLabel>
         </div>
         <div className="flex justify-end gap-3 border-t border-white/5 px-6 py-4">
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           <Btn onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {isEdit ? "Update" : "Create"}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {isEdit ? "Update Course" : "Create Course"}
           </Btn>
         </div>
       </div>
@@ -407,105 +556,190 @@ function ChapterContentPanel({ chapter, onRefresh }) {
   };
 
   const tabs = [
-    { id: "notes", label: "Notes", count: chapter.notes?.length || 0 },
-    { id: "videos", label: "Videos", count: chapter.videos?.length || 0 },
-    { id: "tests", label: "Linked Tests", count: chapter.linkedTests?.length || 0 },
+    { id: "notes", label: "Notes", count: chapter.notes?.length || 0, icon: FileText },
+    { id: "videos", label: "Videos", count: chapter.videos?.length || 0, icon: Video },
+    { id: "tests", label: "Linked Tests", count: chapter.linkedTests?.length || 0, icon: Link2 },
   ];
 
   return (
     <div className="space-y-4">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-white/5 pb-3 flex-wrap">
-        {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === t.id ? "bg-brand-primary/15 text-brand-primary" : "text-white/50 hover:bg-white/5 hover:text-white"}`}>
-            {t.label}
-            <span className={`rounded-full px-1.5 text-[10px] font-bold ${tab === t.id ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-white/40"}`}>{t.count}</span>
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
-          {tab === "notes" && <Btn variant="outline" className="text-xs py-1.5 px-3" onClick={() => setNoteDrawer({})}><Plus size={13} /> Add Note</Btn>}
-          {tab === "videos" && <Btn variant="outline" className="text-xs py-1.5 px-3" onClick={() => setVideoForm({})}><Plus size={13} /> Add Video</Btn>}
-          {tab === "tests" && <TestPicker onLink={handleLinkTest} existingTestIds={(chapter.linkedTests || []).map((lt) => String(lt.testId?._id || lt.testId))} />}
+      <div className="flex flex-wrap items-center gap-1 rounded-2xl glass-card p-1.5">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? "bg-brand-primary/15 text-brand-primary"
+                  : "text-white/50 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <Icon size={14} />
+              {t.label}
+              <span className={`rounded-full px-1.5 text-[10px] font-bold ${
+                tab === t.id ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-white/40"
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-2 pr-1">
+          {tab === "notes" && (
+            <button
+              onClick={() => setNoteDrawer({})}
+              className="flex items-center gap-2 rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-bold text-dark-400 hover:brightness-110"
+            >
+              <Plus size={13} /> Add Note
+            </button>
+          )}
+          {tab === "videos" && (
+            <button
+              onClick={() => setVideoForm({})}
+              className="flex items-center gap-2 rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-bold text-dark-400 hover:brightness-110"
+            >
+              <Plus size={13} /> Add Video
+            </button>
+          )}
+          {tab === "tests" && (
+            <TestPicker
+              onLink={handleLinkTest}
+              existingTestIds={(chapter.linkedTests || []).map((lt) => String(lt.testId?._id || lt.testId))}
+            />
+          )}
         </div>
       </div>
 
-      {/* Notes */}
-      {tab === "notes" && (
-        <div className="space-y-2">
-          {(!chapter.notes?.length) && <p className="text-xs text-white/40 py-2">No notes yet.</p>}
-          {(chapter.notes || []).map((note) => (
-            <div key={note._id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/2 px-4 py-3 group">
-              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${note.type === "pdf" ? "bg-red-500/15 text-red-400" : "bg-brand-primary/15 text-brand-primary"}`}>
-                <FileText size={14} />
+      {/* Content area */}
+      <div className="overflow-hidden rounded-2xl glass-card">
+        {/* Notes */}
+        {tab === "notes" && (
+          <div className="divide-y divide-white/5">
+            {(!chapter.notes?.length) ? (
+              <div className="px-6 py-12 text-center">
+                <FileText size={28} className="mx-auto mb-3 text-white/15" />
+                <p className="text-sm text-white/40">No notes yet. Add your first note.</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{note.title}</p>
-                <span className="text-[10px] text-white/40 uppercase">{note.type === "pdf" ? "PDF" : "Rich Text"}</span>
-              </div>
-              {note.type === "pdf" && note.fileUrl && (
-                <a href={note.fileUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white"><Eye size={14} /></a>
-              )}
-              <button onClick={() => setNoteDrawer({ note })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white"><Pencil size={14} /></button>
-              <button onClick={() => handleDeleteNote(note._id)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400"><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Videos */}
-      {tab === "videos" && (
-        <div className="space-y-2">
-          {(!chapter.videos?.length) && <p className="text-xs text-white/40 py-2">No videos yet.</p>}
-          {(chapter.videos || []).map((vid) => {
-            const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
-            return (
-              <div key={vid._id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/2 px-4 py-3 group">
-                {ytId ? (
-                  <img src={`https://img.youtube.com/vi/${ytId}/default.jpg`} alt="" className="h-10 w-14 shrink-0 rounded-lg object-cover" />
-                ) : (
-                  <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-red-500/15"><Video size={16} className="text-red-400" /></div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{vid.title}</p>
-                  {vid.description && <p className="text-[11px] text-white/40 truncate">{vid.description}</p>}
+            ) : (
+              (chapter.notes || []).map((note) => (
+                <div key={note._id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/2 group transition-colors">
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                    note.type === "pdf" ? "bg-red-500/15 text-red-400" : "bg-brand-primary/15 text-brand-primary"
+                  }`}>
+                    <FileText size={15} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{note.title}</p>
+                    <span className="text-[10px] text-white/40 uppercase tracking-wider">
+                      {note.type === "pdf" ? "PDF Document" : "Rich Text"}
+                    </span>
+                  </div>
+                  {note.type === "pdf" && note.fileUrl && (
+                    <a href={note.fileUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
+                      <Eye size={14} />
+                    </a>
+                  )}
+                  <button onClick={() => setNoteDrawer({ note })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity">
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => handleDeleteNote(note._id)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button onClick={() => setVideoForm({ video: vid })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white"><Pencil size={14} /></button>
-                <button onClick={() => handleDeleteVideo(vid._id)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400"><Trash2 size={14} /></button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              ))
+            )}
+          </div>
+        )}
 
-      {/* Tests */}
-      {tab === "tests" && (
-        <div className="space-y-2">
-          {(!chapter.linkedTests?.length) && <p className="text-xs text-white/40 py-2">No tests linked. Use "Link Test" to add.</p>}
-          {(chapter.linkedTests || []).map((lt) => {
-            const test = lt.test || lt;
-            const testId = lt.testId?._id || lt.testId;
-            return (
-              <div key={String(testId)} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/2 px-4 py-3 group">
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
-                  {(test.type || "practice").toUpperCase()}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{test.title || "Unknown Test"}</p>
-                  <p className="text-[11px] text-white/40">{test.duration ? `${test.duration} min` : ""}</p>
-                </div>
-                <button onClick={() => handleUnlinkTest(testId)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400"><X size={14} /></button>
+        {/* Videos */}
+        {tab === "videos" && (
+          <div className="divide-y divide-white/5">
+            {(!chapter.videos?.length) ? (
+              <div className="px-6 py-12 text-center">
+                <Video size={28} className="mx-auto mb-3 text-white/15" />
+                <p className="text-sm text-white/40">No videos yet. Add a YouTube video.</p>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ) : (
+              (chapter.videos || []).map((vid) => {
+                const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
+                return (
+                  <div key={vid._id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/2 group transition-colors">
+                    {ytId ? (
+                      <img src={`https://img.youtube.com/vi/${ytId}/default.jpg`} alt="" className="h-10 w-16 shrink-0 rounded-xl object-cover" />
+                    ) : (
+                      <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+                        <Video size={16} className="text-red-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{vid.title}</p>
+                      {vid.description && <p className="text-[11px] text-white/40 truncate">{vid.description}</p>}
+                    </div>
+                    <button onClick={() => setVideoForm({ video: vid })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => handleDeleteVideo(vid._id)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Tests */}
+        {tab === "tests" && (
+          <div className="divide-y divide-white/5">
+            {(!chapter.linkedTests?.length) ? (
+              <div className="px-6 py-12 text-center">
+                <Link2 size={28} className="mx-auto mb-3 text-white/15" />
+                <p className="text-sm text-white/40">No tests linked. Use "Link Test" to add.</p>
+              </div>
+            ) : (
+              (chapter.linkedTests || []).map((lt) => {
+                const test = lt.test || lt;
+                const testId = lt.testId?._id || lt.testId;
+                return (
+                  <div key={String(testId)} className="flex items-center gap-4 px-6 py-4 hover:bg-white/2 group transition-colors">
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"
+                    }`}>
+                      {(test.type || "practice").toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{test.title || "Unknown Test"}</p>
+                      <p className="text-[11px] text-white/40">{test.duration ? `${test.duration} min` : ""}</p>
+                    </div>
+                    <button onClick={() => handleUnlinkTest(testId)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity">
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
 
       {noteDrawer !== null && (
-        <NoteEditorDrawer chapterId={chapter._id} note={noteDrawer.note} onClose={() => setNoteDrawer(null)} onSaved={() => { setNoteDrawer(null); onRefresh(); }} />
+        <NoteEditorDrawer
+          chapterId={chapter._id}
+          note={noteDrawer.note}
+          onClose={() => setNoteDrawer(null)}
+          onSaved={() => { setNoteDrawer(null); onRefresh(); }}
+        />
       )}
       {videoForm !== null && (
-        <VideoForm chapterId={chapter._id} video={videoForm.video} onClose={() => setVideoForm(null)} onSaved={() => { setVideoForm(null); onRefresh(); }} />
+        <VideoForm
+          chapterId={chapter._id}
+          video={videoForm.video}
+          onClose={() => setVideoForm(null)}
+          onSaved={() => { setVideoForm(null); onRefresh(); }}
+        />
       )}
     </div>
   );
@@ -514,36 +748,70 @@ function ChapterContentPanel({ chapter, onRefresh }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CourseManager() {
+  const [params, setParams] = useSearchParams();
+
   const [hierarchy, setHierarchy] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // Full course tree (notes/videos/tests) for the selected course — loaded on demand
   const [fullCourseTree, setFullCourseTree] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [loadingTree, setLoadingTree] = useState(false);
 
-  // Sidebar open state (mirrors AdminLayout pattern)
-  const [openCategory, setOpenCategory] = useState(null);
-  const [openExam, setOpenExam] = useState(null);
-  const [openCourse, setOpenCourse] = useState(null);
-  const [openSubject, setOpenSubject] = useState(null);
+  const [level, setLevel] = useState(params.get("level") || "categories");
+  const [selectedCategoryId, setSelectedCategoryId] = useState(params.get("categoryId") || null);
+  const [selectedExamId, setSelectedExamId] = useState(params.get("examId") || null);
+  const [selectedCourseId, setSelectedCourseId] = useState(params.get("courseId") || null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(params.get("subjectId") || null);
+  const [selectedChapterId, setSelectedChapterId] = useState(params.get("chapterId") || null);
 
-  // Selected items for detail panel
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
-  const [selectedChapterId, setSelectedChapterId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  // Editing / adding states
-  const [editingSubject, setEditingSubject] = useState(null);
-  const [editingChapter, setEditingChapter] = useState(null);
-  const [addingSubjectFor, setAddingSubjectFor] = useState(null); // courseId
-  const [addingChapterFor, setAddingChapterFor] = useState(null); // subjectId
   const [courseModal, setCourseModal] = useState(null);
+  const [entityModal, setEntityModal] = useState({ isOpen: false, mode: "create", editData: null });
+  const [entityTitle, setEntityTitle] = useState("");
+  const [confirmState, setConfirmState] = useState({ isOpen: false, type: null, id: null });
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // ── URL helpers ──────────────────────────────────────────────────────────────
+
+  const updateUrl = useCallback((next) => {
+    const sp = new URLSearchParams();
+    const current = {
+      level,
+      categoryId: selectedCategoryId,
+      examId: selectedExamId,
+      courseId: selectedCourseId,
+      subjectId: selectedSubjectId,
+      chapterId: selectedChapterId,
+    };
+    const keys = ["level", "categoryId", "examId", "courseId", "subjectId", "chapterId"];
+    keys.forEach((k) => {
+      const val = k in next ? next[k] : current[k];
+      if (val) sp.set(k, val);
+    });
+    setParams(sp, { replace: true });
+  }, [level, selectedCategoryId, selectedExamId, selectedCourseId, selectedSubjectId, selectedChapterId, setParams]);
+
+  // Sync URL → state
+  useEffect(() => {
+    setLevel(params.get("level") || "categories");
+    setSelectedCategoryId(params.get("categoryId") || null);
+    setSelectedExamId(params.get("examId") || null);
+    setSelectedCourseId(params.get("courseId") || null);
+    setSelectedSubjectId(params.get("subjectId") || null);
+    setSelectedChapterId(params.get("chapterId") || null);
+  }, [params]);
+
+  // ── Data fetching ─────────────────────────────────────────────────────────────
 
   const fetchHierarchy = useCallback(async () => {
     try {
       const data = await getAdminCourseHierarchy();
       setHierarchy(data || []);
-    } catch { toast.error("Failed to load courses"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Failed to load courses");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchFullTree = useCallback(async (courseId) => {
@@ -552,354 +820,515 @@ export default function CourseManager() {
     try {
       const tree = await getAdminCourseTree(courseId);
       setFullCourseTree(tree);
-    } catch { toast.error("Failed to load course content"); }
-    finally { setLoadingTree(false); }
+    } catch {
+      toast.error("Failed to load course content");
+    } finally {
+      setLoadingTree(false);
+    }
   }, []);
 
   useEffect(() => { fetchHierarchy(); }, [fetchHierarchy]);
 
-  // Reload full tree whenever selected course changes
   useEffect(() => {
     if (selectedCourseId) fetchFullTree(selectedCourseId);
     else setFullCourseTree(null);
   }, [selectedCourseId, fetchFullTree]);
-
-  const allExams = hierarchy.flatMap((cat) => cat.exams || []);
-  const allCourses = allExams.flatMap((e) => e.courses || []);
-  // For sidebar display, use hierarchy (lightweight with counts)
-  const selectedCourse = allCourses.find((c) => c._id === selectedCourseId);
-  // For content panel, use fullCourseTree (has notes/videos/tests arrays)
-  const selectedSubject = fullCourseTree?.subjects?.find((s) => s._id === selectedSubjectId);
-  const selectedChapter = selectedSubject?.chapters?.find((ch) => ch._id === selectedChapterId);
 
   const refreshAll = useCallback(() => {
     fetchHierarchy();
     if (selectedCourseId) fetchFullTree(selectedCourseId);
   }, [fetchHierarchy, fetchFullTree, selectedCourseId]);
 
-  const handleDeleteCourse = async (id) => {
-    if (!window.confirm("Delete course and all content?")) return;
-    try { await deleteCourse(id); toast.success("Deleted"); if (selectedCourseId === id) { setSelectedCourseId(null); setSelectedSubjectId(null); setSelectedChapterId(null); setFullCourseTree(null); } fetchHierarchy(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleSaveSubject = async (title) => {
-    try { await createSubject(addingSubjectFor, { title }); toast.success("Subject added"); setAddingSubjectFor(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleUpdateSubject = async (id, title) => {
-    try { await updateSubject(id, { title }); toast.success("Updated"); setEditingSubject(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleDeleteSubject = async (id) => {
-    if (!window.confirm("Delete subject + chapters?")) return;
-    try { await deleteSubject(id); toast.success("Deleted"); if (selectedSubjectId === id) { setSelectedSubjectId(null); setSelectedChapterId(null); } refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleSaveChapter = async (title) => {
-    try { await createChapter(addingChapterFor, { title }); toast.success("Chapter added"); setAddingChapterFor(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleUpdateChapter = async (id, title) => {
-    try { await updateChapter(id, { title }); toast.success("Updated"); setEditingChapter(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
-  };
-  const handleDeleteChapter = async (id) => {
-    if (!window.confirm("Delete chapter + content?")) return;
-    try { await deleteChapter(id); toast.success("Deleted"); if (selectedChapterId === id) setSelectedChapterId(null); refreshAll(); } catch (e) { toast.error(e?.message || "Failed"); }
+  // ── Derived data ──────────────────────────────────────────────────────────────
+
+  const selectedCategory = useMemo(
+    () => hierarchy.find((c) => c._id === selectedCategoryId) || null,
+    [hierarchy, selectedCategoryId]
+  );
+  const selectedExam = useMemo(
+    () => (selectedCategory?.exams || []).find((e) => e._id === selectedExamId) || null,
+    [selectedCategory, selectedExamId]
+  );
+  const selectedCourse = useMemo(
+    () => (selectedExam?.courses || []).find((c) => c._id === selectedCourseId) || null,
+    [selectedExam, selectedCourseId]
+  );
+  const selectedSubject = useMemo(
+    () => (fullCourseTree?.subjects || []).find((s) => s._id === selectedSubjectId) || null,
+    [fullCourseTree, selectedSubjectId]
+  );
+  const selectedChapter = useMemo(
+    () => (selectedSubject?.chapters || []).find((ch) => ch._id === selectedChapterId) || null,
+    [selectedSubject, selectedChapterId]
+  );
+
+  const allExams = useMemo(() => hierarchy.flatMap((c) => c.exams || []), [hierarchy]);
+
+  // ── Breadcrumb ────────────────────────────────────────────────────────────────
+
+  const hierarchyPath = useMemo(() => {
+    const parts = [];
+    if (selectedCategory) parts.push(selectedCategory.title);
+    if (selectedExam) parts.push(selectedExam.title);
+    if (selectedCourse) parts.push(selectedCourse.title);
+    if (selectedSubject) parts.push(selectedSubject.title);
+    if (selectedChapter) parts.push(selectedChapter.title);
+    return parts;
+  }, [selectedCategory, selectedExam, selectedCourse, selectedSubject, selectedChapter]);
+
+  // ── Rows ──────────────────────────────────────────────────────────────────────
+
+  const isContentLevel = level === "chapters" && Boolean(selectedChapterId);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let rows = [];
+    if (level === "categories") rows = hierarchy;
+    else if (level === "exams") rows = selectedCategory?.exams || [];
+    else if (level === "courses") rows = selectedExam?.courses || [];
+    else if (level === "subjects") rows = fullCourseTree?.subjects || [];
+    else if (level === "chapters" && !selectedChapterId) rows = selectedSubject?.chapters || [];
+    return q ? rows.filter((r) => (r.title || "").toLowerCase().includes(q)) : rows;
+  }, [search, level, hierarchy, selectedCategory, selectedExam, fullCourseTree, selectedSubject, selectedChapterId]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const paginatedRows = useMemo(
+    () => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredRows, page]
+  );
+
+  useEffect(() => { setPage(1); }, [search, level, selectedCategoryId, selectedExamId, selectedCourseId, selectedSubjectId, selectedChapterId]);
+
+  // ── Navigation ────────────────────────────────────────────────────────────────
+
+  const handleRowSelect = (row) => {
+    if (level === "categories") {
+      updateUrl({ level: "exams", categoryId: row._id, examId: null, courseId: null, subjectId: null, chapterId: null });
+    } else if (level === "exams") {
+      updateUrl({ level: "courses", examId: row._id, courseId: null, subjectId: null, chapterId: null });
+    } else if (level === "courses") {
+      updateUrl({ level: "subjects", courseId: row._id, subjectId: null, chapterId: null });
+    } else if (level === "subjects") {
+      updateUrl({ level: "chapters", subjectId: row._id, chapterId: null });
+    } else if (level === "chapters") {
+      updateUrl({ chapterId: row._id });
+    }
   };
 
+  const goBack = () => {
+    if (level === "chapters" && selectedChapterId) {
+      updateUrl({ chapterId: null });
+      return;
+    }
+    if (level === "exams") updateUrl({ level: "categories", categoryId: null, examId: null, courseId: null, subjectId: null, chapterId: null });
+    else if (level === "courses") updateUrl({ level: "exams", examId: null, courseId: null, subjectId: null, chapterId: null });
+    else if (level === "subjects") updateUrl({ level: "courses", courseId: null, subjectId: null, chapterId: null });
+    else if (level === "chapters") updateUrl({ level: "subjects", subjectId: null, chapterId: null });
+  };
+
+  const canGoBack = level !== "categories" || isContentLevel;
+
+  // ── Header labels ─────────────────────────────────────────────────────────────
+
+  const headerTitle = isContentLevel
+    ? (selectedChapter?.title || "Chapter Content")
+    : LEVEL_LABELS[level] || level;
+
+  const canCreate = ["courses", "subjects", "chapters"].includes(level) && !isContentLevel;
+  const actionLabel =
+    level === "courses" ? "New Course" :
+    level === "subjects" ? "New Subject" :
+    level === "chapters" ? "New Chapter" : null;
+
+  // ── CRUD handlers ─────────────────────────────────────────────────────────────
+
+  const handleCreate = () => {
+    if (level === "courses") { setCourseModal({}); return; }
+    setEntityTitle("");
+    setEntityModal({ isOpen: true, mode: "create", editData: null });
+  };
+
+  const handleEditRow = (row) => {
+    if (level === "courses") { setCourseModal({ course: row }); return; }
+    setEntityTitle(row.title);
+    setEntityModal({ isOpen: true, mode: "edit", editData: row });
+  };
+
+  const handleSaveEntity = async () => {
+    if (!entityTitle.trim()) return;
+    setActionLoading(true);
+    try {
+      if (entityModal.mode === "create") {
+        if (level === "subjects") await createSubject(selectedCourseId, { title: entityTitle.trim() });
+        else if (level === "chapters") await createChapter(selectedSubjectId, { title: entityTitle.trim() });
+        toast.success("Created successfully");
+      } else {
+        const id = entityModal.editData?._id;
+        if (level === "subjects") await updateSubject(id, { title: entityTitle.trim() });
+        else if (level === "chapters") await updateChapter(id, { title: entityTitle.trim() });
+        toast.success("Updated successfully");
+      }
+      setEntityModal({ isOpen: false, mode: "create", editData: null });
+      refreshAll();
+    } catch (e) {
+      toast.error(e?.message || "Failed to save");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActionLoading(true);
+    try {
+      const { type, id } = confirmState;
+      if (type === "course") {
+        await deleteCourse(id);
+        if (selectedCourseId === id) updateUrl({ level: "courses", courseId: null, subjectId: null, chapterId: null });
+      } else if (type === "subject") {
+        await deleteSubject(id);
+        if (selectedSubjectId === id) updateUrl({ subjectId: null, chapterId: null });
+      } else if (type === "chapter") {
+        await deleteChapter(id);
+        if (selectedChapterId === id) updateUrl({ chapterId: null });
+      }
+      toast.success("Deleted successfully");
+      refreshAll();
+    } catch (e) {
+      toast.error(e?.message || "Failed to delete");
+    } finally {
+      setActionLoading(false);
+      setConfirmState({ isOpen: false, type: null, id: null });
+    }
+  };
+
+  const isReadOnly = level === "categories" || level === "exams";
+  const showTableLoading = loadingTree && (level === "subjects" || level === "chapters");
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   if (loading) {
-    return <div className="flex h-64 items-center justify-center"><Loader2 size={28} className="animate-spin text-brand-primary" /></div>;
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-brand-primary" />
+      </div>
+    );
   }
 
   return (
-    <div className="flex gap-5 min-h-[calc(100vh-6rem)]">
+    <div className="space-y-6">
 
-      {/* ════════════════════════════════════════
-          LEFT SIDEBAR — Collapsible tree
-      ════════════════════════════════════════ */}
-      <aside className="w-72 shrink-0">
-        <div className="sticky top-6 rounded-2xl border border-white/8 bg-white/2 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-brand-primary" />
-              <span className="text-sm font-bold text-white">Courses</span>
-            </div>
-            <button onClick={() => setCourseModal({})} className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors">
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {/* Tree — scrollable */}
-          <div className="custom-scrollbar max-h-[calc(100vh-14rem)] overflow-y-auto p-2 space-y-0.5">
-            {hierarchy.length === 0 ? (
-              <div className="py-8 text-center">
-                <BookOpen size={24} className="mx-auto mb-2 text-white/20" />
-                <p className="text-xs text-white/40 mb-3">No courses yet</p>
-                <button onClick={() => setCourseModal({})} className="text-xs text-brand-primary hover:underline">Create your first course</button>
-              </div>
-            ) : (
-              hierarchy.map((cat) => (
-                <div key={cat._id}>
-                  {/* Category row */}
-                  <button
-                    onClick={() => setOpenCategory((v) => v === cat._id ? null : cat._id)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/4"
-                  >
-                    <ChevronRight size={12} className={`text-white/30 transition-transform shrink-0 ${openCategory === cat._id ? "rotate-90" : ""}`} />
-                    <Tag size={11} className="text-purple-400 shrink-0" />
-                    <span className="flex-1 truncate text-xs font-bold text-purple-300">{cat.title}</span>
-                    <span className="text-[9px] text-white/30">{(cat.exams || []).length}</span>
-                  </button>
-
-                  {openCategory === cat._id && (
-                    <div className="ml-5 space-y-0.5 border-l border-white/5 pl-2">
-                      {(cat.exams || []).map((exam) => (
-                        <div key={exam._id}>
-                          {/* Exam row */}
-                          <button
-                            onClick={() => setOpenExam((v) => v === exam._id ? null : exam._id)}
-                            className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-white/4"
-                          >
-                            <ChevronRight size={11} className={`text-white/30 transition-transform shrink-0 ${openExam === exam._id ? "rotate-90" : ""}`} />
-                            <GraduationCap size={10} className="text-sky-400 shrink-0" />
-                            <span className="flex-1 truncate text-xs text-sky-300">{exam.title}</span>
-                            <span className="text-[9px] text-white/30">{(exam.courses || []).length}</span>
-                          </button>
-
-                          {openExam === exam._id && (
-                            <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2">
-                              {(exam.courses || []).map((course) => (
-                                <div key={course._id}>
-                                  {/* Course row */}
-                                  <div className={`flex items-center group rounded-xl pr-1 transition-colors ${selectedCourseId === course._id ? "bg-brand-primary/10" : "hover:bg-white/4"}`}>
-                                    <button
-                                      onClick={() => setOpenCourse((v) => v === course._id ? null : course._id)}
-                                      className="shrink-0 p-1 text-white/30 hover:text-white"
-                                    >
-                                      <ChevronRight size={10} className={`transition-transform ${openCourse === course._id ? "rotate-90" : ""}`} />
-                                    </button>
-                                    <button
-                                      onClick={() => { setSelectedCourseId(course._id); setSelectedSubjectId(null); setSelectedChapterId(null); }}
-                                      className="flex flex-1 min-w-0 items-center gap-1.5 py-1.5 text-left"
-                                    >
-                                      <BookOpen size={10} className={selectedCourseId === course._id ? "text-brand-primary shrink-0" : "text-white/40 shrink-0"} />
-                                      <span className={`flex-1 truncate text-xs ${selectedCourseId === course._id ? "text-brand-primary font-semibold" : "text-white/70"}`}>{course.title}</span>
-                                      {course.isPaid && <DollarSign size={8} className="text-amber-400 shrink-0" />}
-                                      {course.status === "published" ? <Globe size={8} className="text-emerald-400 shrink-0" /> : <EyeOff size={8} className="text-white/20 shrink-0" />}
-                                    </button>
-                                    <div className="flex shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => setCourseModal({ course })} className="rounded-md p-0.5 text-white/30 hover:text-white"><Pencil size={9} /></button>
-                                      <button onClick={() => handleDeleteCourse(course._id)} className="rounded-md p-0.5 text-red-400/50 hover:text-red-400"><Trash2 size={9} /></button>
-                                    </div>
-                                  </div>
-
-                                  {/* Subjects under course */}
-                                  {openCourse === course._id && (
-                                    <div className="ml-4 space-y-0.5 border-l border-white/5 pl-2">
-                                      {(course.subjects || []).map((sub) => (
-                                        <div key={sub._id}>
-                                          {/* Subject row */}
-                                          <div className={`flex items-center group rounded-xl pr-1 transition-colors ${selectedSubjectId === sub._id ? "bg-teal-500/8" : "hover:bg-white/4"}`}>
-                                            <button onClick={() => setOpenSubject((v) => v === sub._id ? null : sub._id)} className="shrink-0 p-1 text-white/20 hover:text-white">
-                                              <ChevronRight size={9} className={`transition-transform ${openSubject === sub._id ? "rotate-90" : ""}`} />
-                                            </button>
-
-                                            {editingSubject === sub._id ? (
-                                              <InlineInput value={sub.title} onSave={(t) => handleUpdateSubject(sub._id, t)} onCancel={() => setEditingSubject(null)} placeholder="Subject name" />
-                                            ) : (
-                                              <>
-                                                <button onClick={() => { setSelectedSubjectId(sub._id); setSelectedChapterId(null); }} className="flex flex-1 min-w-0 items-center gap-1.5 py-1 text-left">
-                                                  <Folder size={9} className="text-teal-400 shrink-0" />
-                                                  <span className={`flex-1 truncate text-[11px] ${selectedSubjectId === sub._id ? "text-teal-300 font-semibold" : "text-white/60"}`}>{sub.title}</span>
-                                                  <span className="text-[9px] text-white/30">{sub.chapters?.length || 0}</span>
-                                                </button>
-                                                <div className="flex shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                  <button onClick={() => setEditingSubject(sub._id)} className="rounded-md p-0.5 text-white/25 hover:text-white"><Pencil size={8} /></button>
-                                                  <button onClick={() => handleDeleteSubject(sub._id)} className="rounded-md p-0.5 text-red-400/40 hover:text-red-400"><Trash2 size={8} /></button>
-                                                </div>
-                                              </>
-                                            )}
-                                          </div>
-
-                                          {/* Chapters under subject */}
-                                          {openSubject === sub._id && (
-                                            <div className="ml-3 space-y-0.5 border-l border-white/5 pl-2">
-                                              {(sub.chapters || []).map((ch) => (
-                                                <div key={ch._id} className={`flex items-center group rounded-lg pr-1 transition-colors ${selectedChapterId === ch._id ? "bg-amber-500/8" : "hover:bg-white/3"}`}>
-                                                  {editingChapter === ch._id ? (
-                                                    <div className="flex-1 min-w-0 py-1">
-                                                      <InlineInput value={ch.title} onSave={(t) => handleUpdateChapter(ch._id, t)} onCancel={() => setEditingChapter(null)} placeholder="Chapter name" />
-                                                    </div>
-                                                  ) : (
-                                                    <>
-                                                      <button onClick={() => { setSelectedChapterId(ch._id); setSelectedSubjectId(sub._id); setSelectedCourseId(course._id); }} className="flex flex-1 min-w-0 items-center gap-1.5 py-1 pl-1 text-left">
-                                                        <FileText size={8} className="text-amber-400 shrink-0" />
-                                                        <span className={`flex-1 truncate text-[10px] ${selectedChapterId === ch._id ? "text-amber-300 font-semibold" : "text-white/50"}`}>{ch.title}</span>
-                                                        <div className="flex gap-0.5 ml-auto">
-                                                          {ch.notesCount > 0 && <span className="text-[8px] text-white/25">{ch.notesCount}📄</span>}
-                                                          {ch.videosCount > 0 && <span className="text-[8px] text-white/25">{ch.videosCount}▶</span>}
-                                                        </div>
-                                                      </button>
-                                                      <div className="flex shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => setEditingChapter(ch._id)} className="rounded-md p-0.5 text-white/20 hover:text-white"><Pencil size={7} /></button>
-                                                        <button onClick={() => handleDeleteChapter(ch._id)} className="rounded-md p-0.5 text-red-400/30 hover:text-red-400"><Trash2 size={7} /></button>
-                                                      </div>
-                                                    </>
-                                                  )}
-                                                </div>
-                                              ))}
-                                              {/* Add chapter */}
-                                              {addingChapterFor === sub._id ? (
-                                                <div className="py-1 pl-1">
-                                                  <InlineInput value="" onSave={handleSaveChapter} onCancel={() => setAddingChapterFor(null)} placeholder="Chapter name" />
-                                                </div>
-                                              ) : (
-                                                <button onClick={() => setAddingChapterFor(sub._id)} className="flex w-full items-center gap-1 px-1 py-1 text-[10px] text-white/25 hover:text-brand-primary transition-colors">
-                                                  <Plus size={8} /> Add Chapter
-                                                </button>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                      {/* Add subject */}
-                                      {addingSubjectFor === course._id ? (
-                                        <div className="py-1">
-                                          <InlineInput value="" onSave={handleSaveSubject} onCancel={() => setAddingSubjectFor(null)} placeholder="Subject name" />
-                                        </div>
-                                      ) : (
-                                        <button onClick={() => setAddingSubjectFor(course._id)} className="flex w-full items-center gap-1 px-2 py-1 text-[10px] text-white/25 hover:text-teal-400 transition-colors">
-                                          <Plus size={8} /> Add Subject
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                              {(exam.courses || []).length === 0 && (
-                                <p className="px-2 py-1 text-[10px] text-white/25">No courses yet</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* ════════════════════════════════════════
-          RIGHT PANEL — Content
-      ════════════════════════════════════════ */}
-      <div className="flex-1 min-w-0">
-        {/* Nothing selected */}
-        {!selectedCourseId && (
-          <div className="flex h-80 flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/10">
-            <BookOpen size={36} className="text-white/15" />
-            <p className="text-sm text-white/40">Select a course from the sidebar, or create a new one.</p>
-            <Btn onClick={() => setCourseModal({})}><Plus size={14} /> New Course</Btn>
-          </div>
-        )}
-
-        {/* Course selected, no chapter */}
-        {selectedCourseId && !selectedChapterId && selectedCourse && (
-          <div className="space-y-5">
-            {/* Course header */}
-            <div className="rounded-2xl border border-white/8 bg-white/2 p-5">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-primary/15">
-                    <BookOpen size={22} className="text-brand-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="font-extrabold text-xl text-white truncate leading-snug">{selectedCourse.title}</h2>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {selectedCourse.isPaid ? (
-                        <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-400">
-                          <DollarSign size={9} /> ₹{selectedCourse.price}
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-400">FREE</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Btn variant="outline" onClick={() => setCourseModal({ course: selectedCourse })}>
-                  <Settings size={14} /> Edit
-                </Btn>
-              </div>
-
-              {/* Publish status */}
-              {selectedCourse.status !== "published" ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <EyeOff size={13} className="text-amber-400 shrink-0" />
-                    <p className="text-xs text-amber-300 font-semibold">Draft — hidden from students</p>
-                  </div>
-                  <Btn variant="ghost" className="text-amber-400 hover:text-amber-300 text-xs py-1 px-3 border border-amber-500/30 hover:bg-amber-500/10 shrink-0"
-                    onClick={() => setCourseModal({ course: selectedCourse })}>
-                    Publish
-                  </Btn>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-2.5">
-                  <Globe size={12} className="text-emerald-400 shrink-0" />
-                  <p className="text-xs text-emerald-400 font-semibold">Published — visible to students</p>
-                </div>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Subjects", value: selectedCourse.subjects?.length || 0, color: "text-teal-400", bg: "bg-teal-500/8" },
-                { label: "Chapters", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters?.length || 0), 0), color: "text-amber-400", bg: "bg-amber-500/8" },
-                { label: "Content", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters || []).reduce((b, ch) => b + (ch.notesCount || 0) + (ch.videosCount || 0) + (ch.testsCount || 0), 0), 0), color: "text-brand-primary", bg: "bg-brand-primary/8" },
-              ].map((stat) => (
-                <div key={stat.label} className={`rounded-2xl border border-white/8 ${stat.bg} p-4 text-center`}>
-                  <p className={`text-2xl font-extrabold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-xs text-white/50 mt-0.5">{stat.label}</p>
-                </div>
+      {/* ── Toolbar ── */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white">{headerTitle}</h2>
+          {hierarchyPath.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/50">
+              {hierarchyPath.map((label, i) => (
+                <span key={`${label}-${i}`} className="inline-flex items-center gap-1.5">
+                  <span className="rounded-full glass-pill px-2 py-0.5 text-white/80">{label}</span>
+                  {i < hierarchyPath.length - 1 && <ChevronRight size={11} />}
+                </span>
               ))}
             </div>
-
-            <div className="rounded-xl border border-dashed border-white/8 px-4 py-3">
-              <p className="text-xs text-white/40 text-center">
-                Select a chapter from the sidebar to manage its notes, videos, and linked tests.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Chapter selected — show content panel */}
-        {selectedChapterId && (
-          <div className="space-y-4">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs text-white/40 flex-wrap">
-              <button onClick={() => { setSelectedChapterId(null); setSelectedSubjectId(null); }} className="hover:text-brand-primary transition-colors font-medium">{selectedCourse?.title}</button>
-              <ChevronRight size={10} className="text-white/20" />
-              <span className="text-white/60">{fullCourseTree?.subjects?.find((s) => s._id === selectedSubjectId)?.title || "..."}</span>
-              <ChevronRight size={10} className="text-white/20" />
-              <span className="text-white font-semibold">{selectedChapter?.title || "..."}</span>
-            </div>
-
-            {loadingTree ? (
-              <div className="flex h-40 items-center justify-center">
-                <Loader2 size={22} className="animate-spin text-brand-primary" />
-              </div>
-            ) : selectedChapter ? (
-              <ChapterContentPanel chapter={selectedChapter} onRefresh={refreshAll} />
-            ) : (
-              <p className="text-sm text-white/40 py-8 text-center">Chapter not found. It may have been deleted.</p>
-            )}
-          </div>
-        )}
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canGoBack && (
+            <button
+              onClick={goBack}
+              className="rounded-xl glass-pill px-4 py-2 text-sm font-medium text-white/80 hover:text-white"
+            >
+              ← Back
+            </button>
+          )}
+          {canCreate && (
+            <button
+              onClick={handleCreate}
+              className="flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-dark-400 transition hover:brightness-110"
+            >
+              <Plus size={16} /> {actionLabel}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Course modal */}
-      {courseModal !== null && (
-        <CourseFormModal course={courseModal.course} exams={allExams} onClose={() => setCourseModal(null)} onSaved={() => { setCourseModal(null); refreshAll(); }} />
+      {/* ── Chapter content panel ── */}
+      {isContentLevel ? (
+        <div className="space-y-2">
+          {showTableLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 size={22} className="animate-spin text-brand-primary" />
+            </div>
+          ) : selectedChapter ? (
+            <ChapterContentPanel chapter={selectedChapter} onRefresh={refreshAll} />
+          ) : (
+            <div className="flex h-40 items-center justify-center rounded-2xl glass-card">
+              <p className="text-sm text-white/40">Chapter not found.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* ── Search ── */}
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl glass-card p-4">
+            <div className="relative min-w-64 flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Search ${(LEVEL_LABELS[level] || level).toLowerCase()}...`}
+                className="w-full rounded-xl border border-white/10 bg-dark-300/70 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-primary/50"
+              />
+            </div>
+          </div>
+
+          {/* ── Table ── */}
+          <div className="overflow-hidden rounded-2xl glass-card">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/3">
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Name</th>
+                    {level === "categories" && (
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Exams</th>
+                    )}
+                    {level === "exams" && (
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Courses</th>
+                    )}
+                    {level === "courses" && (
+                      <>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Price</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Subjects</th>
+                      </>
+                    )}
+                    {level === "subjects" && (
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Chapters</th>
+                    )}
+                    {level === "chapters" && (
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-white/50">Content</th>
+                    )}
+                    <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-widest text-white/50">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {showTableLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-16 text-center">
+                        <Loader2 size={22} className="animate-spin text-brand-primary mx-auto" />
+                      </td>
+                    </tr>
+                  ) : filteredRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-16 text-center text-sm text-white/40">
+                        {search
+                          ? `No results for "${search}"`
+                          : `No ${(LEVEL_LABELS[level] || level).toLowerCase()} found.${canCreate ? " Create your first one above." : ""}`
+                        }
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRows.map((row, idx) => {
+                      const LevelIcon = LEVEL_ICON[level] || FileText;
+                      const iconColor = ICON_COLOR[level] || "text-brand-primary";
+                      return (
+                        <tr
+                          key={row._id}
+                          className="transition-colors hover:bg-white/4 animate-fade-up"
+                          style={{ animationDelay: `${idx * 25}ms` }}
+                        >
+                          {/* Name */}
+                          <td
+                            className="px-6 py-4 text-sm font-semibold text-white cursor-pointer"
+                            onClick={() => handleRowSelect(row)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <LevelIcon size={14} className={iconColor} />
+                              {row.title}
+                            </div>
+                          </td>
+
+                          {/* Category: exam count */}
+                          {level === "categories" && (
+                            <td className="px-6 py-4 text-sm text-white/50">
+                              {(row.exams || []).length} exams
+                            </td>
+                          )}
+
+                          {/* Exam: course count */}
+                          {level === "exams" && (
+                            <td className="px-6 py-4 text-sm text-white/50">
+                              {(row.courses || []).length} courses
+                            </td>
+                          )}
+
+                          {/* Course columns */}
+                          {level === "courses" && (
+                            <>
+                              <td className="px-6 py-4 text-xs">
+                                <span className={`rounded-full px-2.5 py-1 font-semibold uppercase tracking-wider ${
+                                  row.status === "published"
+                                    ? "bg-emerald-500/15 text-emerald-300"
+                                    : "bg-white/5 text-white/60"
+                                }`}>
+                                  {row.status === "published" ? (
+                                    <span className="flex items-center gap-1"><Globe size={10} /> Published</span>
+                                  ) : (
+                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Draft</span>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                {row.isPaid ? (
+                                  <span className="flex items-center gap-1 font-semibold text-amber-400">
+                                    <DollarSign size={12} /> ₹{row.price}
+                                  </span>
+                                ) : (
+                                  <span className="font-semibold text-emerald-400">Free</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-white/50">
+                                {(row.subjects || []).length} subjects
+                              </td>
+                            </>
+                          )}
+
+                          {/* Subject: chapter count */}
+                          {level === "subjects" && (
+                            <td className="px-6 py-4 text-sm text-white/50">
+                              {(row.chapters || []).length} chapters
+                            </td>
+                          )}
+
+                          {/* Chapter: content summary */}
+                          {level === "chapters" && (
+                            <td className="px-6 py-4 text-xs text-white/50">
+                              <div className="flex items-center gap-3">
+                                {(row.notesCount || 0) > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <FileText size={11} className="text-brand-primary" /> {row.notesCount} notes
+                                  </span>
+                                )}
+                                {(row.videosCount || 0) > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Video size={11} className="text-red-400" /> {row.videosCount} videos
+                                  </span>
+                                )}
+                                {(row.notesCount || 0) === 0 && (row.videosCount || 0) === 0 && (
+                                  <span className="text-white/25">No content yet</span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+
+                          {/* Actions */}
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleRowSelect(row)}
+                                className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white"
+                              >
+                                {level === "chapters" ? "Manage" : "View"}
+                              </button>
+                              {!isReadOnly && (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleEditRow(row); }}
+                                    className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
+                                    title="Edit"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmState({
+                                        isOpen: true,
+                                        type: level === "courses" ? "course" : level === "subjects" ? "subject" : "chapter",
+                                        id: row._id,
+                                      });
+                                    }}
+                                    className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {filteredRows.length > PAGE_SIZE && (
+            <PaginationBar
+              page={page}
+              totalPages={totalPages}
+              totalCount={filteredRows.length}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
+          )}
+        </>
       )}
+
+      {/* ── Subject / Chapter entity modal ── */}
+      <Modal
+        isOpen={entityModal.isOpen}
+        title={`${entityModal.mode === "edit" ? "Edit" : "Create"} ${level === "subjects" ? "Subject" : "Chapter"}`}
+        onClose={() => setEntityModal({ isOpen: false, mode: "create", editData: null })}
+      >
+        <FieldLabel label="Title" required>
+          <input
+            value={entityTitle}
+            onChange={(e) => setEntityTitle(e.target.value)}
+            placeholder={level === "subjects" ? "e.g. Physics" : "e.g. Motion in a Straight Line"}
+            className={fi}
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleSaveEntity()}
+          />
+        </FieldLabel>
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={() => setEntityModal({ isOpen: false, mode: "create", editData: null })}
+            className="rounded-lg glass-pill px-4 py-2 text-sm text-white/80"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveEntity}
+            disabled={actionLoading || !entityTitle.trim()}
+            className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-bold text-dark-400 disabled:opacity-50"
+          >
+            {actionLoading ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Course modal ── */}
+      {courseModal !== null && (
+        <CourseFormModal
+          course={courseModal.course}
+          exams={allExams}
+          onClose={() => setCourseModal(null)}
+          onSaved={() => { setCourseModal(null); refreshAll(); }}
+        />
+      )}
+
+      {/* ── Confirm delete ── */}
+      <ConfirmationModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState({ isOpen: false, type: null, id: null })}
+        onConfirm={handleDelete}
+        title="Delete item"
+        message="This will permanently remove the item and all its nested content. This cannot be undone."
+      />
     </div>
   );
 }
