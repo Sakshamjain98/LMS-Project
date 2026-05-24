@@ -194,6 +194,20 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
     };
   }, [isProctored]);
 
+  // ─── Actions ──────────────────────────────────────────────────────────────────
+
+  const handleOptionSelect = useCallback(async (optionIndex) => {
+    if (isPausedForFullscreen) return;
+    const newAnswer = { questionId: currentQuestion._id, selectedOptionIndex: optionIndex, timeTaken: 0 };
+    setAnswers((prev) => {
+      const exists = prev.find((a) => a.questionId === currentQuestion._id);
+      if (exists) return prev.map((a) => (a.questionId === currentQuestion._id ? newAnswer : a));
+      return [...prev, newAnswer];
+    });
+    try { await submitAnswer(attempt._id, newAnswer); }
+    catch (err) { console.error("Failed to sync answer:", err); }
+  }, [isPausedForFullscreen, currentQuestion._id, attempt._id]);
+
   // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -209,21 +223,7 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isPausedForFullscreen, showSubmitConfirm, currentIndex, currentQuestion, goToQuestion]);
-
-  // ─── Actions ──────────────────────────────────────────────────────────────────
-
-  const handleOptionSelect = async (optionIndex) => {
-    if (isPausedForFullscreen) return;
-    const newAnswer = { questionId: currentQuestion._id, selectedOptionIndex: optionIndex, timeTaken: 0 };
-    setAnswers((prev) => {
-      const exists = prev.find((a) => a.questionId === currentQuestion._id);
-      if (exists) return prev.map((a) => (a.questionId === currentQuestion._id ? newAnswer : a));
-      return [...prev, newAnswer];
-    });
-    try { await submitAnswer(attempt._id, newAnswer); }
-    catch (err) { console.error("Failed to sync answer:", err); }
-  };
+  }, [isPausedForFullscreen, showSubmitConfirm, currentIndex, currentQuestion, goToQuestion, handleOptionSelect]);
 
   const handleClearResponse = () => {
     if (isPausedForFullscreen) return;
