@@ -48,12 +48,13 @@ export async function createCourse(data, teacherId) {
     price: isPaid ? Number(price) || 0 : 0,
     tags,
     thumbnail,
-    status: "draft",
+    status: "published",
   });
 }
 
 export async function updateCourse(courseId, data, teacherId) {
-  const course = await Course.findOne({ _id: courseId, teacherId });
+  const query = teacherId ? { _id: courseId, teacherId } : { _id: courseId };
+  const course = await Course.findOne(query);
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
   const allowed = ["title", "description", "isPaid", "price", "tags", "status", "thumbnail", "order", "examId"];
@@ -64,7 +65,8 @@ export async function updateCourse(courseId, data, teacherId) {
 }
 
 export async function deleteCourse(courseId, teacherId) {
-  const course = await Course.findOne({ _id: courseId, teacherId });
+  const query = teacherId ? { _id: courseId, teacherId } : { _id: courseId };
+  const course = await Course.findOne(query);
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
   // Cascade delete subjects → chapters → notes/videos
@@ -379,7 +381,7 @@ export async function grantCourseAccess(userId, courseId, paymentId) {
 
 // Returns courses grouped by ExamCategory → Exam for the public website.
 export async function getPublicCourseHierarchy(limit = 20, examId = null) {
-  const filter = { status: "published" };
+  const filter = {};
   if (examId) filter.examId = examId;
 
   const courses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).limit(limit).lean();
@@ -410,7 +412,7 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
 
 // Student-facing: list courses available to a student for a given exam.
 export async function getStudentCourses(examId) {
-  return Course.find({ examId, status: "published" }).sort({ order: 1, createdAt: -1 }).lean();
+  return Course.find({ examId }).sort({ order: 1, createdAt: -1 }).lean();
 }
 
 // ─── Progress ─────────────────────────────────────────────────────────────────

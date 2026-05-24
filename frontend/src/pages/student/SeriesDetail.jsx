@@ -541,7 +541,7 @@ export default function SeriesDetail() {
                                 idx={idx}
                                 title={row.title}
                                 description={row.description}
-                                icon={<Folder size={14} className="text-sky-400" />}
+                                icon={<Folder size={14} className="text-brand-primary" />}
                                 meta={`${ch} chapter${ch === 1 ? "" : "s"} · ${totalTests} tests`}
                                 onOpen={() => updateUrl({ level: "chapters", subjectId: row._id, chapterId: null })}
                               />
@@ -735,7 +735,7 @@ function TestRow({ idx, test, isUnlocked, attemptInfo, onStart, onViewResult }) 
               {isCompleted && (
                 <button
                   onClick={() => onViewResult(latestAttempt._id)}
-                  className="rounded-lg bg-blue-500/15 px-3 py-2 text-xs font-bold text-blue-300 hover:bg-blue-500/25"
+                  className="rounded-lg bg-brand-primary/15 px-3 py-2 text-xs font-bold text-brand-primary hover:bg-brand-primary/25"
                 >
                   View Result
                 </button>

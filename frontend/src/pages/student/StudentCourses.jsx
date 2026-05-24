@@ -1,16 +1,104 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpen, Tag, GraduationCap, ChevronRight, Loader2,
-  Lock, DollarSign, Search, BookMarked, CheckCircle2,
+  BookOpen, Tag, GraduationCap, ChevronRight, Loader2, Lock,
+  DollarSign, Search, BookMarked, CheckCircle2, ArrowRight,
+  Sparkles, Layers, Play,
 } from "lucide-react";
 import { getPublicCourses, getMultipleCourseProgress } from "../../services/courseService";
 import { getPublicExamCategories } from "../../services/studentService";
+import StudentNavbar from "../../components/layout/StudentNavbar";
 
 function cloudinaryOptimize(url, w = 500, h = 280) {
   if (!url || !url.includes("cloudinary.com/")) return url;
   return url.replace("/upload/", `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
 }
+
+// ─── Stat Pill ────────────────────────────────────────────────────────────────
+
+function StatPill({ icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-brand-primary/20 bg-brand-primary/10 px-4 py-3">
+      <div className="flex items-center gap-1.5 mb-1 text-brand-primary">{icon}
+        <p className="text-[10px] uppercase tracking-widest font-semibold text-brand-primary">{label}</p>
+      </div>
+      <p className="text-xl font-bold text-white">{value}</p>
+    </div>
+  );
+}
+
+// ─── Category Card (level 0) ──────────────────────────────────────────────────
+
+function CategoryCard({ category, idx, onClick }) {
+  const examCount = category.exams?.length || 0;
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${idx * 40}ms` }}
+      className="group text-left rounded-2xl border border-white/8 bg-white/2 p-6 transition-all duration-200 hover:border-brand-primary/40 hover:bg-white/4 hover:shadow-xl hover:shadow-brand-primary/10 hover:-translate-y-0.5 animate-fade-up"
+    >
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-brand-primary/25 to-brand-primary/5 text-brand-primary ring-1 ring-brand-primary/20 group-hover:ring-brand-primary/40 transition-all">
+          <Tag size={22} />
+        </div>
+        <span className="rounded-full bg-brand-primary/10 border border-brand-primary/20 px-2.5 py-1 text-[10px] font-bold text-brand-primary">
+          {examCount} Exam{examCount !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <h3 className="font-bold text-white text-base group-hover:text-brand-primary transition-colors mb-1.5 leading-snug line-clamp-2">
+        {category.title}
+      </h3>
+      {category.description && (
+        <p className="text-xs text-white/50 line-clamp-2 mb-4">{category.description}</p>
+      )}
+      <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+        <div className="flex items-center gap-1.5 text-xs text-white/40">
+          <BookOpen size={11} />
+          <span>{examCount} exams available</span>
+        </div>
+        <span className="flex items-center gap-1 text-xs font-semibold text-brand-primary opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200">
+          Explore <ArrowRight size={11} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ─── Exam Card (level 1) ──────────────────────────────────────────────────────
+
+function ExamCard({ exam, idx, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${idx * 40}ms` }}
+      className="group rounded-2xl border border-white/8 bg-white/2 p-6 text-left transition-all duration-200 hover:border-brand-primary/30 hover:bg-white/4 hover:shadow-xl hover:shadow-brand-primary/8 hover:-translate-y-0.5 animate-fade-up"
+    >
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary">
+          <GraduationCap size={22} />
+        </div>
+        <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-white/50">
+          View Courses →
+        </span>
+      </div>
+      <h3 className="font-bold text-white text-base mb-1.5 group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
+        {exam.title}
+      </h3>
+      {exam.description && (
+        <p className="text-xs text-white/50 line-clamp-2 mb-4">{exam.description}</p>
+      )}
+      <div className="flex items-center justify-between pt-4 border-t border-white/5">
+        <div className="flex items-center gap-1.5 text-xs text-white/40">
+          <Layers size={11} />
+          <span>Courses in this exam</span>
+        </div>
+        <ChevronRight size={14} className="text-white/30 group-hover:text-brand-primary transition-colors" />
+      </div>
+    </button>
+  );
+}
+
+// ─── Course Card (level 2) ────────────────────────────────────────────────────
 
 function CourseCard({ course, progress, onClick }) {
   const pct = progress?.percentage ?? null;
@@ -18,64 +106,78 @@ function CourseCard({ course, progress, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="group w-full rounded-2xl border border-white/8 bg-white/2 p-5 text-left transition-all hover:border-brand-primary/30 hover:bg-white/4 hover:shadow-xl hover:shadow-brand-primary/5"
+      className="group w-full flex flex-col rounded-2xl border border-white/8 bg-white/2 overflow-hidden text-left transition-all hover:border-brand-primary/30 hover:bg-white/4 hover:shadow-xl hover:shadow-brand-primary/5 hover:-translate-y-0.5"
     >
       {/* Thumbnail */}
-      <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-36 relative">
+      <div className="relative h-40 shrink-0 overflow-hidden bg-white/3">
         {thumbUrl ? (
-          <img src={thumbUrl} alt={course.title} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+          <img src={thumbUrl} alt={course.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <BookOpen size={32} className="text-white/15" />
+            <BookOpen size={36} className="text-white/10" />
           </div>
         )}
+        <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
         {course.isPaid ? (
-          <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
             <DollarSign size={9} /> ₹{course.price}
           </span>
         ) : (
-          <span className="absolute top-2 right-2 rounded-full bg-emerald-500/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+          <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
             FREE
           </span>
         )}
         {pct === 100 && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-brand-primary px-2 py-0.5">
+          <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-brand-primary px-2 py-0.5">
             <CheckCircle2 size={10} className="text-dark-400" />
             <span className="text-[10px] font-bold text-dark-400">Done</span>
           </div>
         )}
+        {/* Subject count badge */}
+        {(course.subjectsCount || 0) > 0 && (
+          <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white/80 backdrop-blur-sm">
+            <Layers size={9} /> {course.subjectsCount} Subject{course.subjectsCount !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
-      <h3 className="font-bold text-white line-clamp-2 mb-1 group-hover:text-brand-primary transition-colors">
-        {course.title}
-      </h3>
-
-      {course.description && (
-        <p className="text-xs text-white/50 line-clamp-2 mb-2" dangerouslySetInnerHTML={{ __html: course.description }} />
-      )}
-
-      {/* Progress bar */}
-      {pct !== null && pct > 0 && (
-        <div className="mb-3 space-y-1">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-white/40">{progress.completedCount}/{progress.totalChapters} chapters</span>
-            <span className="font-bold text-brand-primary">{pct}%</span>
-          </div>
-          <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${pct}%` }} />
-          </div>
+      {/* Card body */}
+      <div className="flex flex-col flex-1 p-5 gap-3">
+        <div>
+          <h3 className="font-bold text-white line-clamp-2 text-sm leading-snug group-hover:text-brand-primary transition-colors">
+            {course.title}
+          </h3>
+          {course.description && (
+            <p className="text-xs text-white/45 line-clamp-2 mt-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: course.description }} />
+          )}
         </div>
-      )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-white/40">{course.subjectsCount || 0} subject{course.subjectsCount !== 1 ? "s" : ""}</span>
-        <span className="text-xs font-semibold text-brand-primary group-hover:gap-2 flex items-center gap-1 transition-all">
-          {pct > 0 ? "Continue" : "Start"} <ChevronRight size={13} />
-        </span>
+        {/* Progress bar */}
+        {pct !== null && pct > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-white/40">{progress.completedCount}/{progress.totalChapters} chapters</span>
+              <span className="font-bold text-brand-primary">{pct}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+              <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-white/5">
+          <div className="flex items-center gap-1.5 text-xs text-white/40">
+            <Play size={10} />
+            <span>{pct > 0 ? "Continue learning" : "Start course"}</span>
+          </div>
+          <ChevronRight size={13} className="text-white/30 group-hover:text-brand-primary transition-colors" />
+        </div>
       </div>
     </button>
   );
 }
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StudentCourses() {
   const navigate = useNavigate();
@@ -91,12 +193,7 @@ export default function StudentCourses() {
   useEffect(() => {
     let active = true;
     getPublicExamCategories()
-      .then((res) => {
-        if (!active) return;
-        const cats = res?.categories || [];
-        setCategories(cats);
-        if (cats.length > 0) setSelectedCategoryId(cats[0]._id);
-      })
+      .then((res) => { if (active) setCategories(res?.categories || []); })
       .catch(() => {})
       .finally(() => setLoadingCats(false));
     return () => { active = false; };
@@ -109,8 +206,6 @@ export default function StudentCourses() {
       const res = await getPublicCourses(50, examId);
       const fetched = res?.courses || [];
       setCourses(fetched);
-
-      // Fetch progress for all courses in parallel (best-effort)
       if (fetched.length > 0) {
         const prog = await getMultipleCourseProgress(fetched.map((c) => c._id));
         setCourseProgress(prog);
@@ -129,128 +224,175 @@ export default function StudentCourses() {
 
   const currentCategory = categories.find((c) => c._id === selectedCategoryId);
   const currentExam = currentCategory?.exams?.find((e) => e._id === selectedExamId);
-
   const filteredCourses = courses.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loadingCats) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-brand-primary" />
-      </div>
-    );
-  }
+  // Drill level: 0 = categories, 1 = exams, 2 = courses
+  const level = !selectedCategoryId ? 0 : !selectedExamId ? 1 : 2;
+
+  const totalExams = categories.reduce((sum, c) => sum + (c.exams?.length || 0), 0);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8 md:px-10 md:py-10 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-extrabold text-white flex items-center gap-3">
-          <BookMarked size={26} className="text-brand-primary" /> Courses
-        </h1>
-        <p className="mt-1 text-sm text-white/50">Browse courses by exam category</p>
-      </div>
+    <>
+      <StudentNavbar />
+      <div className="min-h-screen pb-16">
 
-      {/* Category tabs */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat._id}
-              onClick={() => { setSelectedCategoryId(cat._id); setSelectedExamId(null); setCourses([]); }}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${selectedCategoryId === cat._id ? "bg-brand-primary text-dark-400" : "border border-white/10 text-white/60 hover:border-brand-primary/30 hover:text-white"}`}
-            >
-              <Tag size={13} />
-              {cat.title}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Exam selection or courses */}
-      {!selectedExamId ? (
-        <div className="space-y-4">
-          <p className="text-sm text-white/50">Select an exam to view its courses:</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(currentCategory?.exams || []).map((exam, idx) => {
-              const palette = [
-                { icon: "bg-sky-500/15 text-sky-400",       border: "hover:border-sky-500/40",    title: "group-hover:text-sky-300" },
-                { icon: "bg-violet-500/15 text-violet-400", border: "hover:border-violet-500/40", title: "group-hover:text-violet-300" },
-                { icon: "bg-teal-500/15 text-teal-400",     border: "hover:border-teal-500/40",   title: "group-hover:text-teal-300" },
-                { icon: "bg-orange-500/15 text-orange-400", border: "hover:border-orange-500/40", title: "group-hover:text-orange-300" },
-              ][idx % 4];
-              return (
-                <button
-                  key={exam._id}
-                  onClick={() => setSelectedExamId(exam._id)}
-                  className={`group rounded-2xl border border-white/8 bg-white/2 p-5 text-left transition-all duration-200 ${palette.border} hover:bg-white/4 hover:shadow-xl hover:-translate-y-0.5`}
-                >
-                  <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${palette.icon}`}>
-                    <GraduationCap size={22} />
-                  </div>
-                  <h3 className={`font-bold text-white text-base transition-colors mb-1 ${palette.title}`}>{exam.title}</h3>
-                  {exam.description && <p className="text-xs text-white/50 line-clamp-2 mb-3">{exam.description}</p>}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-                    <div className="flex items-center gap-1.5 text-xs text-white/40">
-                      <BookOpen size={11} />
-                      <span>View Courses</span>
-                    </div>
-                    <ChevronRight size={14} className="text-white/30 group-hover:text-white/60 transition-colors" />
-                  </div>
-                </button>
-              );
-            })}
-            {(currentCategory?.exams || []).length === 0 && (
-              <p className="col-span-full text-sm text-white/40 py-8 text-center">No exams in this category yet</p>
-            )}
+        {/* ── HERO ── */}
+        <div className="relative overflow-hidden border-b border-white/5">
+          <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-brand-primary/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-brand-primary/10 blur-3xl" />
+          <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/60">
+              <Sparkles size={12} className="text-brand-primary" />
+              Expert-crafted learning
+            </div>
+            <h1 className="mt-4 text-3xl font-bold text-white md:text-4xl">
+              Course <span className="bg-linear-to-r from-brand-primary to-emerald-400 bg-clip-text text-transparent">Library</span>
+            </h1>
+            <p className="mt-2 text-sm text-gray-400 md:text-base max-w-xl">
+              Structured courses with notes, video lectures, and practice tests — all in one place. Pick an exam and start learning.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatPill icon={<Tag size={14} />} label="Categories" value={loadingCats ? "—" : categories.length} />
+              <StatPill icon={<GraduationCap size={14} />} label="Exams" value={loadingCats ? "—" : totalExams} />
+              <StatPill icon={<BookMarked size={14} />} label="Courses" value={level === 2 ? courses.length : "—"} />
+              <StatPill icon={<CheckCircle2 size={14} />} label="Progress" value={level === 2 ? `${Object.values(courseProgress).filter(p => p.percentage === 100).length} done` : "—"} />
+            </div>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
+
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">
+
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm">
-            <button onClick={() => { setSelectedExamId(null); setCourses([]); }} className="text-white/50 hover:text-white transition-colors">
-              {currentCategory?.title}
-            </button>
-            <ChevronRight size={14} className="text-white/30" />
-            <span className="text-white font-semibold">{currentExam?.title}</span>
-          </div>
-
-          {/* Search */}
-          <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-4 py-2.5 max-w-sm">
-            <Search size={15} className="text-white/40 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search courses..."
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/30 outline-none"
-            />
-          </div>
-
-          {loadingCourses ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 size={24} className="animate-spin text-brand-primary" />
-            </div>
-          ) : filteredCourses.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-white/5 bg-white/1">
-              <BookOpen size={28} className="text-white/20" />
-              <p className="text-sm text-white/40">No courses available for this exam yet</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredCourses.map((course) => (
-                <CourseCard
-                  key={course._id}
-                  course={course}
-                  progress={courseProgress[course._id]}
-                  onClick={() => navigate(`/student/courses/${course._id}`)}
-                />
-              ))}
+          {level > 0 && (
+            <div className="flex items-center gap-2 text-sm mb-6 rounded-2xl border border-white/8 bg-white/2 px-4 py-2.5">
+              <button
+                onClick={() => { setSelectedCategoryId(null); setSelectedExamId(null); setCourses([]); }}
+                className="text-brand-primary hover:opacity-80 font-semibold transition"
+              >
+                All Categories
+              </button>
+              {level >= 1 && (
+                <>
+                  <ChevronRight size={14} className="text-white/30" />
+                  <button
+                    onClick={level > 1 ? () => { setSelectedExamId(null); setCourses([]); } : undefined}
+                    className={level > 1 ? "text-white/50 hover:text-white transition-colors" : "text-white font-semibold"}
+                  >
+                    {currentCategory?.title}
+                  </button>
+                </>
+              )}
+              {level >= 2 && (
+                <>
+                  <ChevronRight size={14} className="text-white/30" />
+                  <span className="text-white font-semibold">{currentExam?.title}</span>
+                </>
+              )}
             </div>
           )}
+
+          {/* Level label */}
+          {!loadingCats && (
+            <div className="flex items-center gap-2 mb-5">
+              {level === 0 && <><Tag size={16} className="text-brand-primary" /><h2 className="text-base font-bold text-white">Exam Categories</h2><span className="ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/40">{categories.length}</span></>}
+              {level === 1 && <><GraduationCap size={16} className="text-brand-primary" /><h2 className="text-base font-bold text-white">Exams in {currentCategory?.title}</h2><span className="ml-1 rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-white/40">{currentCategory?.exams?.length || 0}</span></>}
+              {level === 2 && <><BookOpen size={16} className="text-brand-primary" /><h2 className="text-base font-bold text-white">Courses — {currentExam?.title}</h2></>}
+            </div>
+          )}
+
+          {/* Loading state for categories */}
+          {loadingCats ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 size={28} className="animate-spin text-brand-primary" />
+            </div>
+          ) : (
+            <>
+              {/* Level 0: Category cards */}
+              {level === 0 && (
+                categories.length === 0 ? (
+                  <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10">
+                    <BookOpen size={32} className="text-white/15" />
+                    <p className="text-sm text-white/40">No exam categories available yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {categories.map((cat, idx) => (
+                      <CategoryCard key={cat._id} category={cat} idx={idx} onClick={() => setSelectedCategoryId(cat._id)} />
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* Level 1: Exam cards */}
+              {level === 1 && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {(currentCategory?.exams || []).length === 0 ? (
+                    <div className="col-span-full flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10">
+                      <GraduationCap size={32} className="text-white/15" />
+                      <p className="text-sm text-white/40">No exams in this category yet</p>
+                    </div>
+                  ) : (
+                    (currentCategory?.exams || []).map((exam, idx) => (
+                      <ExamCard key={exam._id} exam={exam} idx={idx} onClick={() => setSelectedExamId(exam._id)} />
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Level 2: Course cards */}
+              {level === 2 && (
+                <div className="space-y-5">
+                  {/* Search */}
+                  <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-4 py-2.5 max-w-sm">
+                    <Search size={15} className="text-white/40 shrink-0" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search courses..."
+                      className="flex-1 bg-transparent text-sm text-white placeholder-white/30 outline-none"
+                    />
+                  </div>
+
+                  {loadingCourses ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="rounded-2xl border border-white/8 bg-white/2 overflow-hidden animate-pulse">
+                          <div className="h-40 bg-white/3" />
+                          <div className="p-5 space-y-3">
+                            <div className="h-4 bg-white/5 rounded w-3/4" />
+                            <div className="h-3 bg-white/3 rounded w-full" />
+                            <div className="h-3 bg-white/3 rounded w-2/3" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredCourses.length === 0 ? (
+                    <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10">
+                      <BookOpen size={32} className="text-white/15" />
+                      <p className="text-sm text-white/40">
+                        {courses.length === 0 ? "No courses available for this exam yet" : "No courses match your search"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredCourses.map((course) => (
+                        <CourseCard
+                          key={course._id}
+                          course={course}
+                          progress={courseProgress[course._id]}
+                          onClick={() => navigate(`/student/courses/${course._id}`)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

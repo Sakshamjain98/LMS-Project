@@ -130,7 +130,7 @@ export default function TestResult({ attemptId, onBack }) {
         {/* ── Top KPI Cards ── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 mb-8">
           <MetricCard
-            icon={<Target className="text-blue-400" size={18} />}
+            icon={<Target className="text-brand-primary" size={18} />}
             label="Score"
             value={`${result.marksObtained ?? 0}/${result.totalMarks ?? 0}`}
             sub="marks"
@@ -385,7 +385,7 @@ export default function TestResult({ attemptId, onBack }) {
 
 function MetricCard({ icon, label, value, sub, accent, compact }) {
   const accents = {
-    blue: "border-blue-500/20 bg-blue-500/5",
+    blue: "border-brand-primary/20 bg-brand-primary/5",
     emerald: "border-emerald-500/20 bg-emerald-500/5",
     red: "border-red-500/20 bg-red-500/5",
     gray: "border-gray-500/20 bg-gray-500/5",

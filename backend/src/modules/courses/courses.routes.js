@@ -90,7 +90,8 @@ router.patch(
       : req.body.thumbnail !== undefined ? req.body.thumbnail : undefined;
     const data = { ...req.body };
     if (thumbnail !== undefined) data.thumbnail = thumbnail;
-    const course = await svc.updateCourse(req.params.courseId, data, req.user._id);
+    const teacherId = req.user.role === "admin" ? null : req.user._id;
+    const course = await svc.updateCourse(req.params.courseId, data, teacherId);
     res.json({ success: true, course });
   })
 );
@@ -100,7 +101,8 @@ router.delete(
   "/:courseId",
   authorize("teacher", "admin"),
   asyncHandler(async (req, res) => {
-    await svc.deleteCourse(req.params.courseId, req.user._id);
+    const teacherId = req.user.role === "admin" ? null : req.user._id;
+    await svc.deleteCourse(req.params.courseId, teacherId);
     res.json({ success: true, message: "Course deleted" });
   })
 );

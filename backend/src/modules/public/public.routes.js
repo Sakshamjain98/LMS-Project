@@ -152,7 +152,7 @@ router.get(
   "/courses",
   asyncHandler(async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 8, 50);
-    const filter = { status: "published" };
+    const filter = {};
     if (req.query.examId) filter.examId = req.query.examId;
 
     const courses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).limit(limit).lean();

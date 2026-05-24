@@ -428,7 +428,7 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
   const [examId, setExamId] = useState(course?.examId?._id || course?.examId || exams[0]?._id || "");
   const [isPaid, setIsPaid] = useState(course?.isPaid ?? false);
   const [price, setPrice] = useState(course?.price?.toString() || "");
-  const [status, setStatus] = useState(course?.status || "draft");
+  const [status, setStatus] = useState(course?.status || "published");
   const [thumb, setThumb] = useState(null);
   const [saving, setSaving] = useState(false);
 

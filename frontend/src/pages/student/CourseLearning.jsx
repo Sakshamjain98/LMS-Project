@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText,
-  Video, Link2, Download, ArrowLeft, Play, BookMarked,
-  CheckCircle2, Circle, Trophy,
+  Video, Download, ArrowLeft, Play, BookMarked,
+  CheckCircle2, Circle, Trophy, Menu, X, Layers,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -13,16 +13,16 @@ import {
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-function ProgressBar({ percentage, label, className = "" }) {
+function ProgressBar({ percentage, className = "" }) {
   return (
     <div className={className}>
       <div className="flex items-center justify-between mb-1">
-        {label && <span className="text-xs text-white/50">{label}</span>}
-        <span className="text-xs font-bold text-brand-primary ml-auto">{percentage}%</span>
+        <span className="text-xs text-white/50">Progress</span>
+        <span className="text-xs font-bold text-brand-primary">{percentage}%</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+      <div className="h-1.5 w-full rounded-full bg-white/8 overflow-hidden">
         <div
-          className="h-full rounded-full bg-brand-primary transition-all duration-500"
+          className="h-full rounded-full bg-brand-primary transition-all duration-700"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -30,12 +30,12 @@ function ProgressBar({ percentage, label, className = "" }) {
   );
 }
 
-// ─── YouTube Embed ────────────────────────────────────────────────────────────
+// ─── YouTube Player ───────────────────────────────────────────────────────────
 
 function YouTubePlayer({ youtubeId }) {
   if (!youtubeId) return null;
   return (
-    <div className="w-full overflow-hidden rounded-2xl aspect-video bg-black">
+    <div className="w-full overflow-hidden rounded-2xl aspect-video bg-black shadow-2xl shadow-black/40">
       <iframe
         className="h-full w-full"
         src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
@@ -48,29 +48,43 @@ function YouTubePlayer({ youtubeId }) {
   );
 }
 
-// ─── Rich Text Viewer ─────────────────────────────────────────────────────────
+// ─── Rich Text Note Viewer ────────────────────────────────────────────────────
 
 function RichTextNote({ noteId }) {
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(false);
+    setNote(null);
     getNoteById(noteId)
       .then((n) => { if (active) setNote(n); })
-      .catch(() => {})
+      .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [noteId]);
 
-  if (loading) return <div className="flex h-40 items-center justify-center"><Loader2 size={22} className="animate-spin text-brand-primary" /></div>;
+  if (loading) return (
+    <div className="flex h-40 items-center justify-center rounded-2xl border border-white/5 bg-white/2">
+      <Loader2 size={22} className="animate-spin text-brand-primary" />
+    </div>
+  );
+  if (error) return (
+    <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+      <Lock size={20} className="text-amber-400" />
+      <p className="text-sm text-amber-400 font-medium">Content not available</p>
+      <p className="text-xs text-white/40">Purchase this course to access full content</p>
+    </div>
+  );
   if (!note) return <p className="text-sm text-white/40 py-6 text-center">Note not found</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-bold text-lg text-white">{note.title}</h2>
+        <h3 className="font-bold text-base text-white">{note.title}</h3>
         {note.type === "pdf" && note.fileUrl && note.allowDownload && (
           <a
             href={note.fileUrl}
@@ -79,24 +93,16 @@ function RichTextNote({ noteId }) {
             rel="noreferrer"
             className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/5 hover:text-white transition-colors"
           >
-            <Download size={13} /> Download PDF
+            <Download size={13} /> Download
           </a>
         )}
       </div>
-
       {note.type === "rich_text" && note.content ? (
-        <div
-          className="quill-content rounded-2xl border border-white/5 bg-white/2 p-6"
-          dangerouslySetInnerHTML={{ __html: note.content }}
-        />
+        <div className="quill-content rounded-2xl border border-white/5 bg-white/2 p-6"
+          dangerouslySetInnerHTML={{ __html: note.content }} />
       ) : note.type === "pdf" && note.fileUrl ? (
         <div className="rounded-2xl border border-white/8 bg-white/2 overflow-hidden" style={{ height: "80vh" }}>
-          <iframe
-            src={`${note.fileUrl}#toolbar=1`}
-            title={note.title}
-            className="h-full w-full"
-            frameBorder="0"
-          />
+          <iframe src={`${note.fileUrl}#toolbar=1`} title={note.title} className="h-full w-full" frameBorder="0" />
         </div>
       ) : (
         <p className="text-sm text-white/40 py-6 text-center">No content available</p>
@@ -105,137 +111,181 @@ function RichTextNote({ noteId }) {
   );
 }
 
-// ─── Content Area ─────────────────────────────────────────────────────────────
+// ─── Video Section ────────────────────────────────────────────────────────────
 
-function ContentArea({ chapter, initialTab }) {
-  const [tab, setTab] = useState(initialTab || "notes");
-  const [activeNote, setActiveNote] = useState(null);
+function VideoSection({ chapter }) {
   const [activeVideo, setActiveVideo] = useState(null);
 
   useEffect(() => {
-    if (tab === "notes" && chapter.notes?.length > 0) {
-      setActiveNote(chapter.notes[0]);
-    }
-    if (tab === "videos" && chapter.videos?.length > 0) {
-      setActiveVideo(chapter.videos[0]);
-    }
-  }, [tab, chapter._id]);
+    setActiveVideo(chapter.videos?.[0] || null);
+  }, [chapter._id]);
 
-  const autoTab = chapter.notes?.length > 0 ? "notes"
-    : chapter.videos?.length > 0 ? "videos" : "tests";
+  const videos = chapter.videos || [];
+  const vid = activeVideo || videos[0];
+  if (!vid) return null;
 
-  const tabs = [
-    { id: "notes", label: "Notes", count: chapter.notes?.length || 0, icon: FileText },
-    { id: "videos", label: "Videos", count: chapter.videos?.length || 0, icon: Video },
-    { id: "tests", label: "Tests", count: chapter.linkedTests?.length || 0, icon: Link2 },
-  ].filter((t) => t.count > 0);
-
-  if (tabs.length === 0) return <p className="text-sm text-white/40 py-8 text-center">No content in this chapter yet.</p>;
+  const ytId = vid.youtubeId || vid.youtubeUrl?.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/
+  )?.[1];
 
   return (
-    <div className="space-y-4">
-      {tabs.length > 1 && (
-        <div className="flex gap-1 border-b border-white/5 pb-3">
-          {tabs.map(({ id, label, count, icon: Icon }) => (
+    <div className="rounded-2xl border border-white/8 bg-white/2 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-primary/15">
+          <Video size={14} className="text-brand-primary" />
+        </div>
+        <h2 className="text-sm font-bold text-white">
+          Video Lectures
+          <span className="ml-2 text-[11px] font-normal text-white/40">{videos.length} video{videos.length !== 1 ? "s" : ""}</span>
+        </h2>
+      </div>
+
+      {videos.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {videos.map((v) => (
             <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === id ? "bg-brand-primary/15 text-brand-primary" : "text-white/50 hover:bg-white/5 hover:text-white"}`}
+              key={v._id}
+              onClick={() => setActiveVideo(v)}
+              className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition-all ${(activeVideo?._id || videos[0]._id) === v._id ? "bg-brand-primary/15 text-brand-primary" : "border border-white/8 text-white/60 hover:bg-white/5 hover:text-white"}`}
             >
-              <Icon size={13} />
-              {label}
-              <span className={`rounded-full px-1.5 text-[10px] font-bold ${tab === id ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-white/40"}`}>{count}</span>
+              <Play size={11} /> {v.title}
             </button>
           ))}
         </div>
       )}
 
-      {tab === "notes" && (
-        <div className="flex gap-4 min-h-64">
-          {chapter.notes?.length > 1 && (
-            <div className="w-52 shrink-0 space-y-1">
-              {chapter.notes.map((note) => (
-                <button
-                  key={note._id}
-                  onClick={() => setActiveNote(note)}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-all ${activeNote?._id === note._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
-                >
-                  <FileText size={13} className={note.type === "pdf" ? "text-red-400" : "text-brand-primary"} />
-                  <span className="flex-1 truncate">{note.title}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            {activeNote
-              ? <RichTextNote noteId={activeNote._id} />
-              : chapter.notes?.length === 1
-                ? <RichTextNote noteId={chapter.notes[0]._id} />
-                : null}
-          </div>
-        </div>
-      )}
-
-      {tab === "videos" && (
-        <div className="space-y-4">
-          {chapter.videos?.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              {chapter.videos.map((vid) => (
-                <button
-                  key={vid._id}
-                  onClick={() => setActiveVideo(vid)}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all ${activeVideo?._id === vid._id ? "bg-brand-primary/15 text-brand-primary" : "border border-white/8 text-white/60 hover:bg-white/5 hover:text-white"}`}
-                >
-                  <Play size={12} /> {vid.title}
-                </button>
-              ))}
-            </div>
-          )}
-          {(activeVideo || chapter.videos?.[0]) && (() => {
-            const vid = activeVideo || chapter.videos[0];
-            const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
-            return (
-              <div className="space-y-3">
-                <YouTubePlayer youtubeId={ytId} />
-                <h3 className="font-semibold text-white">{vid.title}</h3>
-                {vid.description && <p className="text-sm text-white/60">{vid.description}</p>}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {tab === "tests" && (
+      {ytId ? (
         <div className="space-y-2">
-          {(chapter.linkedTests || []).map((lt) => (
-            <LinkedTestCard key={String(lt.testId?._id || lt.testId)} test={lt.test || {}} testId={lt.testId?._id || lt.testId} />
-          ))}
+          <YouTubePlayer youtubeId={ytId} />
+          {videos.length === 1 && <p className="font-medium text-white text-sm">{vid.title}</p>}
+          {vid.description && <p className="text-sm text-white/55 leading-relaxed">{vid.description}</p>}
+        </div>
+      ) : (
+        <div className="flex h-32 items-center justify-center rounded-2xl border border-white/5 bg-white/1">
+          <p className="text-sm text-white/30">Video URL not available</p>
         </div>
       )}
     </div>
   );
 }
 
-function LinkedTestCard({ test, testId }) {
-  const navigate = useNavigate();
+// ─── Notes Section ────────────────────────────────────────────────────────────
+
+function NotesSection({ chapter }) {
+  const notes = chapter.notes || [];
+  const [activeNote, setActiveNote] = useState(notes[0] || null);
+
+  useEffect(() => {
+    setActiveNote(notes[0] || null);
+  }, [chapter._id]);
+
+  if (!notes.length) return null;
+
   return (
-    <button
-      onClick={() => navigate(`/student/tests?startTest=${testId}`)}
-      className="group flex w-full items-center gap-4 rounded-2xl border border-white/8 bg-white/2 p-4 text-left transition-all hover:border-brand-primary/30 hover:bg-white/4"
-    >
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
-        <BookOpen size={18} />
+    <div className="rounded-2xl border border-white/8 bg-white/2 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-primary/15">
+          <FileText size={14} className="text-brand-primary" />
+        </div>
+        <h2 className="text-sm font-bold text-white">
+          Study Material
+          <span className="ml-2 text-[11px] font-normal text-white/40">{notes.length} note{notes.length !== 1 ? "s" : ""} / PDF{notes.length !== 1 ? "s" : ""}</span>
+        </h2>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-white truncate">{test.title || "Untitled Test"}</p>
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className={`text-[11px] font-semibold uppercase ${test.type === "pyq" ? "text-purple-400" : "text-brand-primary"}`}>{test.type || "practice"}</span>
-          {test.duration && <span className="text-[11px] text-white/40">{test.duration} min</span>}
-          {test.totalMarks && <span className="text-[11px] text-white/40">{test.totalMarks} marks</span>}
+
+      <div className="flex gap-4">
+        {notes.length > 1 && (
+          <div className="w-48 shrink-0 space-y-1">
+            {notes.map((note) => (
+              <button
+                key={note._id}
+                onClick={() => setActiveNote(note)}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium transition-all ${activeNote?._id === note._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/55 hover:bg-white/5 hover:text-white"}`}
+              >
+                <FileText size={12} className={note.type === "pdf" ? "text-red-400 shrink-0" : "text-brand-primary shrink-0"} />
+                <span className="flex-1 truncate">{note.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {activeNote && <RichTextNote noteId={activeNote._id} />}
         </div>
       </div>
-      <ChevronRight size={16} className="text-white/30 group-hover:text-brand-primary transition-colors" />
-    </button>
+    </div>
+  );
+}
+
+// ─── Tests Section ────────────────────────────────────────────────────────────
+
+function TestsSection({ chapter }) {
+  const navigate = useNavigate();
+  const tests = chapter.linkedTests || [];
+  if (!tests.length) return null;
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-white/2 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-primary/15">
+          <BookOpen size={14} className="text-brand-primary" />
+        </div>
+        <h2 className="text-sm font-bold text-white">
+          Related Tests
+          <span className="ml-2 text-[11px] font-normal text-white/40">{tests.length} test{tests.length !== 1 ? "s" : ""}</span>
+        </h2>
+      </div>
+      <div className="space-y-2">
+        {tests.map((lt) => {
+          const test = lt.test || {};
+          const testId = lt.testId?._id || lt.testId;
+          return (
+            <button
+              key={String(testId)}
+              onClick={() => navigate(`/student/tests?startTest=${testId}`)}
+              className="group flex w-full items-center gap-4 rounded-2xl border border-white/8 bg-white/2 p-4 text-left transition-all hover:border-brand-primary/30 hover:bg-white/4"
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
+                <BookOpen size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white text-sm truncate">{test.title || "Untitled Test"}</p>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className={`text-[11px] font-semibold uppercase ${test.type === "pyq" ? "text-purple-400" : "text-brand-primary"}`}>{test.type || "practice"}</span>
+                  {test.duration && <span className="text-[11px] text-white/40">{test.duration} min</span>}
+                  {test.totalMarks && <span className="text-[11px] text-white/40">{test.totalMarks} marks</span>}
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-white/30 group-hover:text-brand-primary transition-colors shrink-0" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Content Area ─────────────────────────────────────────────────────────────
+
+function ContentArea({ chapter }) {
+  const videos = chapter.videos || [];
+  const notes  = chapter.notes  || [];
+  const tests  = chapter.linkedTests || [];
+
+  if (!videos.length && !notes.length && !tests.length) {
+    return (
+      <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10">
+        <BookMarked size={28} className="text-white/15" />
+        <p className="text-sm text-white/40">No content added to this chapter yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {videos.length > 0 && <VideoSection chapter={chapter} />}
+      {notes.length  > 0 && <NotesSection chapter={chapter} />}
+      {tests.length  > 0 && <TestsSection chapter={chapter} />}
+    </div>
   );
 }
 
@@ -251,9 +301,9 @@ export default function CourseLearning() {
   const [progress, setProgress] = useState({ completedChapterIds: [], totalChapters: 0, completedCount: 0, percentage: 0 });
   const [markingComplete, setMarkingComplete] = useState(false);
 
-  // Navigation state
   const [openSubjectId, setOpenSubjectId] = useState(null);
   const [selectedChapterId, setSelectedChapterId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -269,7 +319,6 @@ export default function CourseLearning() {
         if (firstChapter) setSelectedChapterId(firstChapter._id);
       }
 
-      // Load progress
       const prog = await getCourseProgress(courseId);
       setProgress(prog);
     } catch {
@@ -281,10 +330,11 @@ export default function CourseLearning() {
 
   useEffect(() => { load(); }, [load]);
 
-  const selectedChapter = course?.subjects
-    ?.flatMap((s) => s.chapters || [])
-    .find((ch) => ch._id === selectedChapterId);
-
+  const allChapters = course?.subjects?.flatMap((s) => s.chapters || []) || [];
+  const selectedChapter = allChapters.find((ch) => ch._id === selectedChapterId);
+  const selectedSubject = course?.subjects?.find((s) =>
+    (s.chapters || []).some((ch) => ch._id === selectedChapterId)
+  );
   const isCompleted = progress.completedChapterIds.includes(selectedChapterId);
 
   const handleToggleComplete = async () => {
@@ -303,192 +353,310 @@ export default function CourseLearning() {
     }
   };
 
+  const selectChapter = (chapterId) => {
+    setSelectedChapterId(chapterId);
+    setSidebarOpen(false); // close mobile drawer on selection
+  };
+
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-brand-primary" />
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-brand-primary" />
       </div>
     );
   }
   if (!course) return null;
 
-  const allChapters = course.subjects?.flatMap((s) => s.chapters || []) || [];
-
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8 md:px-10 md:py-10">
-    <div className="flex gap-6">
-      {/* ── Sidebar: Chapter Tree ── */}
-      <aside className="w-64 shrink-0">
-        <div className="sticky top-6 space-y-3">
-          <button
-            onClick={() => navigate("/student/courses")}
-            className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={14} /> All Courses
-          </button>
+    <div className="flex flex-col min-h-screen">
 
-          <div
-            className="rounded-2xl border border-white/8 bg-white/2 flex flex-col overflow-hidden"
-            style={{ maxHeight: "calc(100vh - 7rem)" }}
-          >
-            {/* Fixed header: course title + progress */}
-            <div className="shrink-0 p-4 border-b border-white/5 space-y-2">
-              <div className="flex items-center gap-2">
+      {/* ── Course Banner ── */}
+      <div className="relative overflow-hidden border-b border-white/5 bg-dark-300/50">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-brand-primary/15 blur-3xl" />
+          <div className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full bg-brand-primary/8 blur-3xl" />
+        </div>
+        <div className="relative mx-auto w-full max-w-7xl px-4 py-4 md:px-8 md:py-5">
+          <div className="flex items-center gap-4">
+            {/* Back */}
+            <button
+              onClick={() => navigate("/student/courses")}
+              className="shrink-0 flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span className="hidden sm:inline">Courses</span>
+            </button>
+            <div className="w-px h-6 bg-white/10 shrink-0" />
+
+            {/* Course info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <BookOpen size={14} className="text-brand-primary shrink-0" />
-                <h2 className="text-sm font-bold text-white line-clamp-2">{course.title}</h2>
+                <h1 className="text-base font-bold text-white truncate">{course.title}</h1>
+                {!hasAccess && course.isPaid && (
+                  <span className="shrink-0 flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
+                    <Lock size={9} /> Preview Only
+                  </span>
+                )}
+                {hasAccess && progress.percentage === 100 && (
+                  <span className="shrink-0 flex items-center gap-1 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-primary">
+                    <Trophy size={9} /> Completed!
+                  </span>
+                )}
               </div>
-              <ProgressBar percentage={progress.percentage} />
-              <p className="text-[11px] text-white/40">
-                {progress.completedCount} / {progress.totalChapters} chapters done
-              </p>
-              {progress.percentage === 100 && (
-                <div className="flex items-center gap-1.5 rounded-xl bg-brand-primary/10 px-3 py-1.5">
-                  <Trophy size={12} className="text-brand-primary" />
-                  <span className="text-xs font-bold text-brand-primary">Course Complete!</span>
-                </div>
-              )}
-              {!hasAccess && course.isPaid && (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2">
-                  <Lock size={12} className="text-amber-400 shrink-0" />
-                  <p className="text-[11px] text-amber-400">Preview only</p>
+              {/* Progress row */}
+              {hasAccess && (
+                <div className="mt-2 flex items-center gap-3 max-w-sm">
+                  <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+                    <div className="h-full rounded-full bg-brand-primary transition-all duration-700" style={{ width: `${progress.percentage}%` }} />
+                  </div>
+                  <span className="text-[11px] text-white/50 shrink-0">
+                    {progress.completedCount}/{progress.totalChapters} chapters · <span className="text-brand-primary font-bold">{progress.percentage}%</span>
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* Scrollable chapter list */}
-            <div className="custom-scrollbar flex-1 overflow-y-auto px-3 py-3 space-y-1 min-h-0">
-              {(course.subjects || []).map((sub) => (
-                <div key={sub._id}>
-                  <button
-                    onClick={() => setOpenSubjectId(openSubjectId === sub._id ? null : sub._id)}
-                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                  >
-                    <ChevronDown size={13} className={`transition-transform text-white/30 shrink-0 ${openSubjectId === sub._id ? "" : "-rotate-90"}`} />
-                    <span className="flex-1 truncate font-medium">{sub.title}</span>
-                    <span className="text-[10px] text-white/30">{sub.chapters?.length || 0}</span>
-                  </button>
+            {/* Stats chips */}
+            <div className="hidden md:flex items-center gap-2 shrink-0">
+              <span className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-white/50">
+                <Layers size={11} /> {course.subjects?.length || 0} subjects
+              </span>
+              <span className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-white/50">
+                <BookOpen size={11} /> {allChapters.length} chapters
+              </span>
+            </div>
 
-                  {openSubjectId === sub._id && (
-                    <div className="ml-5 space-y-0.5 border-l border-white/5 pl-2">
-                      {(sub.chapters || []).map((ch) => {
-                        const locked = ch.locked;
-                        const done = progress.completedChapterIds.includes(ch._id);
-                        return (
-                          <button
-                            key={ch._id}
-                            onClick={() => !locked && setSelectedChapterId(ch._id)}
-                            disabled={locked}
-                            className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-all ${locked ? "cursor-not-allowed opacity-40" : ""} ${selectedChapterId === ch._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
-                          >
-                            {locked ? (
-                              <Lock size={10} className="shrink-0 text-white/30" />
-                            ) : done ? (
-                              <CheckCircle2 size={10} className="shrink-0 text-brand-primary" />
-                            ) : (
-                              <Circle size={10} className="shrink-0 text-white/20" />
-                            )}
-                            <span className="flex-1 truncate">{ch.title}</span>
-                            {!locked && (
-                              <div className="flex gap-1 ml-auto">
-                                {(ch.notes?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.notes.length}📄</span>}
-                                {(ch.videos?.length || 0) > 0 && <span className="text-[9px] text-white/30">{ch.videos.length}▶</span>}
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+            {/* Mobile sidebar toggle */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden shrink-0 flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 hover:text-white transition"
+            >
+              <Menu size={15} /> Chapters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Layout ── */}
+      <div className="flex flex-1 min-h-0 mx-auto w-full max-w-7xl px-4 md:px-8 py-6 gap-6">
+
+        {/* ── Mobile sidebar overlay ── */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── Chapter Tree Sidebar ── */}
+        <aside className={`
+          lg:relative lg:w-72 lg:shrink-0 lg:translate-x-0 lg:z-auto
+          fixed inset-y-0 left-0 z-50 w-80 bg-dark-300
+          transition-transform duration-300
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}>
+          <div className="lg:sticky lg:top-6 h-full lg:h-auto">
+            <div
+              className="rounded-2xl border border-white/8 bg-white/2 flex flex-col overflow-hidden h-full lg:h-auto"
+              style={{ maxHeight: "calc(100vh - 8rem)" }}
+            >
+              {/* Sidebar header */}
+              <div className="shrink-0 px-4 py-3 border-b border-white/5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <BookOpen size={13} className="text-brand-primary shrink-0" />
+                  <h2 className="text-xs font-bold text-white truncate">{course.title}</h2>
+                </div>
+                <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/40 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Progress mini */}
+              {hasAccess && (
+                <div className="shrink-0 px-4 py-2.5 border-b border-white/5">
+                  <div className="flex items-center justify-between text-[11px] mb-1.5">
+                    <span className="text-white/40">{progress.completedCount} / {progress.totalChapters} chapters</span>
+                    <span className="font-bold text-brand-primary">{progress.percentage}%</span>
+                  </div>
+                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full bg-brand-primary transition-all" style={{ width: `${progress.percentage}%` }} />
+                  </div>
+                  {progress.percentage === 100 && (
+                    <div className="flex items-center gap-1.5 mt-2 rounded-lg bg-brand-primary/10 px-2.5 py-1.5">
+                      <Trophy size={11} className="text-brand-primary" />
+                      <span className="text-[11px] font-bold text-brand-primary">Course Complete!</span>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main Content ── */}
-      <main className="flex-1 min-w-0 space-y-4">
-        {!selectedChapter ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-white/5 bg-white/1">
-            <BookMarked size={32} className="text-white/15" />
-            <p className="text-sm text-white/40">Select a chapter from the sidebar</p>
-          </div>
-        ) : selectedChapter.locked ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5">
-            <Lock size={32} className="text-amber-400/50" />
-            <p className="font-semibold text-white/80">This content is locked</p>
-            <p className="text-sm text-white/40">Purchase the course to access all chapters</p>
-          </div>
-        ) : (
-          <>
-            {/* Chapter header + complete button */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText size={16} className="text-amber-400 shrink-0" />
-                <h1 className="text-xl font-extrabold text-white truncate">{selectedChapter.title}</h1>
-              </div>
-              {hasAccess && (
-                <button
-                  onClick={handleToggleComplete}
-                  disabled={markingComplete}
-                  className={`shrink-0 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                    isCompleted
-                      ? "bg-brand-primary/15 text-brand-primary border border-brand-primary/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
-                      : "border border-white/15 text-white/60 hover:border-brand-primary/40 hover:text-brand-primary"
-                  }`}
-                >
-                  {markingComplete ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : isCompleted ? (
-                    <CheckCircle2 size={14} />
-                  ) : (
-                    <Circle size={14} />
-                  )}
-                  {isCompleted ? "Completed" : "Mark Complete"}
-                </button>
               )}
+
+              {/* Subject + chapter tree */}
+              <div className="custom-scrollbar flex-1 overflow-y-auto px-3 py-3 space-y-0.5 min-h-0">
+                {(course.subjects || []).length === 0 ? (
+                  <p className="text-xs text-white/30 text-center py-8">No subjects added yet</p>
+                ) : (
+                  (course.subjects || []).map((sub) => {
+                    const isOpen = openSubjectId === sub._id;
+                    const chapters = sub.chapters || [];
+                    const doneInSubject = chapters.filter(ch => progress.completedChapterIds.includes(ch._id)).length;
+
+                    return (
+                      <div key={sub._id}>
+                        <button
+                          onClick={() => setOpenSubjectId(isOpen ? null : sub._id)}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                        >
+                          <ChevronDown size={12} className={`transition-transform text-white/30 shrink-0 ${isOpen ? "rotate-0" : "-rotate-90"}`} />
+                          <span className="flex-1 truncate">{sub.title}</span>
+                          <span className="text-[10px] text-white/25 shrink-0">{doneInSubject}/{chapters.length}</span>
+                        </button>
+
+                        {isOpen && (
+                          <div className="ml-4 mb-1 space-y-0.5 border-l border-white/5 pl-3">
+                            {chapters.length === 0 ? (
+                              <p className="text-[11px] text-white/25 px-2 py-1.5">No chapters yet</p>
+                            ) : (
+                              chapters.map((ch) => {
+                                const locked = ch.locked;
+                                const done = progress.completedChapterIds.includes(ch._id);
+                                const isSelected = selectedChapterId === ch._id;
+                                const notesCount = ch.notes?.length || 0;
+                                const videosCount = ch.videos?.length || 0;
+                                const testsCount = ch.linkedTests?.length || 0;
+
+                                return (
+                                  <button
+                                    key={ch._id}
+                                    onClick={() => !locked && selectChapter(ch._id)}
+                                    disabled={locked}
+                                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-all ${locked ? "cursor-not-allowed opacity-35" : ""} ${isSelected ? "bg-brand-primary/15 text-brand-primary" : "text-white/55 hover:bg-white/5 hover:text-white"}`}
+                                  >
+                                    <span className="shrink-0">
+                                      {locked ? (
+                                        <Lock size={9} className="text-white/25" />
+                                      ) : done ? (
+                                        <CheckCircle2 size={9} className="text-brand-primary" />
+                                      ) : (
+                                        <Circle size={9} className="text-white/20" />
+                                      )}
+                                    </span>
+                                    <span className="flex-1 truncate leading-snug">{ch.title}</span>
+                                    {!locked && (notesCount + videosCount + testsCount > 0) && (
+                                      <div className="flex items-center gap-0.5 shrink-0">
+                                        {notesCount > 0 && <span className="text-[9px] text-white/25">{notesCount}📄</span>}
+                                        {videosCount > 0 && <span className="text-[9px] text-white/25">{videosCount}▶</span>}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
+          </div>
+        </aside>
 
-            {selectedChapter.description && (
-              <div className="text-sm text-white/60 quill-content" dangerouslySetInnerHTML={{ __html: selectedChapter.description }} />
-            )}
-
-            <ContentArea chapter={selectedChapter} />
-
-            {/* Chapter navigation */}
-            {(() => {
-              const idx = allChapters.findIndex((c) => c._id === selectedChapterId);
-              const prev = allChapters[idx - 1];
-              const next = allChapters[idx + 1];
-              return (
-                <div className="flex items-center justify-between border-t border-white/5 pt-4 mt-6">
-                  <div>
-                    {prev && !prev.locked && (
-                      <button onClick={() => setSelectedChapterId(prev._id)} className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors">
-                        <ArrowLeft size={14} />
-                        <span className="truncate max-w-40">{prev.title}</span>
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    {next && !next.locked ? (
-                      <button onClick={() => setSelectedChapterId(next._id)} className="flex items-center gap-2 text-sm text-brand-primary hover:opacity-80 transition-opacity">
-                        <span className="truncate max-w-40">{next.title}</span>
-                        <ChevronRight size={14} />
-                      </button>
-                    ) : !isCompleted && hasAccess ? (
-                      <button onClick={handleToggleComplete} disabled={markingComplete} className="flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-dark-400 hover:opacity-90 transition-opacity">
-                        <CheckCircle2 size={14} /> Complete Chapter
-                      </button>
-                    ) : null}
-                  </div>
+        {/* ── Main Content ── */}
+        <main className="flex-1 min-w-0 space-y-5">
+          {!selectedChapter ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-white/5 bg-white/1">
+              <BookMarked size={36} className="text-white/10" />
+              <p className="text-sm text-white/40">Select a chapter from the sidebar</p>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:text-white transition"
+              >
+                <Menu size={14} /> Open Chapter List
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Breadcrumb + chapter title */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  {selectedSubject && (
+                    <p className="text-xs text-white/40 mb-1 flex items-center gap-1.5">
+                      <Layers size={10} />
+                      {selectedSubject.title}
+                    </p>
+                  )}
+                  <h1 className="text-xl font-extrabold text-white leading-tight">{selectedChapter.title}</h1>
                 </div>
-              );
-            })()}
-          </>
-        )}
-      </main>
-    </div>
+
+                {hasAccess && (
+                  <button
+                    onClick={handleToggleComplete}
+                    disabled={markingComplete}
+                    className={`shrink-0 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+                      isCompleted
+                        ? "bg-brand-primary/15 text-brand-primary border border-brand-primary/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
+                        : "border border-white/15 text-white/60 hover:border-brand-primary/40 hover:text-brand-primary"
+                    }`}
+                  >
+                    {markingComplete ? <Loader2 size={14} className="animate-spin" /> : isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    {isCompleted ? "Completed" : "Mark Complete"}
+                  </button>
+                )}
+              </div>
+
+              {/* Chapter description */}
+              {selectedChapter.description && (
+                <div className="text-sm text-white/55 leading-relaxed quill-content rounded-2xl border border-white/5 bg-white/2 px-5 py-4"
+                  dangerouslySetInnerHTML={{ __html: selectedChapter.description }} />
+              )}
+
+              {/* Locked chapter message */}
+              {selectedChapter.locked ? (
+                <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+                  <Lock size={32} className="text-amber-400/60" />
+                  <p className="font-semibold text-white/80">This chapter is locked</p>
+                  <p className="text-sm text-white/40">Purchase the course to access all content</p>
+                </div>
+              ) : (
+                <ContentArea chapter={selectedChapter} />
+              )}
+
+              {/* Prev / Next navigation */}
+              {(() => {
+                const idx = allChapters.findIndex((c) => c._id === selectedChapterId);
+                const prev = allChapters[idx - 1];
+                const next = allChapters[idx + 1];
+                return (
+                  <div className="flex items-center justify-between border-t border-white/5 pt-5 mt-2">
+                    <div>
+                      {prev && !prev.locked && (
+                        <button onClick={() => selectChapter(prev._id)} className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors">
+                          <ArrowLeft size={14} />
+                          <span className="truncate max-w-44">{prev.title}</span>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      {next && !next.locked ? (
+                        <button onClick={() => selectChapter(next._id)} className="flex items-center gap-2 text-sm text-brand-primary hover:opacity-80 transition-opacity font-medium">
+                          <span className="truncate max-w-44">{next.title}</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      ) : !isCompleted && hasAccess ? (
+                        <button onClick={handleToggleComplete} disabled={markingComplete} className="flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-bold text-dark-400 hover:opacity-90 transition-opacity">
+                          <CheckCircle2 size={14} /> Complete Chapter
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

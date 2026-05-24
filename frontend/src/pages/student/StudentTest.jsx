@@ -672,16 +672,16 @@ function ExamCard({ exam, idx, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="group text-left rounded-2xl glass-card p-5 transition-all duration-300 hover:border-sky-500/40 hover:bg-white/5 hover:shadow-[0_8px_32px_rgba(14,165,233,0.15)] hover:-translate-y-0.5 animate-fade-up"
+      className="group text-left rounded-2xl glass-card p-5 transition-all duration-300 hover:border-brand-primary/40 hover:bg-white/5 hover:shadow-[0_8px_32px_rgba(0,200,133,0.15)] hover:-translate-y-0.5 animate-fade-up"
       style={{ animationDelay: `${idx * 40}ms` }}
     >
       {/* Icon row */}
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-sky-500/25 to-sky-600/10 text-sky-400 ring-1 ring-sky-500/20 group-hover:ring-sky-500/40 transition-all">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-brand-primary/25 to-brand-primary/5 text-brand-primary ring-1 ring-brand-primary/20 group-hover:ring-brand-primary/40 transition-all">
           <GraduationCap size={20} />
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className="rounded-full bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 text-[10px] font-bold text-sky-300">
+          <span className="rounded-full bg-brand-primary/10 border border-brand-primary/20 px-2.5 py-1 text-[10px] font-bold text-brand-primary">
             {seriesCount} Series
           </span>
           {aitsCount > 0 && (
@@ -693,7 +693,7 @@ function ExamCard({ exam, idx, onClick }) {
       </div>
 
       {/* Title */}
-      <h3 className="text-sm font-bold text-white group-hover:text-sky-300 transition-colors line-clamp-2 leading-snug">
+      <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
         {exam.title}
       </h3>
       {exam.description && (
@@ -724,7 +724,7 @@ function ExamCard({ exam, idx, onClick }) {
             {stats.live} Live
           </span>
         )}
-        <span className="flex items-center gap-1 text-sky-400 group-hover:gap-2 transition-all ml-auto">
+        <span className="flex items-center gap-1 text-brand-primary group-hover:gap-2 transition-all ml-auto">
           View Series <ArrowRight size={11} />
         </span>
       </div>
@@ -736,7 +736,7 @@ function ExamCard({ exam, idx, onClick }) {
 
 function LevelIcon({ level }) {
   if (level === 0) return <Tag size={16} className="text-purple-400" />;
-  if (level === 1) return <GraduationCap size={16} className="text-sky-400" />;
+  if (level === 1) return <GraduationCap size={16} className="text-brand-primary" />;
   return <Layers size={16} className="text-brand-primary" />;
 }
 
@@ -770,7 +770,7 @@ function TabBtn({ icon: Icon, active, onClick, children }) {
 function StatPill({ icon, label, value, color }) {
   const colors = {
     purple: "bg-purple-500/10 border-purple-500/20 text-purple-400",
-    sky: "bg-sky-500/10 border-sky-500/20 text-sky-400",
+    sky: "bg-brand-primary/10 border-brand-primary/20 text-brand-primary",
     emerald: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
     amber: "bg-amber-500/10 border-amber-500/20 text-amber-400",
   };

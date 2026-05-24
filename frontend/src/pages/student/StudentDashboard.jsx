@@ -206,7 +206,7 @@ export default function StudentDashboard() {
                           className="group text-left animate-fade-up rounded-2xl border border-white/5 bg-dark-200 p-5 transition-colors hover:border-brand-primary/40 hover:bg-dark-100/60 flex flex-col gap-3"
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
                               <GraduationCap size={18} />
                             </div>
                             <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
