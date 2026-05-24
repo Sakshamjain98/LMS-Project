@@ -804,57 +804,70 @@ export default function CourseManager() {
         {/* Course selected, no chapter */}
         {selectedCourseId && !selectedChapterId && selectedCourse && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <BookOpen size={20} className="text-brand-primary shrink-0" />
-                <div className="min-w-0">
-                  <h2 className="font-bold text-lg text-white truncate">{selectedCourse.title}</h2>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    {selectedCourse.isPaid && <span className="text-xs text-amber-400 font-semibold">₹{selectedCourse.price}</span>}
+            {/* Course header */}
+            <div className="rounded-2xl border border-white/8 bg-white/2 p-5">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-primary/15">
+                    <BookOpen size={22} className="text-brand-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-extrabold text-xl text-white truncate leading-snug">{selectedCourse.title}</h2>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {selectedCourse.isPaid ? (
+                        <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-400">
+                          <DollarSign size={9} /> ₹{selectedCourse.price}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-400">FREE</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Btn variant="outline" onClick={() => setCourseModal({ course: selectedCourse })}>
-                <Settings size={14} /> Edit Course
-              </Btn>
-            </div>
-
-            {/* Publish status callout */}
-            {selectedCourse.status !== "published" ? (
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <EyeOff size={14} className="text-amber-400 shrink-0" />
-                  <p className="text-sm text-amber-300 font-semibold">This course is in <span className="uppercase">Draft</span> — students cannot see it.</p>
-                </div>
-                <Btn variant="ghost" className="text-amber-400 hover:text-amber-300 text-xs py-1 px-3 border border-amber-500/30 hover:bg-amber-500/10 shrink-0"
-                  onClick={() => setCourseModal({ course: selectedCourse })}>
-                  Publish
+                <Btn variant="outline" onClick={() => setCourseModal({ course: selectedCourse })}>
+                  <Settings size={14} /> Edit
                 </Btn>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-2">
-                <Globe size={13} className="text-emerald-400 shrink-0" />
-                <p className="text-xs text-emerald-400 font-semibold">Published — visible to students</p>
-              </div>
-            )}
 
-            {/* Subject count summary */}
+              {/* Publish status */}
+              {selectedCourse.status !== "published" ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <EyeOff size={13} className="text-amber-400 shrink-0" />
+                    <p className="text-xs text-amber-300 font-semibold">Draft — hidden from students</p>
+                  </div>
+                  <Btn variant="ghost" className="text-amber-400 hover:text-amber-300 text-xs py-1 px-3 border border-amber-500/30 hover:bg-amber-500/10 shrink-0"
+                    onClick={() => setCourseModal({ course: selectedCourse })}>
+                    Publish
+                  </Btn>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-2.5">
+                  <Globe size={12} className="text-emerald-400 shrink-0" />
+                  <p className="text-xs text-emerald-400 font-semibold">Published — visible to students</p>
+                </div>
+              )}
+            </div>
+
+            {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Subjects", value: selectedCourse.subjects?.length || 0, color: "text-teal-400" },
-                { label: "Chapters", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters?.length || 0), 0), color: "text-amber-400" },
-                { label: "Content Items", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters || []).reduce((b, ch) => b + (ch.notesCount || 0) + (ch.videosCount || 0) + (ch.testsCount || 0), 0), 0), color: "text-brand-primary" },
+                { label: "Subjects", value: selectedCourse.subjects?.length || 0, color: "text-teal-400", bg: "bg-teal-500/8" },
+                { label: "Chapters", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters?.length || 0), 0), color: "text-amber-400", bg: "bg-amber-500/8" },
+                { label: "Content", value: (selectedCourse.subjects || []).reduce((a, s) => a + (s.chapters || []).reduce((b, ch) => b + (ch.notesCount || 0) + (ch.videosCount || 0) + (ch.testsCount || 0), 0), 0), color: "text-brand-primary", bg: "bg-brand-primary/8" },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/8 bg-white/2 p-4 text-center">
+                <div key={stat.label} className={`rounded-2xl border border-white/8 ${stat.bg} p-4 text-center`}>
                   <p className={`text-2xl font-extrabold ${stat.color}`}>{stat.value}</p>
                   <p className="text-xs text-white/50 mt-0.5">{stat.label}</p>
                 </div>
               ))}
             </div>
 
-            <p className="text-sm text-white/40">
-              Select a chapter from the sidebar to manage its notes, videos, and linked tests.
-            </p>
+            <div className="rounded-xl border border-dashed border-white/8 px-4 py-3">
+              <p className="text-xs text-white/40 text-center">
+                Select a chapter from the sidebar to manage its notes, videos, and linked tests.
+              </p>
+            </div>
           </div>
         )}
 
@@ -862,11 +875,11 @@ export default function CourseManager() {
         {selectedChapterId && (
           <div className="space-y-4">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-xs text-white/40 flex-wrap">
-              <button onClick={() => { setSelectedChapterId(null); setSelectedSubjectId(null); }} className="hover:text-white transition-colors">{selectedCourse?.title}</button>
-              <ChevronRight size={10} />
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs text-white/40 flex-wrap">
+              <button onClick={() => { setSelectedChapterId(null); setSelectedSubjectId(null); }} className="hover:text-brand-primary transition-colors font-medium">{selectedCourse?.title}</button>
+              <ChevronRight size={10} className="text-white/20" />
               <span className="text-white/60">{fullCourseTree?.subjects?.find((s) => s._id === selectedSubjectId)?.title || "..."}</span>
-              <ChevronRight size={10} />
+              <ChevronRight size={10} className="text-white/20" />
               <span className="text-white font-semibold">{selectedChapter?.title || "..."}</span>
             </div>
 

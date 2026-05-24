@@ -91,7 +91,6 @@ function App() {
 
         {/* Legacy redirects — old links should still resolve */}
         <Route path="/teacher/*" element={<Navigate to="/admin/test-series" replace />} />
-        <Route path="/student/courses/*" element={<Navigate to="/student/tests" replace />} />
         <Route path="/student/notes" element={<Navigate to="/student/tests" replace />} />
         <Route path="/student/performance" element={<Navigate to="/student/dashboard" replace />} />
 

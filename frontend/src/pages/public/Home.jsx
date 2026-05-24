@@ -1082,13 +1082,6 @@ const Home = () => {
    Public Test Series Section — 3-level Category → Exam → Series
 ───────────────────────────────────────────────────────────── */
 
-const EXAM_ICON_COLORS = [
-  "bg-brand-primary/15 text-brand-primary",
-  "bg-blue-500/15 text-blue-400",
-  "bg-purple-500/15 text-purple-400",
-  "bg-orange-500/15 text-orange-400",
-];
-
 function examGridClass(count) {
   if (count === 1) return "grid-cols-1 max-w-sm mx-auto";
   if (count === 2) return "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto";
@@ -1298,12 +1291,11 @@ function PublicTestSeriesSection({ onGetStarted }) {
 }
 
 function ExamPublicCard({ exam, idx, onClick }) {
-  const colorClass = EXAM_ICON_COLORS[idx % EXAM_ICON_COLORS.length];
-  const hoverAccent = [
-    "hover:border-brand-primary/40 hover:shadow-brand-primary/10",
-    "hover:border-blue-500/40 hover:shadow-blue-500/10",
-    "hover:border-purple-500/40 hover:shadow-purple-500/10",
-    "hover:border-orange-500/40 hover:shadow-orange-500/10",
+  const palette = [
+    { icon: "bg-brand-primary/15 text-brand-primary", border: "hover:border-brand-primary/50", shadow: "hover:shadow-brand-primary/12", ring: "focus:ring-brand-primary/50", badge: "bg-brand-primary/10 text-brand-primary" },
+    { icon: "bg-blue-500/15 text-blue-400",           border: "hover:border-blue-500/50",       shadow: "hover:shadow-blue-500/12",       ring: "focus:ring-blue-500/50",       badge: "bg-blue-500/10 text-blue-400" },
+    { icon: "bg-purple-500/15 text-purple-400",       border: "hover:border-purple-500/50",     shadow: "hover:shadow-purple-500/12",     ring: "focus:ring-purple-500/50",     badge: "bg-purple-500/10 text-purple-400" },
+    { icon: "bg-orange-500/15 text-orange-400",       border: "hover:border-orange-500/50",     shadow: "hover:shadow-orange-500/12",     ring: "focus:ring-orange-500/50",     badge: "bg-orange-500/10 text-orange-400" },
   ][idx % 4];
 
   return (
@@ -1312,43 +1304,43 @@ function ExamPublicCard({ exam, idx, onClick }) {
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
       tabIndex={0}
       style={{ animationDelay: `${idx * 60}ms` }}
-      className={`group text-left rounded-2xl bg-dark-200 border border-dark-100 p-5 ${hoverAccent} hover:bg-dark-100/60 hover:shadow-xl hover:-translate-y-0.5 transition-all animate-fade-up flex flex-col gap-4 focus:outline-none focus:ring-2 focus:ring-brand-primary/50`}
+      className={`group text-left rounded-2xl bg-dark-200 border border-dark-100 p-6 ${palette.border} ${palette.shadow} hover:bg-dark-100/60 hover:shadow-2xl hover:-translate-y-1 transition-all duration-200 animate-fade-up flex flex-col gap-5 focus:outline-none focus:ring-2 ${palette.ring}`}
     >
-      {/* Icon + series count badge */}
-      <div className="flex items-start justify-between gap-2">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${colorClass}`}>
-          <FaGraduationCap size={22} />
+      {/* Top row: icon + series badge */}
+      <div className="flex items-start justify-between gap-3">
+        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${palette.icon} shrink-0`}>
+          <FaGraduationCap size={26} />
         </div>
-        <span className="shrink-0 text-[10px] font-bold bg-dark-100 text-gray-400 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-          <FaFileAlt size={8} />
-          {exam.seriesCount || 0} Series
+        <span className={`shrink-0 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 ${palette.badge}`}>
+          <FaFileAlt size={9} />
+          {exam.seriesCount || 0} {exam.seriesCount === 1 ? "Series" : "Series"}
         </span>
       </div>
 
       {/* Title + description */}
-      <div className="flex-1 min-w-0">
-        <h3 className="text-[15px] font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
+      <div className="flex-1 min-w-0 space-y-2">
+        <h3 className="text-lg font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
           {exam.title}
         </h3>
         {exam.description ? (
-          <p className="mt-2 text-xs text-gray-400 line-clamp-3 leading-relaxed">
+          <p className="text-sm text-gray-400 line-clamp-3 leading-relaxed">
             {exam.description}
           </p>
         ) : (
-          <p className="mt-2 text-xs text-gray-500 italic">
-            Full-length mock tests with All India Rank &amp; detailed analytics.
+          <p className="text-sm text-gray-500 italic leading-relaxed">
+            Full-length mock tests, chapter-wise practice &amp; All India Rank.
           </p>
         )}
       </div>
 
-      {/* Footer: available count + explore CTA */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-auto">
-        <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
-          <FaChartLine size={9} />
-          {exam.seriesCount || 0} series available
+      {/* Footer divider + CTA */}
+      <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+        <span className="text-sm text-gray-500 flex items-center gap-2">
+          <FaChartLine size={11} />
+          {exam.seriesCount || 0} test series
         </span>
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-brand-primary opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">
-          Explore <FaArrowRight size={9} />
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-brand-primary opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200">
+          Explore <FaArrowRight size={11} />
         </span>
       </div>
     </button>
@@ -1436,7 +1428,16 @@ function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction
 
 // ─── Public Courses Section ──────────────────────────────────────────────────
 
+const COURSE_PALETTES = [
+  { icon: "bg-brand-primary/15 text-brand-primary", border: "hover:border-brand-primary/40", shadow: "hover:shadow-brand-primary/10", badge: "bg-brand-primary/10 text-brand-primary", priceBg: "bg-brand-primary/80 text-dark-400" },
+  { icon: "bg-blue-500/15 text-blue-400",           border: "hover:border-blue-500/40",       shadow: "hover:shadow-blue-500/10",       badge: "bg-blue-500/10 text-blue-400",       priceBg: "bg-blue-500/80 text-white" },
+  { icon: "bg-purple-500/15 text-purple-400",       border: "hover:border-purple-500/40",     shadow: "hover:shadow-purple-500/10",     badge: "bg-purple-500/10 text-purple-400",   priceBg: "bg-purple-500/80 text-white" },
+  { icon: "bg-teal-500/15 text-teal-400",           border: "hover:border-teal-500/40",       shadow: "hover:shadow-teal-500/10",       badge: "bg-teal-500/10 text-teal-400",       priceBg: "bg-teal-600/80 text-white" },
+];
+
 function PublicCoursesSection({ onGetStarted }) {
+  const navigate = useNavigate();
+  const isAuthenticated = !!localStorage.getItem("token");
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -1451,6 +1452,11 @@ function PublicCoursesSection({ onGetStarted }) {
 
   if (!loading && courses.length === 0) return null;
 
+  const handleExploreCta = () => {
+    if (isAuthenticated) navigate("/student/courses");
+    else onGetStarted();
+  };
+
   return (
     <Section id="courses" className="border-t border-dark-100">
       <SectionHeading
@@ -1462,14 +1468,21 @@ function PublicCoursesSection({ onGetStarted }) {
         <SeriesLoadingSkeleton />
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <PublicCourseCard key={course._id} course={course} onGetStarted={onGetStarted} />
+          {courses.map((course, idx) => (
+            <PublicCourseCard
+              key={course._id}
+              course={course}
+              idx={idx}
+              isAuthenticated={isAuthenticated}
+              onNavigateCourses={() => navigate("/student/courses")}
+              onGetStarted={onGetStarted}
+            />
           ))}
         </div>
       )}
       <div className="mt-10 flex justify-center">
         <button
-          onClick={onGetStarted}
+          onClick={handleExploreCta}
           className="inline-flex items-center gap-2 rounded-full border border-brand-primary/30 bg-brand-primary/10 px-8 py-3 text-sm font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all"
         >
           Explore All Courses <FaArrowRight size={12} />
@@ -1485,12 +1498,23 @@ function cloudinaryOptimize(url, w = 600, h = 340) {
   return url.replace("/upload/", `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
 }
 
-function PublicCourseCard({ course, onGetStarted }) {
+function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onGetStarted }) {
+  const palette = COURSE_PALETTES[idx % COURSE_PALETTES.length];
   const thumbUrl = cloudinaryOptimize(course.thumbnail?.url);
+  const plainDesc = course.description ? course.description.replace(/<[^>]+>/g, "").trim() : "";
+
+  const handleCta = () => {
+    if (isAuthenticated) onNavigateCourses();
+    else onGetStarted();
+  };
+
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 p-5 backdrop-blur-sm transition-all hover:border-brand-primary/25 hover:shadow-xl hover:shadow-brand-primary/5">
+    <div
+      style={{ animationDelay: `${idx * 70}ms` }}
+      className={`group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 backdrop-blur-sm transition-all duration-200 ${palette.border} hover:shadow-2xl ${palette.shadow} hover:-translate-y-1 animate-fade-up`}
+    >
       {/* Thumbnail */}
-      <div className="mb-4 overflow-hidden rounded-xl bg-white/3 h-40 relative">
+      <div className="relative h-44 shrink-0 overflow-hidden bg-white/3">
         {thumbUrl ? (
           <img
             src={thumbUrl}
@@ -1499,36 +1523,51 @@ function PublicCourseCard({ course, onGetStarted }) {
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <FaBook size={28} className="text-white/15" />
+          <div className={`flex h-full items-center justify-center ${palette.icon}`}>
+            <FaBook size={44} className="opacity-40" />
           </div>
         )}
-        <span className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold shadow ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-brand-primary/80 text-dark-400"}`}>
+        <div className="absolute inset-0 bg-linear-to-t from-dark-400/70 to-transparent" />
+        {/* Price badge */}
+        <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-emerald-500/80 text-white"}`}>
           {course.isPaid ? `₹${Number(course.price || 0).toLocaleString()}` : "FREE"}
         </span>
+        {/* Subject count badge */}
+        {(course.subjectsCount || 0) > 0 && (
+          <span className={`absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg backdrop-blur-sm ${palette.badge}`}>
+            <FaLayerGroup size={9} /> {course.subjectsCount} Subject{course.subjectsCount !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
-      <h3 className="font-bold text-white line-clamp-2 mb-1 group-hover:text-brand-primary transition-colors">{course.title}</h3>
+      {/* Card body */}
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <h3 className="text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-brand-primary transition-colors">
+          {course.title}
+        </h3>
 
-      {course.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {course.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/50">{tag}</span>
-          ))}
-        </div>
-      )}
+        {plainDesc ? (
+          <p className="flex-1 text-sm text-white/50 line-clamp-2 leading-relaxed">{plainDesc}</p>
+        ) : (
+          <p className="flex-1 text-sm text-white/35 italic leading-relaxed">Comprehensive notes, video lectures and practice tests.</p>
+        )}
 
-      <div className="flex items-center justify-between text-[11px] text-white/50 mb-4">
-        <span>{course.subjectsCount || 0} subjects</span>
+        {course.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {course.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/45">{tag}</span>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={handleCta}
+          className="mt-auto w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all inline-flex items-center justify-center gap-1.5"
+        >
+          {course.isPaid ? `Enroll for ₹${Number(course.price || 0).toLocaleString()}` : "Start Learning Free"}
+          <FaArrowRight size={11} />
+        </button>
       </div>
-
-      <button
-        onClick={onGetStarted}
-        className="w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
-      >
-        {course.isPaid ? `Enroll for ₹${Number(course.price || 0).toLocaleString()}` : "Start Learning Free"}
-        <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
-      </button>
     </div>
   );
 }

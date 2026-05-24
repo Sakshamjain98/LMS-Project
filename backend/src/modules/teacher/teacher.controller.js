@@ -675,6 +675,14 @@ export const createTestFromCSV = async (req, res, next) => {
           }
         }
 
+        const normalizeTestType = (rawType) => {
+          const normalized = String(rawType || "").trim().toLowerCase();
+          if (["pyq", "previous_year", "previous-year", "previousyear"].includes(normalized)) {
+            return "pyq";
+          }
+          return "practice";
+        };
+
         const testPayload = {
           title: (req.body.title || "CSV Imported Test").toString().trim() || "CSV Imported Test",
           description: (req.body.description || "").toString().trim(),
@@ -686,7 +694,7 @@ export const createTestFromCSV = async (req, res, next) => {
           isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
           attemptLimit: Number.isFinite(Number(req.body.attemptLimit)) ? Number(req.body.attemptLimit) : 0,
           isProctored: req.body.isProctored === "true" || req.body.isProctored === true,
-          type: ["practice", "pyq"].includes(req.body.type) ? req.body.type : "practice",
+          type: normalizeTestType(req.body.type),
         };
 
         const createdTest = await createTest(testPayload, req.user._id);

@@ -22,6 +22,8 @@ const testSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // "practice" = regular chapter test, "pyq" = past-year questions, "aits" = All India Test Series
+    type: { type: String, enum: ["practice", "pyq", "aits"], default: "practice", index: true },
   },
   { timestamps: true }
 );

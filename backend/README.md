@@ -61,6 +61,37 @@ npm install
 npm run dev
 ```
 
+## One-Time Migration: Legacy PYQ Types
+
+If older tests were saved with `type: "PYQ"` or missing `type`, run this migration once.
+
+By default, it converts:
+- `type: "PYQ"` (always), and
+- missing type only when title/description/instructions indicate PYQ intent.
+
+- Dry-run (preview only):
+
+```bash
+cd backend
+npm run migrate:test-types:pyq
+```
+
+- Apply updates:
+
+```bash
+cd backend
+npm run migrate:test-types:pyq -- --apply
+```
+
+This script updates matching records to `type: "pyq"`.
+
+If you want to force-convert **all** missing types (use carefully):
+
+```bash
+cd backend
+npm run migrate:test-types:pyq -- --apply --force-all-missing
+```
+
 ## Run with Docker
 
 ```bash

@@ -49,6 +49,28 @@ const validateObjectId = (value, label) => {
   return new mongoose.Types.ObjectId(value);
 };
 
+const normalizeTestType = (rawType, { allowAits = false } = {}) => {
+  if (rawType === undefined || rawType === null) {
+    return "practice";
+  }
+
+  const normalized = String(rawType).trim().toLowerCase();
+
+  if (["pyq", "previous_year", "previous-year", "previousyear"].includes(normalized)) {
+    return "pyq";
+  }
+
+  if (normalized === "practice") {
+    return "practice";
+  }
+
+  if (allowAits && normalized === "aits") {
+    return "aits";
+  }
+
+  return "practice";
+};
+
 const resolveHierarchyFromChapter = async (chapterId, teacherId) => {
   const objChapterId = validateObjectId(chapterId, "chapterId");
   const objTeacherId = validateUserId(teacherId);
@@ -110,8 +132,8 @@ export const createTest = async (data, teacherId) => {
     allowReview:      payload.allowReview !== false,
     negativeMarking:  Math.max(0, Number(payload.negativeMarking) || 0),
 
-    // Preserve the test type (practice | pyq) chosen by admin. Default to "practice".
-    type: ["practice", "pyq"].includes(payload.type) ? payload.type : "practice",
+    // Preserve and normalize the chosen test type.
+    type: normalizeTestType(payload.type),
 
     teacherId: objTeacherId,
     topicId: hierarchy.topic._id,
@@ -195,11 +217,9 @@ export const updateTest = async (testId, updateData, teacherId) => {
     updateData.chapterId = hierarchy.chapter._id;
   }
 
-  // Sanitize type — only allow valid enum values; reject "aits" (managed separately)
+  // Sanitize and normalize type — reject "aits" here (managed separately)
   if (updateData.type !== undefined) {
-    if (!["practice", "pyq"].includes(updateData.type)) {
-      delete updateData.type;
-    }
+    updateData.type = normalizeTestType(updateData.type);
   }
 
   return Test.findOneAndUpdate(

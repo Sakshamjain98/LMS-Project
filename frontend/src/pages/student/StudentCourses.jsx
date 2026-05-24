@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Tag, GraduationCap, ChevronRight, Loader2,
-  Lock, DollarSign, Globe, Search, BookMarked, CheckCircle2,
+  Lock, DollarSign, Search, BookMarked, CheckCircle2,
 } from "lucide-react";
 import { getPublicCourses, getMultipleCourseProgress } from "../../services/courseService";
 import { getPublicExamCategories } from "../../services/studentService";
@@ -172,24 +172,35 @@ export default function StudentCourses() {
       {!selectedExamId ? (
         <div className="space-y-4">
           <p className="text-sm text-white/50">Select an exam to view its courses:</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(currentCategory?.exams || []).map((exam) => (
-              <button
-                key={exam._id}
-                onClick={() => setSelectedExamId(exam._id)}
-                className="group rounded-2xl border border-white/8 bg-white/2 p-5 text-left transition-all hover:border-sky-400/30 hover:bg-white/4"
-              >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10">
-                  <GraduationCap size={20} className="text-sky-400" />
-                </div>
-                <h3 className="font-bold text-white group-hover:text-sky-300 transition-colors">{exam.title}</h3>
-                {exam.description && <p className="mt-1 text-xs text-white/50 line-clamp-2">{exam.description}</p>}
-                <div className="mt-3 flex items-center gap-1 text-xs text-white/40">
-                  <Globe size={11} />
-                  <span>{exam.seriesCount || 0} test series</span>
-                </div>
-              </button>
-            ))}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {(currentCategory?.exams || []).map((exam, idx) => {
+              const palette = [
+                { icon: "bg-sky-500/15 text-sky-400",       border: "hover:border-sky-500/40",    title: "group-hover:text-sky-300" },
+                { icon: "bg-violet-500/15 text-violet-400", border: "hover:border-violet-500/40", title: "group-hover:text-violet-300" },
+                { icon: "bg-teal-500/15 text-teal-400",     border: "hover:border-teal-500/40",   title: "group-hover:text-teal-300" },
+                { icon: "bg-orange-500/15 text-orange-400", border: "hover:border-orange-500/40", title: "group-hover:text-orange-300" },
+              ][idx % 4];
+              return (
+                <button
+                  key={exam._id}
+                  onClick={() => setSelectedExamId(exam._id)}
+                  className={`group rounded-2xl border border-white/8 bg-white/2 p-5 text-left transition-all duration-200 ${palette.border} hover:bg-white/4 hover:shadow-xl hover:-translate-y-0.5`}
+                >
+                  <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${palette.icon}`}>
+                    <GraduationCap size={22} />
+                  </div>
+                  <h3 className={`font-bold text-white text-base transition-colors mb-1 ${palette.title}`}>{exam.title}</h3>
+                  {exam.description && <p className="text-xs text-white/50 line-clamp-2 mb-3">{exam.description}</p>}
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                    <div className="flex items-center gap-1.5 text-xs text-white/40">
+                      <BookOpen size={11} />
+                      <span>View Courses</span>
+                    </div>
+                    <ChevronRight size={14} className="text-white/30 group-hover:text-white/60 transition-colors" />
+                  </div>
+                </button>
+              );
+            })}
             {(currentCategory?.exams || []).length === 0 && (
               <p className="col-span-full text-sm text-white/40 py-8 text-center">No exams in this category yet</p>
             )}
