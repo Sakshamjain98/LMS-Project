@@ -3,13 +3,30 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText,
   Video, Download, ArrowLeft, Play, BookMarked,
-  CheckCircle2, Circle, Trophy, Menu, X, Layers,
+  CheckCircle2, Circle, Trophy, Menu, X, Layers, CreditCard, ShieldCheck, Sparkles,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   getCourseFull, getNoteById,
   markChapterComplete, unmarkChapterComplete, getCourseProgress,
 } from "../../services/courseService";
+import { getPlans, createOrder, verifyPayment } from "../../services/paymentService";
+
+const ensureRazorpayLoaded = () =>
+  new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve();
+    const existing = document.querySelector('script[src*="checkout.razorpay.com"]');
+    if (existing) {
+      existing.addEventListener("load", resolve);
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
@@ -102,7 +119,14 @@ function RichTextNote({ noteId }) {
           dangerouslySetInnerHTML={{ __html: note.content }} />
       ) : note.type === "pdf" && note.fileUrl ? (
         <div className="rounded-2xl border border-white/8 bg-white/2 overflow-hidden" style={{ height: "80vh" }}>
-          <iframe src={`${note.fileUrl}#toolbar=1`} title={note.title} className="h-full w-full" frameBorder="0" />
+          <iframe
+            src={note.fileUrl.includes("cloudinary.com")
+              ? note.fileUrl.replace("/upload/", "/upload/fl_attachment:false/")
+              : note.fileUrl}
+            title={note.title}
+            className="h-full w-full"
+            frameBorder="0"
+          />
         </div>
       ) : (
         <p className="text-sm text-white/40 py-6 text-center">No content available</p>
@@ -264,6 +288,107 @@ function TestsSection({ chapter }) {
   );
 }
 
+// ─── Unlock Banner ───────────────────────────────────────────────────────────
+
+function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
+  return (
+    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
+      {/* Top gradient bar */}
+      <div className="h-1 w-full bg-linear-to-r from-amber-500 via-brand-primary to-emerald-500" />
+
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 ring-1 ring-amber-500/25">
+            <Lock size={26} className="text-amber-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Course Access Required</h2>
+            <p className="text-sm text-white/50 mt-0.5">
+              Subscribe to unlock full access to <span className="text-white/80 font-medium">{course.title}</span>
+            </p>
+          </div>
+          {course.isPaid && (
+            <div className="sm:ml-auto shrink-0 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 text-sm font-bold text-amber-400">
+              <CreditCard size={14} /> ₹{course.price}
+            </div>
+          )}
+        </div>
+
+        {/* Feature list */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          {[
+            { icon: <BookOpen size={14} />, label: "Full course content" },
+            { icon: <FileText size={14} />, label: "All notes & PDFs" },
+            { icon: <Video size={14} />, label: "Video lectures" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2.5 text-white/60">
+              <span className="text-brand-primary">{icon}</span>
+              {label}
+            </div>
+          ))}
+        </div>
+
+        {/* Plan cards */}
+        {plans.length > 0 ? (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-white/40 mb-3">Choose a plan</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {plans.map((plan) => {
+                const isYearly = plan.id === "YEARLY";
+                return (
+                  <button
+                    key={plan.id}
+                    onClick={() => onUnlock(plan.id)}
+                    disabled={unlocking}
+                    className={`relative group text-left rounded-2xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isYearly
+                        ? "border-brand-primary/40 bg-brand-primary/8 hover:border-brand-primary/60 hover:shadow-brand-primary/15"
+                        : "border-white/10 bg-white/3 hover:border-white/20"
+                    }`}
+                  >
+                    {isYearly && (
+                      <span className="absolute -top-2.5 right-4 flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-0.5 text-[10px] font-bold text-dark-400">
+                        <Sparkles size={9} /> Best Value
+                      </span>
+                    )}
+                    <p className={`font-bold text-base ${isYearly ? "text-brand-primary" : "text-white"}`}>
+                      {plan.name}
+                    </p>
+                    <p className={`text-2xl font-extrabold mt-1 ${isYearly ? "text-brand-primary" : "text-white"}`}>
+                      ₹{plan.price}
+                      <span className="text-sm font-normal text-white/40 ml-1">
+                        / {plan.duration === 365 ? "year" : plan.duration === 30 ? "month" : `${plan.duration} days`}
+                      </span>
+                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-xs text-white/40">Full access to all courses</span>
+                      <span className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
+                        isYearly ? "bg-brand-primary text-dark-400" : "bg-white/8 text-white/70 group-hover:bg-white/12"
+                      }`}>
+                        {unlocking ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                        {unlocking ? "Processing…" : "Subscribe Now"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <Loader2 size={20} className="animate-spin text-white/30" />
+          </div>
+        )}
+
+        <p className="text-center text-[11px] text-white/25">
+          Secure payment via Razorpay · Cancel anytime
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Content Area ─────────────────────────────────────────────────────────────
 
 function ContentArea({ chapter }) {
@@ -305,6 +430,9 @@ export default function CourseLearning() {
   const [selectedChapterId, setSelectedChapterId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [plans, setPlans] = useState([]);
+  const [unlocking, setUnlocking] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -329,6 +457,67 @@ export default function CourseLearning() {
   }, [courseId, navigate]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!hasAccess && course?.isPaid) {
+      getPlans()
+        .then((d) => setPlans(d?.plans || []))
+        .catch(() => {});
+    }
+  }, [hasAccess, course?.isPaid]);
+
+  const handleUnlockCourse = async (planId) => {
+    setUnlocking(true);
+    try {
+      await ensureRazorpayLoaded();
+      const result = await createOrder(planId);
+      const order = result.order;
+
+      const onSuccess = async (response) => {
+        try {
+          await verifyPayment({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          toast.success("Payment successful! Unlocking your course...");
+          await load();
+        } catch (err) {
+          toast.error(err?.message || "Payment verification failed");
+        } finally {
+          setUnlocking(false);
+        }
+      };
+
+      if (order.orderId?.startsWith("dev_")) {
+        return onSuccess({
+          razorpay_order_id: order.orderId,
+          razorpay_payment_id: `DEV_PAY_${Date.now()}`,
+          razorpay_signature: "mock_signature",
+        });
+      }
+
+      const rzp = new window.Razorpay({
+        key: order.razorpayKeyId,
+        amount: order.amountInPaise,
+        currency: order.currency || "INR",
+        name: "PS Classes",
+        description: `${order.planName} Plan — Full Course Access`,
+        order_id: order.orderId,
+        prefill: {
+          email: localStorage.getItem("userEmail") || "",
+          contact: localStorage.getItem("userPhone") || "",
+        },
+        theme: { color: "#00c885" },
+        handler: onSuccess,
+        modal: { ondismiss: () => setUnlocking(false) },
+      });
+      rzp.open();
+    } catch (err) {
+      setUnlocking(false);
+      toast.error(err?.message || "Failed to start payment");
+    }
+  };
 
   const allChapters = course?.subjects?.flatMap((s) => s.chapters || []) || [];
   const selectedChapter = allChapters.find((ch) => ch._id === selectedChapterId);
@@ -491,6 +680,31 @@ export default function CourseLearning() {
                 </div>
               )}
 
+              {/* Sidebar unlock CTA for locked paid courses */}
+              {!hasAccess && course?.isPaid && (
+                <div className="shrink-0 px-3 py-3 border-b border-white/5">
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <Lock size={12} className="text-amber-400 shrink-0" />
+                      <p className="text-[11px] font-bold text-amber-400">Preview Mode</p>
+                    </div>
+                    <p className="text-[11px] text-white/40 leading-relaxed">
+                      Subscribe to unlock all subjects, chapters, notes &amp; videos.
+                    </p>
+                    {plans.length > 0 && (
+                      <button
+                        onClick={() => handleUnlockCourse(plans[0]?.id)}
+                        disabled={unlocking}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3 py-2 text-[11px] font-bold text-dark-400 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        {unlocking ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
+                        {unlocking ? "Processing…" : `Get Full Access from ₹${plans[0]?.price}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Subject + chapter tree */}
               <div className="custom-scrollbar flex-1 overflow-y-auto px-3 py-3 space-y-0.5 min-h-0">
                 {(course.subjects || []).length === 0 ? (
@@ -612,8 +826,15 @@ export default function CourseLearning() {
                   dangerouslySetInnerHTML={{ __html: selectedChapter.description }} />
               )}
 
-              {/* Locked chapter message */}
-              {selectedChapter.locked ? (
+              {/* Locked course — show payment CTA */}
+              {!hasAccess && course?.isPaid ? (
+                <CourseUnlockBanner
+                  course={course}
+                  plans={plans}
+                  unlocking={unlocking}
+                  onUnlock={handleUnlockCourse}
+                />
+              ) : selectedChapter.locked ? (
                 <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5">
                   <Lock size={32} className="text-amber-400/60" />
                   <p className="font-semibold text-white/80">This chapter is locked</p>
