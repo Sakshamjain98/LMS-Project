@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../../components/layout/Navbar";
 import {
@@ -1082,6 +1082,26 @@ const Home = () => {
    Public Test Series Section — 3-level Category → Exam → Series
 ───────────────────────────────────────────────────────────── */
 
+const EXAM_ICON_COLORS = [
+  "bg-brand-primary/15 text-brand-primary",
+  "bg-blue-500/15 text-blue-400",
+  "bg-purple-500/15 text-purple-400",
+  "bg-orange-500/15 text-orange-400",
+];
+
+function examGridClass(count) {
+  if (count === 1) return "grid-cols-1 max-w-sm mx-auto";
+  if (count === 2) return "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto";
+  if (count === 3) return "grid-cols-1 sm:grid-cols-3";
+  return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+}
+
+function seriesGridClass(count) {
+  if (count === 1) return "grid-cols-1 max-w-md mx-auto";
+  if (count === 2) return "grid-cols-1 md:grid-cols-2 max-w-2xl mx-auto";
+  return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+}
+
 function PublicTestSeriesSection({ onGetStarted }) {
   const [categories, setCategories] = useState([]);
   const [catLoading, setCatLoading] = useState(true);
@@ -1089,6 +1109,7 @@ function PublicTestSeriesSection({ onGetStarted }) {
   const [selectedExamId, setSelectedExamId] = useState(null);
   const [examSeries, setExamSeries] = useState([]);
   const [seriesLoading, setSeriesLoading] = useState(false);
+  const seriesGridRef = useRef(null);
 
   useEffect(() => {
     getPublicExamCategories()
@@ -1110,8 +1131,11 @@ function PublicTestSeriesSection({ onGetStarted }) {
   }, []);
 
   useEffect(() => {
-    if (!selectedExamId) { setExamSeries([]); return; }
+    if (!selectedExamId) return;
     fetchSeries(selectedExamId);
+    setTimeout(() => {
+      seriesGridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
   }, [selectedExamId, fetchSeries]);
 
   const currentCategory = categories.find((c) => c._id === selectedCategoryId) || null;
@@ -1141,34 +1165,61 @@ function PublicTestSeriesSection({ onGetStarted }) {
         </div>
       ) : (
         <>
-          {/* ── Category tabs ── */}
-          <div className="flex flex-wrap gap-2 mb-8">
-            {categories.map((cat) => (
-              <button
-                key={cat._id}
-                onClick={() => { setSelectedCategoryId(cat._id); setSelectedExamId(null); }}
-                className={`px-5 py-2 rounded-full text-sm font-bold border transition-all ${
-                  selectedCategoryId === cat._id
-                    ? "btn-gradient border-transparent shadow-lg shadow-brand-primary/20"
-                    : "bg-dark-200 border-dark-100 text-gray-400 hover:border-brand-primary/40 hover:text-white"
-                }`}
+          {/* ── Category scroll-tab bar (hidden when only one category) ── */}
+          {categories.length > 1 && (
+            <div className="relative mb-10">
+              <div
+                role="tablist"
+                aria-label="Exam categories"
+                className="flex overflow-x-auto scrollbar-none border-b border-dark-100"
               >
-                {cat.title}
-                <span className="ml-1.5 text-[10px] opacity-60">
-                  ({cat.exams?.length || 0})
-                </span>
-              </button>
-            ))}
-          </div>
+                {categories.map((cat) => (
+                  <button
+                    key={cat._id}
+                    role="tab"
+                    aria-selected={selectedCategoryId === cat._id}
+                    onClick={() => { setSelectedCategoryId(cat._id); setSelectedExamId(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        setSelectedCategoryId(cat._id);
+                        setSelectedExamId(null);
+                      }
+                    }}
+                    className={`relative flex-shrink-0 flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all outline-none focus:outline-none ${
+                      selectedCategoryId === cat._id
+                        ? "text-white bg-brand-primary/8"
+                        : "text-gray-400 hover:text-white hover:bg-dark-200/50"
+                    }`}
+                  >
+                    {cat.title}
+                    <span
+                      className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 transition-colors ${
+                        selectedCategoryId === cat._id
+                          ? "bg-brand-primary/20 text-brand-primary"
+                          : "bg-dark-100 text-gray-500"
+                      }`}
+                    >
+                      {cat.exams?.length || 0}
+                    </span>
+                    {selectedCategoryId === cat._id && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-t-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              {/* Scroll-hint fade mask on the right */}
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0.5 w-12 bg-linear-to-l from-dark-400 to-transparent" />
+            </div>
+          )}
 
           {!selectedExamId ? (
             /* ── Exam cards ── */
             examsToShow.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-12 text-center text-sm text-gray-500 mb-10">
-                No exams in this category yet.
+                No exams in {currentCategory?.title || "this category"} yet.
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
+              <div className={`grid ${examGridClass(examsToShow.length)} gap-4 mb-10`}>
                 {examsToShow.map((exam, i) => (
                   <ExamPublicCard
                     key={exam._id}
@@ -1182,29 +1233,49 @@ function PublicTestSeriesSection({ onGetStarted }) {
           ) : (
             /* ── Test series cards for selected exam ── */
             <>
-              {/* Breadcrumb */}
-              <div className="flex items-center gap-2 mb-6 text-sm">
+              {/* Breadcrumb bar — also serves as scroll target */}
+              <div
+                ref={seriesGridRef}
+                className="flex items-center justify-between gap-3 mb-8 bg-dark-300/60 rounded-xl px-4 py-2.5"
+              >
+                <div className="flex items-center gap-2 text-sm min-w-0">
+                  <button
+                    onClick={() => setSelectedExamId(null)}
+                    aria-label={`Back to ${currentCategory?.title} exams`}
+                    className="flex items-center gap-1.5 text-brand-primary hover:opacity-80 font-semibold transition shrink-0"
+                  >
+                    <FaChevronLeft size={11} />
+                    {currentCategory?.title}
+                  </button>
+                  <FaChevronRight size={11} className="text-gray-600 shrink-0" />
+                  <span className="text-white font-bold truncate">{currentExam?.title}</span>
+                </div>
                 <button
                   onClick={() => setSelectedExamId(null)}
-                  className="flex items-center gap-1.5 text-brand-primary hover:opacity-80 font-semibold transition"
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-dark-100 hover:border-brand-primary/40 bg-dark-200 rounded-lg px-3 py-1.5 transition shrink-0"
                 >
-                  <FaChevronLeft size={11} />
-                  {currentCategory?.title}
+                  <FaLayerGroup size={11} />
+                  Change Exam
                 </button>
-                <FaChevronRight size={11} className="text-gray-600" />
-                <span className="text-white font-bold">{currentExam?.title}</span>
               </div>
 
               {seriesLoading ? (
                 <SeriesLoadingSkeleton />
               ) : examSeries.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-dark-100 bg-dark-200/40 py-12 text-center text-sm text-gray-500 mb-10">
-                  No test series for this exam yet — check back soon.
+                  No test series for {currentExam?.title} yet — check back soon.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                <div className={`grid ${seriesGridClass(examSeries.length)} gap-6 mb-10`}>
                   {examSeries.map((s, i) => (
-                    <TestSeriesPublicCard key={s._id} series={s} idx={i} onAction={onGetStarted} />
+                    <TestSeriesPublicCard
+                      key={s._id}
+                      series={s}
+                      idx={i}
+                      seriesNumber={i + 1}
+                      examName={currentExam?.title}
+                      onAction={onGetStarted}
+                    />
                   ))}
                 </div>
               )}
@@ -1227,25 +1298,56 @@ function PublicTestSeriesSection({ onGetStarted }) {
 }
 
 function ExamPublicCard({ exam, idx, onClick }) {
+  const colorClass = EXAM_ICON_COLORS[idx % EXAM_ICON_COLORS.length];
+  const hoverAccent = [
+    "hover:border-brand-primary/40 hover:shadow-brand-primary/10",
+    "hover:border-blue-500/40 hover:shadow-blue-500/10",
+    "hover:border-purple-500/40 hover:shadow-purple-500/10",
+    "hover:border-orange-500/40 hover:shadow-orange-500/10",
+  ][idx % 4];
+
   return (
     <button
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+      tabIndex={0}
       style={{ animationDelay: `${idx * 60}ms` }}
-      className="group text-left rounded-2xl bg-dark-200 border border-dark-100 p-5 hover:border-brand-primary/40 hover:bg-dark-100/80 transition-all animate-fade-up flex flex-col gap-3"
+      className={`group text-left rounded-2xl bg-dark-200 border border-dark-100 p-5 ${hoverAccent} hover:bg-dark-100/60 hover:shadow-xl hover:-translate-y-0.5 transition-all animate-fade-up flex flex-col gap-4 focus:outline-none focus:ring-2 focus:ring-brand-primary/50`}
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
-        <FaGraduationCap size={18} />
+      {/* Icon + series count badge */}
+      <div className="flex items-start justify-between gap-2">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${colorClass}`}>
+          <FaGraduationCap size={22} />
+        </div>
+        <span className="shrink-0 text-[10px] font-bold bg-dark-100 text-gray-400 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+          <FaFileAlt size={8} />
+          {exam.seriesCount || 0} Series
+        </span>
       </div>
-      <div className="min-w-0">
-        <h3 className="text-sm font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+
+      {/* Title + description */}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-[15px] font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2 leading-snug">
           {exam.title}
         </h3>
-        <p className="text-[11px] text-gray-500 mt-1">
-          {exam.seriesCount || 0} series
-        </p>
+        {exam.description ? (
+          <p className="mt-2 text-xs text-gray-400 line-clamp-3 leading-relaxed">
+            {exam.description}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-gray-500 italic">
+            Full-length mock tests with All India Rank &amp; detailed analytics.
+          </p>
+        )}
       </div>
-      <div className="mt-auto flex items-center justify-end text-[11px] text-brand-primary">
-        <span className="flex items-center gap-1 group-hover:gap-2 transition-all">
+
+      {/* Footer: available count + explore CTA */}
+      <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-auto">
+        <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
+          <FaChartLine size={9} />
+          {exam.seriesCount || 0} series available
+        </span>
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-brand-primary opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">
           Explore <FaArrowRight size={9} />
         </span>
       </div>
@@ -1253,38 +1355,57 @@ function ExamPublicCard({ exam, idx, onClick }) {
   );
 }
 
-function TestSeriesPublicCard({ series: s, idx, onAction }) {
+function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction }) {
   return (
     <div
-      className="glass-card glass-card-hover relative rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
+      className="rounded-2xl border border-dark-100 bg-dark-200 p-6 flex flex-col gap-4 animate-fade-up hover:border-brand-primary/40 hover:shadow-xl hover:shadow-brand-primary/8 hover:-translate-y-0.5 transition-all"
       style={{ animationDelay: `${idx * 80}ms` }}
     >
-      <span
-        className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-          s.isPaid
-            ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
-            : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-        }`}
-      >
-        {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
-      </span>
-      <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
-        <FaMedal size={20} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-primary">
-          Test Series
-        </p>
-        <h3 className="mt-1 text-lg font-bold text-white wrap-break-word">{s.title}</h3>
-        {s.description && (
-          <p className="mt-1.5 text-sm text-gray-400 leading-relaxed line-clamp-2 wrap-break-word">
-            {s.description}
-          </p>
+      {/* Context row: series number + exam name + price badge */}
+      <div className="flex items-center gap-2 min-w-0">
+        {seriesNumber && (
+          <span className="shrink-0 text-[10px] font-bold bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full">
+            #{seriesNumber}
+          </span>
         )}
+        {examName && (
+          <span className="text-[11px] text-gray-400 font-medium truncate">{examName}</span>
+        )}
+        <span
+          aria-label={s.isPaid ? `Price: ₹${Number(s.price || 0).toLocaleString()}` : "Price: Free"}
+          className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+            s.isPaid
+              ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
+              : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+          }`}
+        >
+          {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
+        </span>
       </div>
+
+      {/* Icon + title + description */}
+      <div className="flex gap-3 items-start">
+        <div className="shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary/15 text-brand-primary">
+          <FaMedal size={20} />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-white leading-snug wrap-break-word">{s.title}</h3>
+          {s.description ? (
+            <p className="mt-1.5 text-sm text-gray-400 leading-relaxed line-clamp-2">
+              {s.description}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-xs text-gray-500 italic">
+              {examName ? `${examName} mock test series` : "Mock test series"}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
         <div>
-          <p className="text-base font-bold text-white">{s.testsCount || 0}</p>
+          <p className="text-base font-bold text-brand-primary">{s.testsCount || 0}</p>
           <p className="text-[10px] uppercase tracking-wider text-gray-500">Tests</p>
         </div>
         <div>
@@ -1292,15 +1413,21 @@ function TestSeriesPublicCard({ series: s, idx, onAction }) {
           <p className="text-[10px] uppercase tracking-wider text-gray-500">Subjects</p>
         </div>
         <div>
-          <p className="text-base font-bold text-brand-primary">{s.chaptersCount || 0}</p>
+          <p className="text-base font-bold text-white">{s.chaptersCount || 0}</p>
           <p className="text-[10px] uppercase tracking-wider text-gray-500">Chapters</p>
         </div>
       </div>
+
+      {/* CTA — green for free, brand for paid */}
       <button
         onClick={onAction}
-        className="mt-2 w-full py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-dark-400 transition-colors inline-flex items-center justify-center gap-1.5 group/btn"
+        className={`mt-1 w-full py-2.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center justify-center gap-1.5 group/btn ${
+          s.isPaid
+            ? "bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary hover:text-dark-400"
+            : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
+        }`}
       >
-        {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Attempt Free Test"}
+        {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Start Attempting"}
         <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
       </button>
     </div>
@@ -1427,7 +1554,34 @@ function SeriesLoadingSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse mb-10">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-64 rounded-2xl bg-dark-200" />
+        <div key={i} className="rounded-2xl bg-dark-200 border border-dark-100 p-6 flex flex-col gap-4">
+          {/* Context row */}
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-8 rounded-full bg-dark-100" />
+            <div className="h-3 w-28 rounded bg-dark-100" />
+            <div className="ml-auto h-5 w-12 rounded-full bg-dark-100" />
+          </div>
+          {/* Icon + title block */}
+          <div className="flex gap-3">
+            <div className="h-11 w-11 rounded-xl bg-dark-100 shrink-0" />
+            <div className="flex-1 space-y-2 pt-1">
+              <div className="h-4 w-3/4 rounded bg-dark-100" />
+              <div className="h-3 w-full rounded bg-dark-100" />
+              <div className="h-3 w-2/3 rounded bg-dark-100" />
+            </div>
+          </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5">
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="flex flex-col items-center gap-1.5">
+                <div className="h-5 w-8 rounded bg-dark-100" />
+                <div className="h-2.5 w-12 rounded bg-dark-100" />
+              </div>
+            ))}
+          </div>
+          {/* CTA */}
+          <div className="h-9 w-full rounded-lg bg-dark-100" />
+        </div>
       ))}
     </div>
   );
