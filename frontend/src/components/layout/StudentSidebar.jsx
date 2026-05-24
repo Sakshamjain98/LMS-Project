@@ -16,7 +16,7 @@ import {
   Tag,
   BookOpen,
   GraduationCap,
-  Zap,
+  Trophy,
 } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
 import { getAvailableTests } from "../../services/studentService";
@@ -32,11 +32,10 @@ const countTopicTests = (topic) =>
 const countSubjectTests = (subject) =>
   (subject?.chapters || []).reduce((sum, c) => sum + (c.tests?.length || 0), 0);
 
-// Count total tests in an exam (testSeries + allIndiaTestSeries)
+// Count total tests in an exam (test series only — AITS are shown in the dedicated AITS tab)
 const countExamTests = (exam) => {
   let total = 0;
   (exam?.testSeries || []).forEach((ts) => { total += countTopicTests(ts); });
-  (exam?.allIndiaTestSeries || []).forEach((a) => { total += (a.tests?.length || 0); });
   return total;
 };
 
@@ -261,23 +260,7 @@ export default function StudentSidebar() {
                                         );
                                       })}
 
-                                      {/* All India Test Series */}
-                                      {(exam.allIndiaTestSeries || []).map((aits) => (
-                                        <Link
-                                          key={aits._id}
-                                          to={`/student/tests/${aits._id}`}
-                                          onClick={() => setMobileOpen(false)}
-                                          className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-white/50 hover:bg-white/5 hover:text-white"
-                                        >
-                                          <Zap size={10} className="text-yellow-400 shrink-0" />
-                                          <span className="truncate flex-1 min-w-0">{aits.title}</span>
-                                          <span className="ml-auto shrink-0 text-[9px] text-white/30">
-                                            {aits.tests?.length || 0}
-                                          </span>
-                                        </Link>
-                                      ))}
-
-                                      {(exam.testSeries || []).length === 0 && (exam.allIndiaTestSeries || []).length === 0 && (
+                                      {(exam.testSeries || []).length === 0 && (
                                         <p className="px-2 py-1 text-[10px] text-white/30">No test series</p>
                                       )}
                                     </div>
@@ -299,6 +282,21 @@ export default function StudentSidebar() {
           </div>
 
           <SidebarLink to="/student/courses" icon={BookOpen} label="Courses" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
+          <NavLink
+            to="/student/aits"
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) =>
+              `group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-amber-500/15 text-amber-300 shadow-[0_6px_18px_rgba(251,191,36,0.15)]"
+                  : "text-white/60 hover:bg-white/5 hover:text-white"
+              } ${collapsed ? "justify-center px-0" : ""}`
+            }
+            title={collapsed ? "AITS" : ""}
+          >
+            <Trophy size={18} className="shrink-0 text-amber-400" />
+            {!collapsed && <span>AITS</span>}
+          </NavLink>
           <div className="my-2 h-px bg-white/5" />
           <SidebarLink to="/student/profile" icon={User} label="Profile" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
         </nav>

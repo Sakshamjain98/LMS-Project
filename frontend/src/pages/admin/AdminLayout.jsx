@@ -298,16 +298,6 @@ export default function AdminLayout() {
                                     </div>
                                   ))}
 
-                                  {/* AITS shortcut */}
-                                  <Link
-                                    to={`/admin/test-series?level=exams&categoryId=${cat._id}&examId=${exam._id}&aitsView=1`}
-                                    onClick={() => setMobileOpen(false)}
-                                    className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[11px] text-amber-300/60 hover:bg-white/5 hover:text-amber-300"
-                                  >
-                                    <Trophy size={10} className="text-amber-400 shrink-0" />
-                                    <span className="truncate flex-1 min-w-0">AITS</span>
-                                  </Link>
-
                                   {!(exam.testSeries || []).length && <p className="px-2 py-1 text-[10px] text-white/30">No test series</p>}
                                 </div>
                               )}
@@ -320,6 +310,27 @@ export default function AdminLayout() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* AITS — dedicated top-level tab */}
+          <div className="mt-1">
+            <NavLink
+              to="/admin/aits"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `group flex w-full items-center justify-between rounded-xl px-4 py-2.5 transition-colors ${
+                  isActive
+                    ? "bg-amber-500/15 text-amber-300"
+                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                } ${collapsed ? "justify-center px-0" : ""}`
+              }
+              title={collapsed ? "AITS" : ""}
+            >
+              <span className="flex items-center gap-3">
+                <Trophy size={18} className="text-amber-400 shrink-0" />
+                {!collapsed && <span className="text-sm font-semibold">AITS</span>}
+              </span>
+            </NavLink>
           </div>
 
           {/* Courses section */}

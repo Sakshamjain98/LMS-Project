@@ -24,6 +24,7 @@ import { Readable } from "stream";
 
 import * as testService from "../test/test.service.js";
 import * as noteService from "../teacher/note.service.js";
+import * as aitsService from "../aits/aits.service.js";
 
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
@@ -522,11 +523,14 @@ export const studentPerformance = asyncHandler(async (req, res) => {
 export const createTestFromCSV = async (req, res, next) => {
   try {
     if (!req.file) throw new ApiError(400, "No CSV file uploaded");
-    if (!req.body?.chapterId) {
-      throw new ApiError(400, "chapterId is required for CSV test upload");
+    const isAitsUpload = Boolean(req.body?.aitsId);
+    if (!isAitsUpload && !req.body?.chapterId) {
+      throw new ApiError(400, "Either chapterId or aitsId is required for CSV test upload");
     }
 
     const parsedQuestions = [];
+    let parseError = null;  // use a flag instead of stream.destroy() to avoid unhandled errors
+
     const response = await fetch(req.file.path);
     if (!response.ok || !response.body) {
       throw new ApiError(400, "Unable to fetch uploaded CSV file.");
@@ -564,58 +568,64 @@ export const createTestFromCSV = async (req, res, next) => {
     csvStream
       .pipe(csv())
       .on('data', (row) => {
+        if (parseError) return; // skip remaining rows once an error is found
+
         const normalized = Object.fromEntries(
           Object.entries(row).map(([k, v]) => [k.trim(), typeof v === 'string' ? v.trim() : v])
         );
 
-        const isValid = requiredHeaders.every(field => 
+        const isValid = requiredHeaders.every(field =>
           Object.prototype.hasOwnProperty.call(normalized, field) && normalized[field] !== ""
         );
 
         if (!isValid) {
-          csvStream.destroy(new Error("Invalid CSV format. Please ensure all columns (question, optionA, etc.) are present and not empty."));
-        } else {
-          const options = [
-            { text: normalized.optionA, isCorrect: false },
-            { text: normalized.optionB, isCorrect: false },
-            { text: normalized.optionC, isCorrect: false },
-            { text: normalized.optionD, isCorrect: false },
-          ];
-
-          const correctOptionIndex = parseCorrectOptionIndex(normalized.answer, options);
-
-          if (correctOptionIndex < 0) {
-            csvStream.destroy(new Error(`Invalid answer value '${normalized.answer}'. Use 1-4, A-D, or exact option text.`));
-            return;
-          }
-
-          options[correctOptionIndex].isCorrect = true;
-
-          const marks = Number(normalized.marks);
-          const negativeMarks = Number(normalized.negativeMarks);
-          const difficulty = ["easy", "medium", "hard"].includes((normalized.difficulty || "").toLowerCase())
-            ? normalized.difficulty.toLowerCase()
-            : "medium";
-
-          parsedQuestions.push({
-            questionText: normalized.question,
-            questionType: "MCQ",
-            options,
-            correctOptionIndex,
-            marks: Number.isFinite(marks) && marks > 0 ? marks : 1,
-            negativeMarks: Number.isFinite(negativeMarks) && negativeMarks >= 0 ? negativeMarks : 0,
-            difficulty,
-            explanation: normalized.explanation || "",
-            tags: (normalized.tags || "")
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean),
-          });
+          parseError = "Invalid CSV format. Please ensure all columns (question, optionA, optionB, optionC, optionD, answer) are present and not empty.";
+          return;
         }
+
+        const options = [
+          { text: normalized.optionA, isCorrect: false },
+          { text: normalized.optionB, isCorrect: false },
+          { text: normalized.optionC, isCorrect: false },
+          { text: normalized.optionD, isCorrect: false },
+        ];
+
+        const correctOptionIndex = parseCorrectOptionIndex(normalized.answer, options);
+
+        if (correctOptionIndex < 0) {
+          parseError = `Invalid answer value '${normalized.answer}'. Use 1–4, A–D, or the exact option text.`;
+          return;
+        }
+
+        options[correctOptionIndex].isCorrect = true;
+
+        const marks = Number(normalized.marks);
+        const negativeMarks = Number(normalized.negativeMarks);
+        const difficulty = ["easy", "medium", "hard"].includes((normalized.difficulty || "").toLowerCase())
+          ? normalized.difficulty.toLowerCase()
+          : "medium";
+
+        parsedQuestions.push({
+          questionText: normalized.question,
+          questionType: "MCQ",
+          options,
+          correctOptionIndex,
+          marks: Number.isFinite(marks) && marks > 0 ? marks : 1,
+          negativeMarks: Number.isFinite(negativeMarks) && negativeMarks >= 0 ? negativeMarks : 0,
+          difficulty,
+          explanation: normalized.explanation || "",
+          tags: (normalized.tags || "")
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        });
       })
       .on('end', async () => {
+        if (parseError) {
+          return res.status(400).json({ success: false, message: parseError });
+        }
         if (parsedQuestions.length === 0) {
-          return res.status(400).json({ success: false, message: "CSV file is empty." });
+          return res.status(400).json({ success: false, message: "CSV file is empty or has no valid rows." });
         }
 
         const now = new Date();
@@ -677,27 +687,32 @@ export const createTestFromCSV = async (req, res, next) => {
 
         const normalizeTestType = (rawType) => {
           const normalized = String(rawType || "").trim().toLowerCase();
+          if (normalized === "aits") return "aits";
           if (["pyq", "previous_year", "previous-year", "previousyear"].includes(normalized)) {
             return "pyq";
           }
           return "practice";
         };
 
-        const testPayload = {
+        const basePayload = {
           title: (req.body.title || "CSV Imported Test").toString().trim() || "CSV Imported Test",
           description: (req.body.description || "").toString().trim(),
           duration: Number(req.body.duration) > 0 ? Number(req.body.duration) : 60,
           passingMarks: Number(req.body.passingMarks) >= 0 ? Number(req.body.passingMarks) : 0,
           startTime: startTime ? startTime.toISOString() : undefined,
           endTime: endTime ? endTime.toISOString() : undefined,
-          chapterId: req.body.chapterId,
           isPaid: req.body.isPaid === "true" || req.body.isPaid === true,
           attemptLimit: Number.isFinite(Number(req.body.attemptLimit)) ? Number(req.body.attemptLimit) : 0,
           isProctored: req.body.isProctored === "true" || req.body.isProctored === true,
           type: normalizeTestType(req.body.type),
         };
 
-        const createdTest = await createTest(testPayload, req.user._id);
+        let createdTest;
+        if (isAitsUpload) {
+          createdTest = await aitsService.createAITSTest(req.body.aitsId, { ...basePayload, type: "aits" }, req.user._id);
+        } else {
+          createdTest = await createTest({ ...basePayload, chapterId: req.body.chapterId }, req.user._id);
+        }
         const createdQuestions = await bulkCreateQuestions(parsedQuestions, createdTest._id, req.user._id);
 
         res.status(200).json({ 

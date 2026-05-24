@@ -38,6 +38,8 @@ import AdminTestSeriesAnalytics from "./pages/admin/TestSeriesAnalytics";
 import AdminSiteContent from "./pages/admin/SiteContent";
 import AdminBlogEditor from "./pages/admin/BlogEditor";
 import CourseManager from "./pages/admin/CourseManager";
+import AITSManager from "./pages/admin/AITSManager";
+import StudentAITS from "./pages/student/StudentAITS";
 
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -101,6 +103,7 @@ function App() {
           <Route path="tests/:topicId" element={<StudentSeriesDetail />} />
           <Route path="courses" element={<StudentCourses />} />
           <Route path="courses/:courseId" element={<CourseLearning />} />
+          <Route path="aits" element={<StudentAITS />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 
@@ -125,6 +128,7 @@ function App() {
           <Route path="test-series/:topicId/analytics" element={<AdminTestSeriesAnalytics />} />
           <Route path="test-series/test/:testId" element={<AdminTestEditor />} />
           <Route path="courses" element={<CourseManager />} />
+          <Route path="aits" element={<AITSManager />} />
           <Route path="site-content" element={<AdminSiteContent />} />
           <Route path="create-admin" element={<CreateAdmin />} />
           <Route path="profile" element={<AdminProfile />} />
