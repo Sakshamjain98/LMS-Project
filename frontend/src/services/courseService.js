@@ -243,7 +243,7 @@ export const checkCourseAccess = async (courseId) => {
   try {
     const res = await api.get(`/courses/${courseId}/access`);
     return res.data;
-  } catch (err) {
+  } catch {
     return { hasAccess: false };
   }
 };
@@ -254,7 +254,7 @@ export const getCourseProgress = async (courseId) => {
   try {
     const res = await api.get(`/courses/${courseId}/progress`);
     return res.data;
-  } catch (err) {
+  } catch {
     return { completedChapterIds: [], totalChapters: 0, completedCount: 0, percentage: 0 };
   }
 };

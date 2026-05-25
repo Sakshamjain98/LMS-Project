@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getStudentProfile,
@@ -46,7 +46,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        setLoading(true);
         const [profRes, attemptsRes, testsRes, coursesRes] = await Promise.all([
           getStudentProfile().catch(() => ({})),
           getMyAttempts().catch(() => ({ data: [] })),

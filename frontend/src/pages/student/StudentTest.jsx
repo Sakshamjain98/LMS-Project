@@ -36,18 +36,6 @@ import TestResult from "./TestResult";
 
 const PAGE_SIZE = 8;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-export const formatDuration = (seconds) => {
-  if (!seconds || seconds <= 0) return "0 sec";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h} hr ${m} min ${s} sec`;
-  if (m > 0) return `${m} min ${s} sec`;
-  return `${s} sec`;
-};
-
 const isLiveTest = (test) => {
   const now = Date.now();
   const startOk = !test.startTime || new Date(test.startTime).getTime() <= now;

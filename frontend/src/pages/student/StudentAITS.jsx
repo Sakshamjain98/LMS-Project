@@ -141,7 +141,6 @@ export default function StudentAITS() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getAvailableTests()
       .then((res) => { if (active) setCategories(res?.categories || []); })
       .catch(() => {})
@@ -209,8 +208,6 @@ export default function StudentAITS() {
   const totalTests  = allAITS.reduce((s, a) => s + (a.tests?.length || 0), 0);
   const freeCount   = allAITS.filter((a) => !a.isPaid).length;
   const examCount   = examOptions.length;
-  const hasFilters  = search || filterExam !== "all" || filterPaid !== "all";
-
   const clearFilters = () => { setSearch(""); setFilterExam("all"); setFilterPaid("all"); };
 
   return (

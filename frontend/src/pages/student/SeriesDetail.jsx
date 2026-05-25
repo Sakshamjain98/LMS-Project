@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { formatDuration } from "../../utils/formatDuration";
 import {
   ArrowLeft,
   ChevronRight,
@@ -16,7 +17,6 @@ import {
   ShieldAlert,
   Zap,
 } from "lucide-react";
-import { formatDuration } from "./TestResult";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
   getAvailableTests,
@@ -290,7 +290,7 @@ export default function SeriesDetail() {
           contact: localStorage.getItem("userPhone") || "",
         },
         theme: { color: "#00c885" },
-        handler: onSuccess,
+     
         modal: { ondismiss: () => setUnlocking(false) },
       });
       rzp.open();

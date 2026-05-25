@@ -1186,10 +1186,11 @@ function PublicTestSeriesSection({ onGetStarted }) {
 
   useEffect(() => {
     if (!selectedExamId) return;
-    fetchSeries(selectedExamId);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      fetchSeries(selectedExamId);
       seriesGridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedExamId, fetchSeries]);
 
   const currentCategory = categories.find((c) => c._id === selectedCategoryId) || null;
@@ -1529,19 +1530,21 @@ function PublicCoursesSection({ onGetStarted }) {
   useEffect(() => {
     let active = true;
     if (!selectedExamId) {
-      setCourses([]);
       return () => { active = false; };
     }
-    setLoadingCourses(true);
-    getPublicCourses(50, selectedExamId)
-      .then((res) => { if (active) setCourses(res?.courses || []); })
-      .catch(() => { if (active) setCourses([]); })
-      .finally(() => { if (active) setLoadingCourses(false); });
-    return () => { active = false; };
+    const timer = setTimeout(() => {
+      if (!active) return;
+      setLoadingCourses(true);
+      getPublicCourses(50, selectedExamId)
+        .then((res) => { if (active) setCourses(res?.courses || []); })
+        .catch(() => { if (active) setCourses([]); })
+        .finally(() => { if (active) setLoadingCourses(false); });
+    }, 0);
+    return () => { active = false; clearTimeout(timer); };
   }, [selectedExamId]);
 
   const filteredCourses = courses.filter((course) =>
-    course.title.toLowerCase().includes(search.trim().toLowerCase())
+    selectedExamId && course.title.toLowerCase().includes(search.trim().toLowerCase())
   );
 
   const handleExploreCta = () => {

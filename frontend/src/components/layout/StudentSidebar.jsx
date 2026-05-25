@@ -156,9 +156,6 @@ export default function StudentSidebar() {
                 ) : (
                   categoryTree.map((category) => {
                     const categoryOpen = openCategory === category._id;
-                    const categoryTotalTests = (category.exams || []).reduce(
-                      (sum, e) => sum + countExamTests(e), 0
-                    );
                     return (
                       <div key={category._id} className="min-w-0">
                         <div className="flex items-center min-w-0">

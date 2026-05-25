@@ -16,18 +16,9 @@ import {
   BookOpen,
   Minus,
 } from "lucide-react";
+import { formatDuration } from "../../utils/formatDuration";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export const formatDuration = (seconds) => {
-  if (!seconds || seconds <= 0) return "0 sec";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h} hr ${m} min ${s} sec`;
-  if (m > 0) return `${m} min ${s} sec`;
-  return `${s} sec`;
-};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -93,9 +84,6 @@ export default function TestResult({ attemptId, onBack }) {
 
   // Derived analytics
   const unattempted = (result.totalQuestions || 0) - (result.attemptedQuestions || 0);
-  const negativeMarks = result.wrongAnswers > 0
-    ? Math.max(0, result.correctAnswers * (result.totalMarks / Math.max(result.totalQuestions, 1)) - result.marksObtained)
-    : 0;
   const accuracy = result.attemptedQuestions > 0
     ? ((result.correctAnswers / result.attemptedQuestions) * 100).toFixed(1)
     : "0.0";

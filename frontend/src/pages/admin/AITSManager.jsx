@@ -323,7 +323,9 @@ export default function AITSManager() {
       const res = await getAITSByExam(selectedAits.examId);
       const found = (res.aitsList || []).find((a) => a._id === selectedAits._id);
       setAitsTests(found?.tests || []);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [selectedAits]);
 
   // ── AITS create/edit ─────────────────────────────────────────────────────
@@ -358,7 +360,9 @@ export default function AITSManager() {
       await updateAITS(a._id, { title: a.title, description: a.description || "", isPaid: !a.isPaid, price: !a.isPaid ? (a.price || 0) : 0, examId: a.examId });
       await loadHierarchy();
       if (selectedAits?._id === a._id) setSelectedAits((prev) => ({ ...prev, isPaid: !a.isPaid, price: !a.isPaid ? (a.price || 0) : 0 }));
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   };
 
   // ── Test create ──────────────────────────────────────────────────────────

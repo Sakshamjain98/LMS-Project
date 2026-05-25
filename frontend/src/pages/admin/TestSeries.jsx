@@ -24,7 +24,6 @@ import {
   createExam,
   updateExam,
   deleteExam,
-  assignTestSeriesToExam,
   getAITSByExam,
   createAITS,
   updateAITS,
@@ -264,9 +263,6 @@ export default function AdminTestSeries() {
   );
 
   useEffect(() => { setPage(1); }, [filters.search, level, selectedCategoryId, selectedExamId, selectedTopicId, selectedSubjectId, selectedChapterId, aitsView, selectedAitsId]);
-
-  // ─── Effective level for display ─────────────────────────────────────────
-  const effectiveLevel = aitsView ? (selectedAitsId ? "tests" : "aits") : level;
 
   const headerTitle = aitsView
     ? (selectedAitsId ? `AITS: ${selectedAits?.title || ""}` : "All India Test Series")
