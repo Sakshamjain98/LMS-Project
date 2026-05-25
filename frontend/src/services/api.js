@@ -2,7 +2,7 @@ import toast from "react-hot-toast";
 
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const normalizedApiBaseUrl = rawApiBaseUrl?.trim().replace(/\/+$/, "");
-const apiBaseUrl = normalizedApiBaseUrl
+export const apiBaseUrl = normalizedApiBaseUrl
   ? (normalizedApiBaseUrl.endsWith("/api") ? normalizedApiBaseUrl : `${normalizedApiBaseUrl}/api`)
   : "/api";
 
@@ -21,6 +21,8 @@ const buildUrl = (url, params) => {
   });
   return `${path}?${searchParams.toString()}`;
 };
+
+export const buildApiUrl = (url) => `${apiBaseUrl}${url}`;
 
 const request = async (method, url, data, config = {}) => {
   const token = localStorage.getItem("token");

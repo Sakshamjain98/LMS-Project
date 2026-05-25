@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText,
+  BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText, Eye,
   Video, Download, ArrowLeft, Play, BookMarked,
   CheckCircle2, Circle, Trophy, Menu, X, Layers, CreditCard, ShieldCheck, Sparkles,
 } from "lucide-react";
@@ -11,6 +11,7 @@ import {
   markChapterComplete, unmarkChapterComplete, getCourseProgress,
 } from "../../services/courseService";
 import { getPlans, createOrder, verifyPayment } from "../../services/paymentService";
+import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 
 const ensureRazorpayLoaded = () =>
   new Promise((resolve, reject) => {
@@ -74,9 +75,6 @@ function RichTextNote({ noteId }) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(false);
-    setNote(null);
     getNoteById(noteId)
       .then((n) => { if (active) setNote(n); })
       .catch(() => { if (active) setError(true); })
@@ -102,31 +100,13 @@ function RichTextNote({ noteId }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-base text-white">{note.title}</h3>
-        {note.type === "pdf" && note.fileUrl && note.allowDownload && (
-          <a
-            href={note.fileUrl}
-            download={note.fileName || "note.pdf"}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <Download size={13} /> Download
-          </a>
-        )}
       </div>
       {note.type === "rich_text" && note.content ? (
         <div className="quill-content rounded-2xl border border-white/5 bg-white/2 p-6"
           dangerouslySetInnerHTML={{ __html: note.content }} />
-      ) : note.type === "pdf" && note.fileUrl ? (
+      ) : note.type === "pdf" ? (
         <div className="rounded-2xl border border-white/8 bg-white/2 overflow-hidden" style={{ height: "80vh" }}>
-          <iframe
-            src={note.fileUrl.includes("cloudinary.com")
-              ? note.fileUrl.replace("/upload/", "/upload/fl_attachment:false/")
-              : note.fileUrl}
-            title={note.title}
-            className="h-full w-full"
-            frameBorder="0"
-          />
+          <PdfPreviewFrame noteId={note._id} title={note.title} />
         </div>
       ) : (
         <p className="text-sm text-white/40 py-6 text-center">No content available</p>
@@ -135,16 +115,32 @@ function RichTextNote({ noteId }) {
   );
 }
 
+function PdfPreviewModal({ note, onClose }) {
+  if (!note) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
+      <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark-300 shadow-2xl">
+        <div className="flex items-center justify-between gap-4 border-b border-white/5 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/35">PDF Preview</p>
+            <h3 className="truncate text-base font-bold text-white">{note.title}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+        <PdfPreviewFrame noteId={note._id} title={note.title} className="bg-white" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Video Section ────────────────────────────────────────────────────────────
 
 function VideoSection({ chapter }) {
-  const [activeVideo, setActiveVideo] = useState(null);
-
-  useEffect(() => {
-    setActiveVideo(chapter.videos?.[0] || null);
-  }, [chapter._id]);
-
   const videos = chapter.videos || [];
+  const [activeVideo, setActiveVideo] = useState(videos[0] || null);
   const vid = activeVideo || videos[0];
   if (!vid) return null;
 
@@ -198,10 +194,7 @@ function VideoSection({ chapter }) {
 function NotesSection({ chapter }) {
   const notes = chapter.notes || [];
   const [activeNote, setActiveNote] = useState(notes[0] || null);
-
-  useEffect(() => {
-    setActiveNote(notes[0] || null);
-  }, [chapter._id]);
+  const [previewNote, setPreviewNote] = useState(null);
 
   if (!notes.length) return null;
 
@@ -221,14 +214,24 @@ function NotesSection({ chapter }) {
         {notes.length > 1 && (
           <div className="w-48 shrink-0 space-y-1">
             {notes.map((note) => (
-              <button
+              <div
                 key={note._id}
-                onClick={() => setActiveNote(note)}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium transition-all ${activeNote?._id === note._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/55 hover:bg-white/5 hover:text-white"}`}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium transition-all ${activeNote?._id === note._id ? "bg-brand-primary/15 text-brand-primary" : "text-white/55 hover:bg-white/5 hover:text-white"}`}
               >
-                <FileText size={12} className={note.type === "pdf" ? "text-red-400 shrink-0" : "text-brand-primary shrink-0"} />
-                <span className="flex-1 truncate">{note.title}</span>
-              </button>
+                <button onClick={() => setActiveNote(note)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                  <FileText size={12} className={note.type === "pdf" ? "text-red-400 shrink-0" : "text-brand-primary shrink-0"} />
+                  <span className="flex-1 truncate">{note.title}</span>
+                </button>
+                {note.type === "pdf" && (
+                  <button
+                    onClick={() => setPreviewNote(note)}
+                    className="shrink-0 rounded-lg p-1 text-white/45 hover:bg-white/5 hover:text-white"
+                    aria-label={`Preview ${note.title}`}
+                  >
+                    <Eye size={12} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -236,13 +239,14 @@ function NotesSection({ chapter }) {
           {activeNote && <RichTextNote noteId={activeNote._id} />}
         </div>
       </div>
+      {previewNote && <PdfPreviewModal note={previewNote} onClose={() => setPreviewNote(null)} />}
     </div>
   );
 }
 
 // ─── Tests Section ────────────────────────────────────────────────────────────
 
-function TestsSection({ chapter }) {
+function TestsSection({ chapter, courseId }) {
   const navigate = useNavigate();
   const tests = chapter.linkedTests || [];
   if (!tests.length) return null;
@@ -265,7 +269,7 @@ function TestsSection({ chapter }) {
           return (
             <button
               key={String(testId)}
-              onClick={() => navigate(`/student/tests?startTest=${testId}`)}
+              onClick={() => navigate(`/student/courses/${courseId}/tests/${testId}`, { state: { returnTo: `/student/courses/${courseId}` } })}
               className="group flex w-full items-center gap-4 rounded-2xl border border-white/8 bg-white/2 p-4 text-left transition-all hover:border-brand-primary/30 hover:bg-white/4"
             >
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
@@ -391,7 +395,7 @@ function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
 
 // ─── Content Area ─────────────────────────────────────────────────────────────
 
-function ContentArea({ chapter }) {
+function ContentArea({ chapter, courseId }) {
   const videos = chapter.videos || [];
   const notes  = chapter.notes  || [];
   const tests  = chapter.linkedTests || [];
@@ -407,9 +411,9 @@ function ContentArea({ chapter }) {
 
   return (
     <div className="space-y-4">
-      {videos.length > 0 && <VideoSection chapter={chapter} />}
-      {notes.length  > 0 && <NotesSection chapter={chapter} />}
-      {tests.length  > 0 && <TestsSection chapter={chapter} />}
+      {videos.length > 0 && <VideoSection key={`${chapter._id}-videos`} chapter={chapter} />}
+      {notes.length  > 0 && <NotesSection key={`${chapter._id}-notes`} chapter={chapter} />}
+      {tests.length  > 0 && <TestsSection chapter={chapter} courseId={courseId} />}
     </div>
   );
 }
@@ -841,7 +845,7 @@ export default function CourseLearning() {
                   <p className="text-sm text-white/40">Purchase the course to access all content</p>
                 </div>
               ) : (
-                <ContentArea chapter={selectedChapter} />
+                <ContentArea chapter={selectedChapter} courseId={courseId} />
               )}
 
               {/* Prev / Next navigation */}

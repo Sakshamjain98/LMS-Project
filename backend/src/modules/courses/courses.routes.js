@@ -6,6 +6,7 @@ import { upload } from "../../middlewares/upload.middleware.js";
 import * as svc from "./courses.service.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import mongoose from "mongoose";
+import { Readable } from "node:stream";
 
 const router = express.Router();
 
@@ -277,6 +278,48 @@ router.get(
       }
     }
     res.json({ success: true, note });
+  })
+);
+
+// GET /api/courses/notes/:noteId/preview — authenticated in-app PDF preview
+router.get(
+  "/notes/:noteId/preview",
+  asyncHandler(async (req, res) => {
+    const { noteId } = req.params;
+    const note = await svc.getNoteById(noteId);
+
+    if (note.type !== "pdf" || !note.fileUrl) {
+      return res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "PDF preview unavailable" });
+    }
+
+    if (req.user.role !== "admin" && req.user.role !== "teacher") {
+      const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
+      const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
+      const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
+      const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
+      if (subject) {
+        const { hasAccess } = await svc.checkCourseAccess(req.user._id, subject.courseId);
+        if (!hasAccess) {
+          return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Course access required" });
+        }
+      }
+    }
+
+    const response = await fetch(note.fileUrl);
+    if (!response.ok || !response.body) {
+      return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Unable to load PDF preview" });
+    }
+
+    const safeName = String(note.fileName || note.title || "preview.pdf").replace(/["\r\n]/g, "");
+
+    res.setHeader("Content-Type", response.headers.get("content-type") || "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+    res.setHeader("Cache-Control", "no-store");
+
+    const length = response.headers.get("content-length");
+    if (length) res.setHeader("Content-Length", length);
+
+    Readable.fromWeb(response.body).pipe(res);
   })
 );
 

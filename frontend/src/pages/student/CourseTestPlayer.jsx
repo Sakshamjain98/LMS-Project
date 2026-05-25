@@ -6,17 +6,24 @@ import TestPlayer from "./TestPlayer";
 import TestResult from "./TestResult";
 
 export default function CourseTestPlayer() {
-  const { testId } = useParams();
+  const { courseId, testId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const returnTo = location.state?.returnTo || "/student/courses";
+  const returnTo = location.state?.returnTo || (courseId ? `/student/courses/${courseId}` : "/student/courses");
+  const token = localStorage.getItem("token");
 
-  const [phase, setPhase] = useState("loading"); // "loading" | "player" | "result" | "error"
+  const [phase, setPhase] = useState(token ? "loading" : "error"); // "loading" | "player" | "result" | "error"
   const [attemptData, setAttemptData] = useState(null);
   const [resultId, setResultId] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    token ? "" : "Authorization token is missing. Please sign in again to start this test."
+  );
 
   useEffect(() => {
+    if (!token) {
+      return;
+    }
+
     let active = true;
     startTest(testId)
       .then((res) => {
@@ -26,11 +33,15 @@ export default function CourseTestPlayer() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || "Failed to start test.");
+        if (err?.response?.status === 401) {
+          setError("Your session is not valid for this test. Please sign in again.");
+        } else {
+          setError(err?.message || "Failed to start test.");
+        }
         setPhase("error");
       });
     return () => { active = false; };
-  }, [testId]);
+  }, [testId, token]);
 
   const handleFinish = (attemptId) => {
     setResultId(attemptId);

@@ -8,6 +8,7 @@ import {
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 import {
   getAdminCourseHierarchy, getAdminCourseTree,
   createCourse, updateCourse, deleteCourse,
@@ -139,7 +140,6 @@ function TestPicker({ onLink, existingTestIds = [] }) {
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
     api.get("/teacher/tests", { params: { limit: 100 } })
       .then((r) => setTests(r.data?.tests || r.data || []))
       .catch(() => setTests([]))
@@ -151,12 +151,23 @@ function TestPicker({ onLink, existingTestIds = [] }) {
   );
 
   return (
-    <div className="relative">
-      <Btn variant="outline" className="text-xs py-1.5 px-3" onClick={() => setOpen(!open)}>
+    <div className="relative z-50">
+      <Btn
+        variant="outline"
+        className="text-xs py-1.5 px-3"
+        onClick={() => {
+          setOpen((current) => {
+            const next = !current;
+            if (next) setLoading(true);
+            else setQuery("");
+            return next;
+          });
+        }}
+      >
         <Link2 size={13} /> Link Test
       </Btn>
       {open && (
-        <div className="absolute right-0 top-10 z-30 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
+        <div className="absolute right-0 top-10 z-80 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2">
             <Search size={13} className="text-white/40" />
             <input
@@ -322,7 +333,7 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
                 <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-4 py-2.5">
                   <FileText size={14} className="text-red-400" />
                   <span className="text-xs text-white/60 truncate">{note.fileName || "Current PDF"}</span>
-                  <a href={note.fileUrl} target="_blank" rel="noreferrer" className="ml-auto text-xs text-brand-primary hover:underline">View</a>
+                  <span className="ml-auto text-xs text-white/35">Preview available in the chapter list</span>
                 </div>
               )}
               <div
@@ -352,6 +363,27 @@ function NoteEditorDrawer({ chapterId, note, onClose, onSaved }) {
             {isEdit ? "Update" : "Create"}
           </Btn>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PdfPreviewModal({ note, onClose }) {
+  if (!note) return null;
+
+  return (
+    <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
+      <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark-300 shadow-2xl">
+        <div className="flex items-center justify-between gap-4 border-b border-white/5 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/35">PDF Preview</p>
+            <h3 className="truncate text-base font-bold text-white">{note.title}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+        <PdfPreviewFrame noteId={note._id} title={note.title} className="bg-white" />
       </div>
     </div>
   );
@@ -538,6 +570,7 @@ function ChapterContentPanel({ chapter, onRefresh }) {
   const [tab, setTab] = useState("notes");
   const [noteDrawer, setNoteDrawer] = useState(null);
   const [videoForm, setVideoForm] = useState(null);
+  const [pdfPreview, setPdfPreview] = useState(null);
 
   const handleDeleteNote = async (id) => {
     if (!window.confirm("Delete this note?")) return;
@@ -637,10 +670,10 @@ function ChapterContentPanel({ chapter, onRefresh }) {
                       {note.type === "pdf" ? "PDF Document" : "Rich Text"}
                     </span>
                   </div>
-                  {note.type === "pdf" && note.fileUrl && (
-                    <a href={note.fileUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
+                  {note.type === "pdf" && (
+                    <button onClick={() => setPdfPreview(note)} className="shrink-0 rounded-lg p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
                       <Eye size={14} />
-                    </a>
+                    </button>
                   )}
                   <button onClick={() => setNoteDrawer({ note })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity">
                     <Pencil size={14} />
@@ -656,9 +689,9 @@ function ChapterContentPanel({ chapter, onRefresh }) {
 
         {/* Videos */}
         {tab === "videos" && (
-          <div className="divide-y divide-white/5">
+          <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {(!chapter.videos?.length) ? (
-              <div className="px-6 py-12 text-center">
+              <div className="col-span-full px-6 py-12 text-center">
                 <Video size={28} className="mx-auto mb-3 text-white/15" />
                 <p className="text-sm text-white/40">No videos yet. Add a YouTube video.</p>
               </div>
@@ -666,24 +699,38 @@ function ChapterContentPanel({ chapter, onRefresh }) {
               (chapter.videos || []).map((vid) => {
                 const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
                 return (
-                  <div key={vid._id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/2 group transition-colors">
-                    {ytId ? (
-                      <img src={`https://img.youtube.com/vi/${ytId}/default.jpg`} alt="" className="h-10 w-16 shrink-0 rounded-xl object-cover" />
-                    ) : (
-                      <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
-                        <Video size={16} className="text-red-400" />
+                  <div key={vid._id} className="group overflow-hidden rounded-2xl border border-white/8 bg-white/2 transition-all hover:border-brand-primary/25 hover:bg-white/4">
+                    <div className="relative aspect-video overflow-hidden bg-black/20">
+                      {ytId ? (
+                        <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-red-500/10">
+                          <Video size={22} className="text-red-400" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
+                      <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{vid.title}</p>
+                          <p className="text-[11px] text-white/55">{vid.description || "YouTube lecture"}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">Video</span>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{vid.title}</p>
-                      {vid.description && <p className="text-[11px] text-white/40 truncate">{vid.description}</p>}
                     </div>
-                    <button onClick={() => setVideoForm({ video: vid })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity">
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => handleDeleteVideo(vid._id)} className="shrink-0 rounded-lg p-1.5 text-red-400/60 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center justify-between gap-2 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">{vid.title}</p>
+                        <p className="text-[11px] text-white/40 truncate">{vid.description || "No description added"}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setVideoForm({ video: vid })} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => handleDeleteVideo(vid._id)} className="rounded-lg p-1.5 text-red-400/60 hover:bg-red-500/10 hover:text-red-400">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })
@@ -741,6 +788,7 @@ function ChapterContentPanel({ chapter, onRefresh }) {
           onSaved={() => { setVideoForm(null); onRefresh(); }}
         />
       )}
+      {pdfPreview && <PdfPreviewModal note={pdfPreview} onClose={() => setPdfPreview(null)} />}
     </div>
   );
 }

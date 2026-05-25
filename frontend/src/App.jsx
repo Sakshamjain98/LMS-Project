@@ -19,6 +19,7 @@ import StudentSeriesDetail from "./pages/student/SeriesDetail";
 import StudentProfile from "./pages/student/StudentProfile";
 import StudentCourses from "./pages/student/StudentCourses";
 import CourseLearning from "./pages/student/CourseLearning";
+import CourseTestPlayer from "./pages/student/CourseTestPlayer";
 
 /* Layouts */
 import StudentLayout from "./pages/student/StudentLayout";
@@ -103,6 +104,7 @@ function App() {
           <Route path="tests/:topicId" element={<StudentSeriesDetail />} />
           <Route path="courses" element={<StudentCourses />} />
           <Route path="courses/:courseId" element={<CourseLearning />} />
+          <Route path="courses/:courseId/tests/:testId" element={<CourseTestPlayer />} />
           <Route path="aits" element={<StudentAITS />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>

@@ -182,8 +182,13 @@ export default function SeriesDetail() {
   }, [search, level, selectedSubjectId, selectedChapterId, testTypeTab]);
 
   useEffect(() => {
+    if (level !== "tests") return;
+    if (!practiceTests.length && pyqTests.length) {
+      setTestTypeTab("pyq");
+      return;
+    }
     setTestTypeTab("practice");
-  }, [selectedChapterId]);
+  }, [level, selectedChapterId, practiceTests.length, pyqTests.length]);
 
   // Breadcrumb pieces for the hero
   const breadcrumbs = [
