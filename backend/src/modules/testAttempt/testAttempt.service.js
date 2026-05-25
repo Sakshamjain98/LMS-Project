@@ -299,7 +299,6 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   const attempt = await TestAttempt.findOne({
     _id: objAttemptId,
     studentId: objStudentId,
-    status: "in_progress",
   });
 
   if (!attempt) {
@@ -307,6 +306,21 @@ export const submitTest = async (attemptId, answersData, studentId) => {
       STATUS_CODES.NOT_FOUND,
       "Attempt not found or already submitted"
     );
+  }
+
+  if (attempt.status !== "in_progress") {
+    const rank =
+      (await TestAttempt.countDocuments({
+        testId: attempt.testId,
+        status: "evaluated",
+        marksObtained: { $gt: attempt.marksObtained },
+      })) + 1;
+
+    return {
+      ...attempt.toObject(),
+      rank,
+      alreadySubmitted: true,
+    };
   }
 
   const test = await Test.findById(attempt.testId).lean();

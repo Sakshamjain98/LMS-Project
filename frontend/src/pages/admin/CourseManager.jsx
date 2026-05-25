@@ -151,7 +151,7 @@ function TestPicker({ onLink, existingTestIds = [] }) {
   );
 
   return (
-    <div className="relative z-50">
+    <div className="relative z-70">
       <Btn
         variant="outline"
         className="text-xs py-1.5 px-3"
@@ -416,7 +416,7 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-dark-300 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
           <h3 className="font-bold text-white">{isEdit ? "Edit Video" : "Add Video"}</h3>

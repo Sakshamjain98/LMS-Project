@@ -35,6 +35,7 @@ import {
   FaLayerGroup,
   FaSpinner,
 } from "react-icons/fa";
+import { Search, BookOpen } from "lucide-react";
 import { normalizeYouTubeUrl } from "../../utils/youtube";
 
 /* ─────────────────────────────────────────────────────────────
@@ -1113,7 +1114,7 @@ function CourseCategoryCard({ category, idx, active, onClick }) {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary ring-1 ring-brand-primary/15">
           <FaLayerGroup size={20} />
         </div>
         <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-white/50">
@@ -1140,7 +1141,7 @@ function CourseExamCard({ exam, idx, active, onClick }) {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/15">
           <FaGraduationCap size={20} />
         </div>
         <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-white/50">
@@ -1548,6 +1549,11 @@ function PublicCoursesSection({ onGetStarted }) {
     else onGetStarted();
   };
 
+  const currentCourseTarget = (course) => {
+    if (!course?._id) return;
+    navigate(`/student/courses/${course._id}`);
+  };
+
   return (
     <Section id="courses" className="border-t border-dark-100">
       <SectionHeading
@@ -1559,22 +1565,43 @@ function PublicCoursesSection({ onGetStarted }) {
         <SeriesLoadingSkeleton />
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-wrap gap-3 rounded-2xl border border-white/8 bg-white/3 p-3">
-            {categories.map((category, idx) => (
-              <CourseCategoryCard
-                key={category._id}
-                category={category}
-                idx={idx}
-                active={selectedCategoryId === category._id}
-                onClick={() => {
-                  setSelectedCategoryId(category._id);
-                  setSelectedExamId(null);
-                  setCourses([]);
-                  setSearch("");
-                }}
-              />
-            ))}
-          </div>
+          {categories.length > 1 && (
+            <div className="relative">
+              <div role="tablist" aria-label="Course categories" className="flex overflow-x-auto scrollbar-none border-b border-dark-100">
+                {categories.map((category) => (
+                  <button
+                    key={category._id}
+                    role="tab"
+                    aria-selected={selectedCategoryId === category._id}
+                    onClick={() => {
+                      setSelectedCategoryId(category._id);
+                      setSelectedExamId(null);
+                      setCourses([]);
+                      setSearch("");
+                    }}
+                    className={`relative shrink-0 flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all outline-none focus:outline-none ${
+                      selectedCategoryId === category._id
+                        ? "text-white bg-brand-primary/8"
+                        : "text-gray-400 hover:text-white hover:bg-dark-200/50"
+                    }`}
+                  >
+                    {category.title}
+                    <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 transition-colors ${
+                      selectedCategoryId === category._id
+                        ? "bg-brand-primary/20 text-brand-primary"
+                        : "bg-dark-100 text-gray-500"
+                    }`}>
+                      {category.exams?.length || 0}
+                    </span>
+                    {selectedCategoryId === category._id && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-t-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0.5 w-12 bg-linear-to-l from-dark-400 to-transparent" />
+            </div>
+          )}
 
           {currentCategory && !selectedExamId && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1633,7 +1660,7 @@ function PublicCoursesSection({ onGetStarted }) {
                       course={course}
                       idx={idx}
                       isAuthenticated={isAuthenticated}
-                      onNavigateCourses={() => navigate("/student/courses")}
+                      onNavigateCourse={() => currentCourseTarget(course)}
                       onGetStarted={onGetStarted}
                     />
                   ))}
@@ -1661,20 +1688,22 @@ function cloudinaryOptimize(url, w = 600, h = 340) {
   return url.replace("/upload/", `/upload/w_${w},h_${h},c_fill,q_auto,f_auto/`);
 }
 
-function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onGetStarted }) {
+function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGetStarted }) {
   const palette = COURSE_PALETTES[idx % COURSE_PALETTES.length];
   const thumbUrl = cloudinaryOptimize(course.thumbnail?.url);
   const plainDesc = course.description ? course.description.replace(/<[^>]+>/g, "").trim() : "";
 
   const handleCta = () => {
-    if (isAuthenticated) onNavigateCourses();
+    if (isAuthenticated) onNavigateCourse();
     else onGetStarted();
   };
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={handleCta}
       style={{ animationDelay: `${idx * 70}ms` }}
-      className={`group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 backdrop-blur-sm transition-all duration-200 ${palette.border} hover:shadow-2xl ${palette.shadow} hover:-translate-y-1 animate-fade-up`}
+      className={`group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-dark-300/40 backdrop-blur-sm text-left transition-all duration-200 ${palette.border} hover:shadow-2xl ${palette.shadow} hover:-translate-y-1 animate-fade-up focus:outline-none focus:ring-2 focus:ring-brand-primary/40`}
     >
       {/* Thumbnail */}
       <div className="relative h-44 shrink-0 overflow-hidden bg-white/3">
@@ -1691,11 +1720,9 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onG
           </div>
         )}
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/70 to-transparent" />
-        {/* Price badge */}
         <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-emerald-500/80 text-white"}`}>
           {course.isPaid ? `₹${Number(course.price || 0).toLocaleString()}` : "FREE"}
         </span>
-        {/* Subject count badge */}
         {(course.subjectsCount || 0) > 0 && (
           <span className={`absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg backdrop-blur-sm ${palette.badge}`}>
             <FaLayerGroup size={9} /> {course.subjectsCount} Subject{course.subjectsCount !== 1 ? "s" : ""}
@@ -1703,8 +1730,16 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onG
         )}
       </div>
 
-      {/* Card body */}
-      <div className="flex flex-1 flex-col gap-3 p-5">
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${palette.icon} shrink-0`}>
+            <FaGraduationCap size={20} />
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${course.isPaid ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+            {course.isPaid ? "Premium" : "Free"}
+          </span>
+        </div>
+
         <h3 className="text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-brand-primary transition-colors">
           {course.title}
         </h3>
@@ -1715,6 +1750,21 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onG
           <p className="flex-1 text-sm text-white/35 italic leading-relaxed">Comprehensive notes, video lectures and practice tests.</p>
         )}
 
+        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+          <div>
+            <p className="text-base font-bold text-brand-primary">{course.subjectsCount || 0}</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Subjects</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-white">{course.chaptersCount || 0}</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Chapters</p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-white">{course.tags?.length || 0}</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Tags</p>
+          </div>
+        </div>
+
         {course.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {course.tags.slice(0, 3).map((tag) => (
@@ -1723,15 +1773,12 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourses, onG
           </div>
         )}
 
-        <button
-          onClick={handleCta}
-          className="mt-auto w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all inline-flex items-center justify-center gap-1.5"
-        >
+        <span className="mt-auto w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all inline-flex items-center justify-center gap-1.5">
           {course.isPaid ? `Enroll for ₹${Number(course.price || 0).toLocaleString()}` : "Start Learning Free"}
           <FaArrowRight size={11} />
-        </button>
+        </span>
       </div>
-    </div>
+    </button>
   );
 }
 

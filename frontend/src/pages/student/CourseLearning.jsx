@@ -10,6 +10,8 @@ import {
   getCourseFull, getNoteById,
   markChapterComplete, unmarkChapterComplete, getCourseProgress,
 } from "../../services/courseService";
+import { getMyAttempts } from "../../services/studentService";
+import TestResult from "./TestResult";
 import { getPlans, createOrder, verifyPayment } from "../../services/paymentService";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 
@@ -246,7 +248,7 @@ function NotesSection({ chapter }) {
 
 // ─── Tests Section ────────────────────────────────────────────────────────────
 
-function TestsSection({ chapter, courseId }) {
+function TestsSection({ chapter, courseId, attemptsByTest, onViewAnalysis }) {
   const navigate = useNavigate();
   const tests = chapter.linkedTests || [];
   if (!tests.length) return null;
@@ -266,25 +268,61 @@ function TestsSection({ chapter, courseId }) {
         {tests.map((lt) => {
           const test = lt.test || {};
           const testId = lt.testId?._id || lt.testId;
+          const attemptEntry = attemptsByTest?.[String(testId)] || null;
+          const latestAttempt = attemptEntry?.latest || null;
+          const completed = Boolean(latestAttempt && ["submitted", "evaluated"].includes(latestAttempt.status));
           return (
-            <button
+            <div
               key={String(testId)}
-              onClick={() => navigate(`/student/courses/${courseId}/tests/${testId}`, { state: { returnTo: `/student/courses/${courseId}` } })}
-              className="group flex w-full items-center gap-4 rounded-2xl border border-white/8 bg-white/2 p-4 text-left transition-all hover:border-brand-primary/30 hover:bg-white/4"
+              className="group rounded-2xl border border-white/8 bg-white/2 p-4 transition-all hover:border-brand-primary/30 hover:bg-white/4"
             >
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
-                <BookOpen size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white text-sm truncate">{test.title || "Untitled Test"}</p>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className={`text-[11px] font-semibold uppercase ${test.type === "pyq" ? "text-purple-400" : "text-brand-primary"}`}>{test.type || "practice"}</span>
-                  {test.duration && <span className="text-[11px] text-white/40">{test.duration} min</span>}
-                  {test.totalMarks && <span className="text-[11px] text-white/40">{test.totalMarks} marks</span>}
+              <button
+                onClick={() => navigate(`/student/courses/${courseId}/tests/${testId}`, { state: { returnTo: `/student/courses/${courseId}` } })}
+                className="flex w-full items-center gap-4 text-left"
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${test.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
+                  <BookOpen size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm truncate">{test.title || "Untitled Test"}</p>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <span className={`text-[11px] font-semibold uppercase ${test.type === "pyq" ? "text-purple-400" : "text-brand-primary"}`}>{test.type || "practice"}</span>
+                    {test.duration && <span className="text-[11px] text-white/40">{test.duration} min</span>}
+                    {test.totalMarks && <span className="text-[11px] text-white/40">{test.totalMarks} marks</span>}
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-white/30 group-hover:text-brand-primary transition-colors shrink-0" />
+              </button>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+                {attemptEntry?.count ? (
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${completed ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                    {completed ? "Completed" : "Attempted"}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    Not attempted
+                  </span>
+                )}
+
+                {latestAttempt?.submittedAt && (
+                  <span className="text-[11px] text-white/40">
+                    Last attempt: {new Date(latestAttempt.submittedAt).toLocaleString()}
+                  </span>
+                )}
+
+                <div className="ml-auto flex items-center gap-2">
+                  {latestAttempt?._id && (completed || attemptEntry?.count > 0) && (
+                    <button
+                      onClick={() => onViewAnalysis(latestAttempt._id)}
+                      className="rounded-xl border border-brand-primary/30 bg-brand-primary/10 px-3 py-1.5 text-xs font-semibold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-colors"
+                    >
+                      View Last Attempt Analysis
+                    </button>
+                  )}
                 </div>
               </div>
-              <ChevronRight size={16} className="text-white/30 group-hover:text-brand-primary transition-colors shrink-0" />
-            </button>
+            </div>
           );
         })}
       </div>
@@ -395,7 +433,7 @@ function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
 
 // ─── Content Area ─────────────────────────────────────────────────────────────
 
-function ContentArea({ chapter, courseId }) {
+function ContentArea({ chapter, courseId, attemptsByTest, onViewAnalysis }) {
   const videos = chapter.videos || [];
   const notes  = chapter.notes  || [];
   const tests  = chapter.linkedTests || [];
@@ -413,7 +451,14 @@ function ContentArea({ chapter, courseId }) {
     <div className="space-y-4">
       {videos.length > 0 && <VideoSection key={`${chapter._id}-videos`} chapter={chapter} />}
       {notes.length  > 0 && <NotesSection key={`${chapter._id}-notes`} chapter={chapter} />}
-      {tests.length  > 0 && <TestsSection chapter={chapter} courseId={courseId} />}
+      {tests.length  > 0 && (
+        <TestsSection
+          chapter={chapter}
+          courseId={courseId}
+          attemptsByTest={attemptsByTest}
+          onViewAnalysis={onViewAnalysis}
+        />
+      )}
     </div>
   );
 }
@@ -436,6 +481,8 @@ export default function CourseLearning() {
 
   const [plans, setPlans] = useState([]);
   const [unlocking, setUnlocking] = useState(false);
+  const [attemptsByTest, setAttemptsByTest] = useState({});
+  const [activeResultId, setActiveResultId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -461,6 +508,33 @@ export default function CourseLearning() {
   }, [courseId, navigate]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    getMyAttempts()
+      .then((res) => {
+        if (!active) return;
+        const attempts = res?.data || [];
+        const nextMap = attempts.reduce((map, attempt) => {
+          const testId = String(attempt?.testId?._id || attempt?.testId || "");
+          if (!testId) return map;
+          const entry = map[testId] || { latest: null, count: 0 };
+          entry.count += 1;
+          const currentTime = new Date(attempt?.submittedAt || attempt?.updatedAt || attempt?.createdAt || 0).getTime();
+          const latestTime = entry.latest
+            ? new Date(entry.latest?.submittedAt || entry.latest?.updatedAt || entry.latest?.createdAt || 0).getTime()
+            : -1;
+          if (!entry.latest || currentTime >= latestTime) entry.latest = attempt;
+          map[testId] = entry;
+          return map;
+        }, {});
+        setAttemptsByTest(nextMap);
+      })
+      .catch(() => {
+        if (active) setAttemptsByTest({});
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!hasAccess && course?.isPaid) {
@@ -559,6 +633,10 @@ export default function CourseLearning() {
     );
   }
   if (!course) return null;
+
+  if (activeResultId) {
+    return <TestResult attemptId={activeResultId} onBack={() => setActiveResultId(null)} />;
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -845,7 +923,12 @@ export default function CourseLearning() {
                   <p className="text-sm text-white/40">Purchase the course to access all content</p>
                 </div>
               ) : (
-                <ContentArea chapter={selectedChapter} courseId={courseId} />
+                <ContentArea
+                  chapter={selectedChapter}
+                  courseId={courseId}
+                  attemptsByTest={attemptsByTest}
+                  onViewAnalysis={setActiveResultId}
+                />
               )}
 
               {/* Prev / Next navigation */}
