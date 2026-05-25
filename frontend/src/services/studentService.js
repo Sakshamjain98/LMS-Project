@@ -38,6 +38,15 @@ export const startTest = async (testId) => {
   }
 };
 
+export const getTestPreview = async (testId) => {
+  try {
+    const res = await api.get(`/test/preview/${testId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch test preview" };
+  }
+};
+
 export const submitAnswer = async (attemptId, answerData) => {
   try {
     const res = await api.post(`/test/${attemptId}/answer`, answerData);

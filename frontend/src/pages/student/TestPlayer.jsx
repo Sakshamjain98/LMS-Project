@@ -26,7 +26,24 @@ const STATUS_STYLE = {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function TestPlayer({ attemptData, onFinish, onExit }) {
-  const { attempt, questions, duration, isProctored } = attemptData;
+  const { attempt, questions, duration, isProctored } = attemptData || {};
+
+  if (!attempt?._id || !Array.isArray(questions) || questions.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-dark-400 px-6">
+        <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <AlertTriangle size={40} className="text-amber-400" />
+          <p className="text-base font-semibold text-white">This test has no available questions yet.</p>
+          <button
+            onClick={onExit}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={15} /> Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState(attempt.answers || []);

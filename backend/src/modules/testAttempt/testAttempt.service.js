@@ -161,6 +161,71 @@ export const startTest = async (testId, studentId) => {
 };
 
 /**
+ * Read-only preview for students before starting the test.
+ */
+export const getTestPreview = async (testId, studentId) => {
+  const objTestId = validateTestId(testId);
+  const objStudentId = validateUserId(studentId);
+
+  const test = await Test.findById(objTestId).lean();
+  if (!test) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Test not found");
+  }
+
+  const timingCheck = validateTestTiming(test);
+  if (!timingCheck.valid) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, timingCheck.reason);
+  }
+
+  if (test.status !== "published") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test is not available");
+  }
+
+  if (test.topicId) {
+    const topic = await TestSeriesTopic.findById(test.topicId).lean();
+    if (topic?.isPaid) {
+      const [subOk, topicOk] = await Promise.all([
+        hasActivePaidSubscription(objStudentId),
+        TopicAccess.exists({ userId: objStudentId, topicId: topic._id }),
+      ]);
+      if (!subOk && !topicOk) {
+        throw new ApiError(
+          STATUS_CODES.FORBIDDEN,
+          `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to view details.`
+        );
+      }
+    }
+  }
+
+  const attemptCount = await TestAttempt.countDocuments({
+    testId: objTestId,
+    studentId: objStudentId,
+  });
+
+  return {
+    test: {
+      _id: test._id,
+      title: test.title,
+      description: test.description,
+      duration: test.duration,
+      totalMarks: test.totalMarks || 0,
+      passingMarks: test.passingMarks || 0,
+      attemptLimit: Number(test.attemptLimit) || 0,
+      isProctored: Boolean(test.isProctored),
+      isPaid: Boolean(test.isPaid),
+      type: test.type || "practice",
+      status: test.status,
+      questionsCount: Array.isArray(test.questions) ? test.questions.length : 0,
+      negativeMarking: Number(test.negativeMarking) || 0,
+      allowReview: test.allowReview !== false,
+      showSolution: test.showSolution !== false,
+    },
+    attemptCount,
+    canStart: true,
+  };
+};
+
+/**
  * Submit a single answer
  */
 export const submitAnswer = async (attemptId, answerData, studentId) => {

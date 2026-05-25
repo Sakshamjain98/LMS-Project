@@ -13,6 +13,15 @@ export const startTest = asyncHandler(async (req, res) => {
   });
 });
 
+export const previewTest = asyncHandler(async (req, res) => {
+  const result = await service.getTestPreview(req.params.testId, req.user._id);
+
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    data: result,
+  });
+});
+
 export const submitAnswer = asyncHandler(async (req, res) => {
   const body = req.body || {};
 

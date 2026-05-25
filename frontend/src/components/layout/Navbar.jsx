@@ -56,6 +56,7 @@ const Navbar = () => {
     { name: "About", id: "about" },
     { name: "Features", id: "why-us" },
     { name: "Test Series", id: "test-series" },
+    { name: "Courses", id: "courses" },
     { name: "Articles", id: "blog" },
     { name: "News", id: "news" },
     { name: "Testimonials", id: "testimonials" },

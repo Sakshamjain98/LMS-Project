@@ -167,7 +167,7 @@ function TestPicker({ onLink, existingTestIds = [] }) {
         <Link2 size={13} /> Link Test
       </Btn>
       {open && (
-        <div className="absolute right-0 top-10 z-80 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
+        <div className="absolute right-0 top-10 z-9999 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2">
             <Search size={13} className="text-white/40" />
             <input
@@ -372,7 +372,7 @@ function PdfPreviewModal({ note, onClose }) {
   if (!note) return null;
 
   return (
-    <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
+    <div className="fixed inset-0 z-9998 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-6">
       <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-dark-300 shadow-2xl">
         <div className="flex items-center justify-between gap-4 border-b border-white/5 px-5 py-4">
           <div className="min-w-0">

@@ -9,6 +9,7 @@ router.use(authMiddleware);
 router.use(authorize("student"));
 
 // ========== ATTEMPT MANAGEMENT ==========
+router.get("/preview/:testId", controller.previewTest);
 router.post("/start/:testId", controller.startTest);
 router.post("/:attemptId/answer", controller.submitAnswer);
 router.post("/:attemptId/submit", controller.submitTest);

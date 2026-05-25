@@ -1095,6 +1095,66 @@ function seriesGridClass(count) {
   return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
 }
 
+function courseGridClass(count) {
+  if (count === 1) return "grid-cols-1 max-w-md mx-auto";
+  if (count === 2) return "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto";
+  return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+}
+
+function CourseCategoryCard({ category, idx, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${idx * 50}ms` }}
+      className={`group rounded-2xl border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 animate-fade-up ${
+        active
+          ? "border-brand-primary/40 bg-brand-primary/10 shadow-[0_12px_40px_rgba(0,200,133,0.12)]"
+          : "border-white/8 bg-dark-300/40 hover:border-brand-primary/30 hover:bg-dark-300/60"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-primary/15 text-brand-primary">
+          <FaLayerGroup size={20} />
+        </div>
+        <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-white/50">
+          {category.exams?.length || 0} Exam{(category.exams?.length || 0) === 1 ? "" : "s"}
+        </span>
+      </div>
+      <h3 className="mt-4 text-base font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+        {category.title}
+      </h3>
+      {category.description && <p className="mt-2 text-xs text-white/45 line-clamp-2">{category.description}</p>}
+    </button>
+  );
+}
+
+function CourseExamCard({ exam, idx, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${idx * 50}ms` }}
+      className={`group rounded-2xl border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 animate-fade-up ${
+        active
+          ? "border-brand-primary/35 bg-white/5"
+          : "border-white/8 bg-dark-300/40 hover:border-brand-primary/25 hover:bg-dark-300/60"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400">
+          <FaGraduationCap size={20} />
+        </div>
+        <span className="rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-white/50">
+          View Courses →
+        </span>
+      </div>
+      <h3 className="mt-4 text-base font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2">
+        {exam.title}
+      </h3>
+      {exam.description && <p className="mt-2 text-xs text-white/45 line-clamp-2">{exam.description}</p>}
+    </button>
+  );
+}
+
 function PublicTestSeriesSection({ onGetStarted }) {
   const [categories, setCategories] = useState([]);
   const [catLoading, setCatLoading] = useState(true);
@@ -1178,7 +1238,7 @@ function PublicTestSeriesSection({ onGetStarted }) {
                         setSelectedExamId(null);
                       }
                     }}
-                    className={`relative flex-shrink-0 flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all outline-none focus:outline-none ${
+                    className={`relative shrink-0 flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all outline-none focus:outline-none ${
                       selectedCategoryId === cat._id
                         ? "text-white bg-brand-primary/8"
                         : "text-gray-400 hover:text-white hover:bg-dark-200/50"
@@ -1438,19 +1498,50 @@ const COURSE_PALETTES = [
 function PublicCoursesSection({ onGetStarted }) {
   const navigate = useNavigate();
   const isAuthenticated = !!localStorage.getItem("token");
+  const [categories, setCategories] = useState([]);
+  const [loadingCats, setLoadingCats] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedExamId, setSelectedExamId] = useState(null);
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     let active = true;
-    getPublicCourses(6)
-      .then((res) => { if (active) setCourses(res?.courses || []); })
+    getPublicExamCategories()
+      .then((res) => {
+        if (!active) return;
+        const cats = res?.categories || [];
+        setCategories(cats);
+        if (cats[0]?._id) {
+          setSelectedCategoryId(cats[0]._id);
+        }
+      })
       .catch(() => {})
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active) setLoadingCats(false); });
     return () => { active = false; };
   }, []);
 
-  if (!loading && courses.length === 0) return null;
+  const currentCategory = categories.find((c) => c._id === selectedCategoryId) || null;
+  const currentExam = currentCategory?.exams?.find((e) => e._id === selectedExamId) || null;
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedExamId) {
+      setCourses([]);
+      return () => { active = false; };
+    }
+    setLoadingCourses(true);
+    getPublicCourses(50, selectedExamId)
+      .then((res) => { if (active) setCourses(res?.courses || []); })
+      .catch(() => { if (active) setCourses([]); })
+      .finally(() => { if (active) setLoadingCourses(false); });
+    return () => { active = false; };
+  }, [selectedExamId]);
+
+  const filteredCourses = courses.filter((course) =>
+    course.title.toLowerCase().includes(search.trim().toLowerCase())
+  );
 
   const handleExploreCta = () => {
     if (isAuthenticated) navigate("/student/courses");
@@ -1461,23 +1552,95 @@ function PublicCoursesSection({ onGetStarted }) {
     <Section id="courses" className="border-t border-dark-100">
       <SectionHeading
         eyebrow="Course Library"
-        title="Master every topic with structured courses"
-        subtitle="Expert-crafted notes, video lectures, and practice tests — all in one place."
+        title="Browse courses by exam category and exam"
+        subtitle="Pick the category, choose the exam, then open the course library with the same drill-down flow as test browsing."
       />
-      {loading ? (
+      {loadingCats ? (
         <SeriesLoadingSkeleton />
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course, idx) => (
-            <PublicCourseCard
-              key={course._id}
-              course={course}
-              idx={idx}
-              isAuthenticated={isAuthenticated}
-              onNavigateCourses={() => navigate("/student/courses")}
-              onGetStarted={onGetStarted}
-            />
-          ))}
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-3 rounded-2xl border border-white/8 bg-white/3 p-3">
+            {categories.map((category, idx) => (
+              <CourseCategoryCard
+                key={category._id}
+                category={category}
+                idx={idx}
+                active={selectedCategoryId === category._id}
+                onClick={() => {
+                  setSelectedCategoryId(category._id);
+                  setSelectedExamId(null);
+                  setCourses([]);
+                  setSearch("");
+                }}
+              />
+            ))}
+          </div>
+
+          {currentCategory && !selectedExamId && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {(currentCategory.exams || []).map((exam, idx) => (
+                <CourseExamCard
+                  key={exam._id}
+                  exam={exam}
+                  idx={idx}
+                  active={false}
+                  onClick={() => {
+                    setSelectedExamId(exam._id);
+                    setSearch("");
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {selectedExamId && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-dark-300/60 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-[0.3em] text-white/35">Selected Exam</p>
+                  <h3 className="truncate text-sm font-bold text-white">{currentExam?.title}</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedExamId(null)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70 hover:text-white"
+                >
+                  Change Exam
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-4 py-2.5 max-w-sm">
+                <Search size={15} className="text-white/40 shrink-0" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search courses..."
+                  className="flex-1 bg-transparent text-sm text-white placeholder-white/30 outline-none"
+                />
+              </div>
+
+              {loadingCourses ? (
+                <SeriesLoadingSkeleton />
+              ) : filteredCourses.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10">
+                  <BookOpen size={32} className="text-white/15" />
+                  <p className="text-sm text-white/40">No courses found for this exam yet</p>
+                </div>
+              ) : (
+                <div className={`grid ${courseGridClass(filteredCourses.length)} gap-6`}>
+                  {filteredCourses.map((course, idx) => (
+                    <PublicCourseCard
+                      key={course._id}
+                      course={course}
+                      idx={idx}
+                      isAuthenticated={isAuthenticated}
+                      onNavigateCourses={() => navigate("/student/courses")}
+                      onGetStarted={onGetStarted}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       <div className="mt-10 flex justify-center">
