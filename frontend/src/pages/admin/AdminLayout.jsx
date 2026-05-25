@@ -54,7 +54,6 @@ export default function AdminLayout() {
   const [openTopic, setOpenTopic] = useState(null);
   const [openSubject, setOpenSubject] = useState(null);
   const [seriesExpanded, setSeriesExpanded] = useState(true);
-  const [coursesExpanded, setCoursesExpanded] = useState(false);
 
   const [user] = useState(() => {
     const userStr = localStorage.getItem("user");
@@ -134,8 +133,8 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        {/* Nav — NOT scrollable; sidebar stays fixed. Long names truncate. */}
-        <nav className="flex-1 min-w-0 space-y-1 px-3 py-3">
+        {/* Nav — scrollable when content overflows the fixed sidebar height. */}
+        <nav className="flex-1 min-w-0 overflow-y-auto space-y-1 px-3 py-3">
           {navTop.map((item) => (
             <NavItem key={item.path} item={item} collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           ))}
