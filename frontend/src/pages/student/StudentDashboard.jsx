@@ -5,6 +5,7 @@ import {
   getMyAttempts,
   getAvailableTests,
 } from "../../services/studentService";
+import { getPublicCourses } from "../../services/courseService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 import {
   ChevronRight,
@@ -24,6 +25,9 @@ import {
   PlayCircle,
   Tag,
   GraduationCap,
+  BookOpen,
+  DollarSign,
+  Play,
 } from "lucide-react";
 
 export default function StudentDashboard() {
@@ -37,21 +41,24 @@ export default function StudentDashboard() {
   // Hierarchy drill-down state for the "Test Series" section
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedExamId, setSelectedExamId] = useState(null);
+  const [courses, setCourses] = useState([]);
 
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
-        const [profRes, attemptsRes, testsRes] = await Promise.all([
+        const [profRes, attemptsRes, testsRes, coursesRes] = await Promise.all([
           getStudentProfile().catch(() => ({})),
           getMyAttempts().catch(() => ({ data: [] })),
           getAvailableTests().catch(() => ({ topics: [], categories: [] })),
+          getPublicCourses(6).catch(() => ({ courses: [] })),
         ]);
         setProfile(profRes.user || {});
         setAttempts(Array.isArray(attemptsRes.data) ? attemptsRes.data : []);
         const cats = Array.isArray(testsRes.categories) ? testsRes.categories : [];
         setCategories(cats);
         if (cats.length > 0) setSelectedCategoryId(cats[0]._id);
+        setCourses(coursesRes?.courses || []);
       } catch {
         setError("Failed to load some dashboard components.");
       } finally {
@@ -156,6 +163,27 @@ export default function StudentDashboard() {
             <MetricCard icon={<LayoutDashboard size={22} />} label="Ongoing Tests" value={ongoingTests} />
             <MetricCard icon={<LineChart size={22} />} label="Average Score" value={`${averageScore}%`} isPercentage />
           </div>
+
+          {/* Courses */}
+          {courses.length > 0 && (
+            <section>
+              <div className="mb-5 flex items-end justify-between">
+                <h2 className="text-xl font-bold text-white tracking-tight">Courses</h2>
+                <Link
+                  to="/student/courses"
+                  className="group flex items-center text-sm font-semibold text-brand-primary hover:text-brand-primary/80"
+                >
+                  Browse all
+                  <ChevronRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {courses.map((course, idx) => (
+                  <DashboardCourseCard key={course._id} course={course} delay={idx * 50} />
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Test Series — Category → Exam → Series hierarchy */}
           <section>
@@ -507,6 +535,50 @@ function RecentCard({ attempt, delay = 0 }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function DashboardCourseCard({ course, delay = 0 }) {
+  const navigate = useNavigate();
+  const thumbUrl = course.thumbnail?.url;
+  return (
+    <button
+      onClick={() => navigate("/student/courses")}
+      style={{ animationDelay: `${delay}ms` }}
+      className="group animate-fade-up flex flex-col rounded-2xl border border-white/5 bg-dark-200 overflow-hidden text-left transition-colors hover:border-brand-primary/40 hover:bg-dark-100/60"
+    >
+      <div className="relative h-36 shrink-0 bg-white/3 overflow-hidden">
+        {thumbUrl ? (
+          <img src={thumbUrl} alt={course.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <BookOpen size={32} className="text-white/10" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
+        {course.isPaid ? (
+          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+            <DollarSign size={9} /> ₹{course.price}
+          </span>
+        ) : (
+          <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+            FREE
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col flex-1 gap-3 p-5">
+        <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-brand-primary transition-colors">
+          {course.title}
+        </h3>
+        {course.description && (
+          <p className="text-xs text-white/45 line-clamp-2 leading-relaxed" dangerouslySetInnerHTML={{ __html: course.description }} />
+        )}
+        <div className="mt-auto inline-flex items-center justify-between rounded-xl bg-brand-primary/10 px-3 py-2 text-xs font-bold text-brand-primary">
+          <span className="flex items-center gap-1.5"><Play size={11} /> Start Learning</span>
+          <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </div>
+    </button>
   );
 }
 
