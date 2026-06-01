@@ -205,6 +205,15 @@ function TestPicker({ onLink, examId, existingTestIds = [] }) {
   const isSearching = query.trim().length > 0;
   const q = query.trim().toLowerCase();
 
+  // Filter series to only show those belonging to the same exam as the course.
+  // Unassigned series (no examId) are also included as a fallback.
+  const filteredHierarchy = useMemo(() => {
+    if (!examId) return hierarchy;
+    return (hierarchy || []).filter(
+      (t) => !t.examId || String(t.examId) === String(examId) || String(t.examId?._id) === String(examId)
+    );
+  }, [hierarchy, examId]);
+
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const results = [];
@@ -227,15 +236,6 @@ function TestPicker({ onLink, examId, existingTestIds = [] }) {
     });
     return results;
   }, [filteredHierarchy, q, isSearching, existingTestIds]);
-
-  // Filter series to only show those belonging to the same exam as the course.
-  // Unassigned series (no examId) are also included as a fallback.
-  const filteredHierarchy = useMemo(() => {
-    if (!examId) return hierarchy;
-    return (hierarchy || []).filter(
-      (t) => !t.examId || String(t.examId) === String(examId) || String(t.examId?._id) === String(examId)
-    );
-  }, [hierarchy, examId]);
 
   const totalTests = useMemo(() =>
     (filteredHierarchy || []).reduce((n, t) =>
