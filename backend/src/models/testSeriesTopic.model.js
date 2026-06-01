@@ -11,6 +11,7 @@ const testSeriesTopicSchema = new mongoose.Schema(
     // A topic is either free for all students or sold as a single bundle at `price`.
     isPaid: { type: Boolean, default: false },
     price: { type: Number, default: 0, min: 0 },
+    discountedPrice: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

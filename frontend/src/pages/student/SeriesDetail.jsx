@@ -346,7 +346,11 @@ export default function SeriesDetail() {
                           </span>
                         ) : (
                           <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                            Premium · ₹{Number(topic.price || 0).toLocaleString()}
+                            {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+                              <>Premium · <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span> ₹{Number(topic.discountedPrice).toLocaleString()}</>
+                            ) : (
+                              <>Premium · ₹{Number(topic.price || 0).toLocaleString()}</>
+                            )}
                           </span>
                         )
                       ) : (
@@ -395,7 +399,15 @@ export default function SeriesDetail() {
                         </>
                       ) : (
                         <>
-                          <Lock size={14} /> Unlock for ₹{Number(topic.price || 0).toLocaleString()}
+                          <Lock size={14} /> Unlock for{" "}
+                          {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+                            <>
+                              <span className="line-through opacity-60 mr-0.5">₹{Number(topic.price || 0).toLocaleString()}</span>
+                              ₹{Number(topic.discountedPrice).toLocaleString()}
+                            </>
+                          ) : (
+                            <>₹{Number(topic.price || 0).toLocaleString()}</>
+                          )}
                         </>
                       )}
                     </button>
@@ -590,7 +602,15 @@ export default function SeriesDetail() {
                     <p className="font-semibold text-amber-200">This is a premium test series</p>
                     <p className="mt-1 text-amber-100/80">
                       You can browse the chapters above. Unlock the full series for{" "}
-                      <strong className="text-white">₹{Number(topic.price || 0).toLocaleString()}</strong> to start tests, see solutions, and earn All-India Ranks.
+                      {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+                        <>
+                          <strong className="text-white/40 line-through mr-1">₹{Number(topic.price || 0).toLocaleString()}</strong>
+                          <strong className="text-white">₹{Number(topic.discountedPrice).toLocaleString()}</strong>
+                        </>
+                      ) : (
+                        <strong className="text-white">₹{Number(topic.price || 0).toLocaleString()}</strong>
+                      )}{" "}
+                      to start tests, see solutions, and earn All-India Ranks.
                     </p>
                   </div>
                   <button

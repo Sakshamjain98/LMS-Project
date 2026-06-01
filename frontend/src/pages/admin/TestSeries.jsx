@@ -80,7 +80,7 @@ const ICON_COLOR = {
 };
 
 // ─── Empty form defaults ─────────────────────────────────────────────────────
-const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, examId: "" };
+const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, discountedPrice: 0, examId: "" };
 const emptyTestForm = {
   title: "", description: "", duration: 60, passingMarks: 0, instructions: "",
   isPaid: false, attemptLimit: 0, isProctored: false, isOpenTest: true,
@@ -303,7 +303,8 @@ export default function AdminTestSeries() {
     if (mode === "edit" && data) {
       setEntityForm({
         title: data.title || "", description: data.description || "",
-        isPaid: Boolean(data.isPaid), price: Number(data.price) || 0, examId: data.examId || "",
+        isPaid: Boolean(data.isPaid), price: Number(data.price) || 0,
+        discountedPrice: Number(data.discountedPrice) || 0, examId: data.examId || "",
       });
       setModalState({ isOpen: true, type, mode, editId: data._id });
       return;
@@ -486,7 +487,7 @@ export default function AdminTestSeries() {
   const handleEditRow = (row) => {
     if (aitsView && !selectedAitsId) {
       // editing an AITS section — store id for update
-      setEntityForm({ title: row.title, description: row.description || "", isPaid: Boolean(row.isPaid), price: Number(row.price) || 0, examId: selectedExamId });
+      setEntityForm({ title: row.title, description: row.description || "", isPaid: Boolean(row.isPaid), price: Number(row.price) || 0, discountedPrice: Number(row.discountedPrice) || 0, examId: selectedExamId });
       setModalState({ isOpen: true, type: "entity", mode: "edit", editId: row._id });
       return;
     }
@@ -838,11 +839,18 @@ function EntityForm({ form, onChange, level, categories, exams, selectedCategory
             <span>Paid <span className="block text-[10px] text-white/40">Students pay once to access.</span></span>
           </label>
           {form.isPaid && (
-            <FieldLabel label="Price (₹)" required>
-              <input type="number" min="0" value={form.price ?? 0}
-                onChange={(e) => onChange({ ...form, price: Number(e.target.value) })}
-                placeholder="999" className={fi} />
-            </FieldLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <FieldLabel label="Original Price (₹)" hint="Full MRP (shown strikethrough)." required>
+                <input type="number" min="0" value={form.price ?? 0}
+                  onChange={(e) => onChange({ ...form, price: Number(e.target.value) })}
+                  placeholder="1499" className={fi} />
+              </FieldLabel>
+              <FieldLabel label="Selling Price (₹)" hint="What students pay. Leave 0 if no discount.">
+                <input type="number" min="0" value={form.discountedPrice ?? 0}
+                  onChange={(e) => onChange({ ...form, discountedPrice: Number(e.target.value) })}
+                  placeholder="999" className={fi} />
+              </FieldLabel>
+            </div>
           )}
         </>
       )}
@@ -964,7 +972,7 @@ function CsvForm({ form, onChange, showTypeSelector = true }) {
           <FieldLabel label="Ends At"><input type="datetime-local" value={form.endTime} onChange={(e) => onChange({ ...form, endTime: e.target.value })} className={fi} /></FieldLabel>
         </div>
       )}
-      <FieldLabel label="CSV File" hint="Columns: questionText, optionA-D, correctIndex (0-3), marks." required>
+      <FieldLabel label="CSV File" hint="Columns: question, optionA, optionB, optionC, optionD, answer (1-4 or A-D), marks, explanation (optional)." required>
         <input type="file" accept=".csv" onChange={(e) => onChange({ ...form, file: e.target.files?.[0] || null })} className={fi} />
       </FieldLabel>
     </div>

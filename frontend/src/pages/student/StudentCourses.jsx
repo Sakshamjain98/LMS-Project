@@ -120,7 +120,15 @@ function CourseCard({ course, progress, onClick }) {
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
         {course.isPaid ? (
           <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-            <DollarSign size={9} /> ₹{course.price}
+            <DollarSign size={9} />
+            {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+              <>
+                <span className="line-through opacity-70">₹{course.price}</span>
+                <span>₹{course.discountedPrice}</span>
+              </>
+            ) : (
+              <span>₹{course.price}</span>
+            )}
           </span>
         ) : (
           <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">

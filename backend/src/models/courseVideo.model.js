@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 function extractYouTubeId(url) {
   if (!url) return null;
   const m = url.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/
   );
   return m ? m[1] : null;
 }

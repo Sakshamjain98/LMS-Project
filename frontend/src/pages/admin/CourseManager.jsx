@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
   BookOpen, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, Check, X,
   FileText, Video, Link2, Loader2, Upload, Eye,
-  GraduationCap, Folder, Tag, Search, DollarSign, Globe, EyeOff,
+  GraduationCap, Folder, Layers, Tag, Search, DollarSign, Globe, EyeOff,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
@@ -132,82 +133,319 @@ function Btn({ children, onClick, variant = "primary", className = "", disabled,
 
 // ─── Test Picker ──────────────────────────────────────────────────────────────
 
-function TestPicker({ onLink, existingTestIds = [] }) {
+function TestPicker({ onLink, examId, existingTestIds = [] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [tests, setTests] = useState([]);
+  const [hierarchy, setHierarchy] = useState([]);
   const [loading, setLoading] = useState(false);
+  // expanded: Set of "series-{id}", "subject-{id}", "chapter-{id}"
+  const [expanded, setExpanded] = useState(new Set());
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0, minWidth: 400 });
 
+  // Load hierarchy once when first opened
   useEffect(() => {
     if (!open) return;
-    api.get("/teacher/tests", { params: { limit: 100 } })
-      .then((r) => setTests(r.data?.tests || r.data || []))
-      .catch(() => setTests([]))
+    setLoading(true);
+    api.get("/teacher/test-series")
+      .then((r) => {
+        const topics = r.data?.topics || [];
+        setHierarchy(topics);
+        if (topics.length === 1) setExpanded(new Set([`series-${topics[0]._id}`]));
+      })
+      .catch(() => setHierarchy([]))
       .finally(() => setLoading(false));
   }, [open]);
 
-  const filtered = tests.filter(
-    (t) => !existingTestIds.includes(String(t._id)) && t.title.toLowerCase().includes(query.toLowerCase())
+  // Compute portal position from button rect
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const panelWidth = 400;
+    // Prefer right-aligned; shift left if it would overflow
+    let right = window.innerWidth - rect.right;
+    if (rect.right - panelWidth < 0) right = Math.max(8, window.innerWidth - panelWidth - 8);
+    setDropPos({ top: rect.bottom + 6, right, minWidth: panelWidth });
+  }, [open]);
+
+  // Close on outside click (check both the button and the portal panel)
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (
+        btnRef.current?.contains(e.target) ||
+        panelRef.current?.contains(e.target)
+      ) return;
+      setOpen(false);
+      setQuery("");
+      setExpanded(new Set());
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === "Escape") { setOpen(false); setQuery(""); setExpanded(new Set()); } };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open]);
+
+  const toggle = (key) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  const close = () => { setOpen(false); setQuery(""); setExpanded(new Set()); };
+
+  const isSearching = query.trim().length > 0;
+  const q = query.trim().toLowerCase();
+
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
+    const results = [];
+    (filteredHierarchy || []).forEach((topic) => {
+      (topic.subjects || []).forEach((subject) => {
+        (subject.chapters || []).forEach((chapter) => {
+          (chapter.tests || []).forEach((test) => {
+            if (existingTestIds.includes(String(test._id))) return;
+            if (
+              test.title?.toLowerCase().includes(q) ||
+              topic.title?.toLowerCase().includes(q) ||
+              subject.title?.toLowerCase().includes(q) ||
+              chapter.title?.toLowerCase().includes(q)
+            ) {
+              results.push({ test, seriesTitle: topic.title, subjectTitle: subject.title, chapterTitle: chapter.title });
+            }
+          });
+        });
+      });
+    });
+    return results;
+  }, [filteredHierarchy, q, isSearching, existingTestIds]);
+
+  // Filter series to only show those belonging to the same exam as the course.
+  // Unassigned series (no examId) are also included as a fallback.
+  const filteredHierarchy = useMemo(() => {
+    if (!examId) return hierarchy;
+    return (hierarchy || []).filter(
+      (t) => !t.examId || String(t.examId) === String(examId) || String(t.examId?._id) === String(examId)
+    );
+  }, [hierarchy, examId]);
+
+  const totalTests = useMemo(() =>
+    (filteredHierarchy || []).reduce((n, t) =>
+      n + (t.subjects || []).reduce((m, s) =>
+        m + (s.chapters || []).reduce((k, c) =>
+          k + (c.tests || []).filter(tt => !existingTestIds.includes(String(tt._id))).length, 0), 0), 0),
+    [filteredHierarchy, existingTestIds]
   );
 
-  return (
-    <div className="relative z-70">
-      <Btn
-        variant="outline"
-        className="text-xs py-1.5 px-3"
-        onClick={() => {
-          setOpen((current) => {
-            const next = !current;
-            if (next) setLoading(true);
-            else setQuery("");
-            return next;
-          });
-        }}
-      >
-        <Link2 size={13} /> Link Test
-      </Btn>
-      {open && (
-        <div className="absolute right-0 top-10 z-9999 w-80 rounded-2xl border border-white/10 bg-dark-300 p-3 shadow-2xl">
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2">
-            <Search size={13} className="text-white/40" />
-            <input
-              autoFocus
-              placeholder="Search tests..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent text-xs text-white placeholder-white/30 outline-none"
-            />
+  // ── The panel JSX (rendered via portal) ────────────────────────────────────
+  const panel = open ? (
+    <div
+      ref={panelRef}
+      className="rounded-2xl border border-white/15 bg-dark-300 shadow-2xl shadow-black/70 overflow-hidden"
+      style={{
+        position: "fixed",
+        top: dropPos.top,
+        right: dropPos.right,
+        width: dropPos.minWidth,
+        zIndex: 2147483647, // max 32-bit int — above everything
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
+        <p className="text-xs font-bold text-white">Link a Test</p>
+        <span className="text-[10px] text-white/35">{totalTests} available</span>
+      </div>
+
+      {/* Search */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <Search size={13} className="shrink-0 text-white/40" />
+          <input
+            autoFocus
+            placeholder="Search tests, series, subject, chapter…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 bg-transparent text-xs text-white placeholder-white/30 outline-none"
+          />
+          {query && (
+            <button onClick={() => setQuery("")} className="text-white/30 hover:text-white">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="max-h-[55vh] overflow-y-auto custom-scrollbar px-2 pb-3">
+        {loading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 size={20} className="animate-spin text-brand-primary" />
           </div>
-          {loading ? (
-            <div className="flex justify-center py-3">
-              <Loader2 size={18} className="animate-spin text-brand-primary" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="py-3 text-center text-xs text-white/40">No tests found</p>
+        ) : isSearching ? (
+          searchResults.length === 0 ? (
+            <p className="py-6 text-center text-xs text-white/40">No tests match "{query}"</p>
           ) : (
-            <div className="max-h-48 overflow-y-auto space-y-0.5">
-              {filtered.map((t) => (
+            <div className="space-y-0.5 pt-1">
+              {searchResults.map(({ test, seriesTitle, subjectTitle, chapterTitle }) => (
                 <button
-                  key={t._id}
-                  onClick={() => { onLink(t._id); setOpen(false); setQuery(""); }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-white/70 hover:bg-white/5 hover:text-white"
+                  key={test._id}
+                  onClick={() => { onLink(test._id); close(); }}
+                  className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left hover:bg-white/6 transition-colors"
                 >
-                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${t.type === "pyq" ? "bg-purple-500/15 text-purple-400" : "bg-brand-primary/15 text-brand-primary"}`}>
-                    {t.type?.toUpperCase()}
-                  </span>
-                  <span className="flex-1 truncate">{t.title}</span>
+                  <TypeBadge type={test.type} />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-white">{test.title}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-white/35">
+                      {[seriesTitle, subjectTitle, chapterTitle].filter(Boolean).join(" › ")}
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
-          )}
-          <div className="mt-2 border-t border-white/5 pt-2">
-            <Btn variant="ghost" className="w-full justify-center text-xs" onClick={() => setOpen(false)}>
-              Cancel
-            </Btn>
+          )
+        ) : filteredHierarchy.length === 0 ? (
+          <p className="py-6 text-center text-xs text-white/40">
+            {examId ? "No test series found for this exam" : "No test series found"}
+          </p>
+        ) : (
+          <div className="pt-1 space-y-0.5">
+            {filteredHierarchy.map((topic) => {
+              const seriesKey = `series-${topic._id}`;
+              const seriesOpen = expanded.has(seriesKey);
+              const availableInSeries = (topic.subjects || []).reduce((n, s) =>
+                n + (s.chapters || []).reduce((m, c) =>
+                  m + (c.tests || []).filter(t => !existingTestIds.includes(String(t._id))).length, 0), 0);
+              if (availableInSeries === 0) return null;
+              return (
+                <div key={topic._id}>
+                  <button
+                    onClick={() => toggle(seriesKey)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
+                  >
+                    <ChevronRight size={13} className={`shrink-0 text-brand-primary transition-transform duration-150 ${seriesOpen ? "rotate-90" : ""}`} />
+                    <Layers size={13} className="shrink-0 text-brand-primary" />
+                    <span className="flex-1 truncate text-xs font-bold text-white">{topic.title}</span>
+                    <span className="shrink-0 rounded-full bg-brand-primary/15 px-2 py-0.5 text-[10px] font-bold text-brand-primary">{availableInSeries}</span>
+                  </button>
+                  {seriesOpen && (
+                    <div className="ml-4 border-l border-white/8 pl-2 space-y-0.5">
+                      {(topic.subjects || []).map((subject) => {
+                        const subjectKey = `subject-${subject._id}`;
+                        const subjectOpen = expanded.has(subjectKey);
+                        const availableInSubject = (subject.chapters || []).reduce((m, c) =>
+                          m + (c.tests || []).filter(t => !existingTestIds.includes(String(t._id))).length, 0);
+                        if (availableInSubject === 0) return null;
+                        return (
+                          <div key={subject._id}>
+                            <button
+                              onClick={() => toggle(subjectKey)}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-white/5 transition-colors"
+                            >
+                              <ChevronRight size={12} className={`shrink-0 text-teal-400/70 transition-transform duration-150 ${subjectOpen ? "rotate-90" : ""}`} />
+                              <Folder size={12} className="shrink-0 text-teal-400" />
+                              <span className="flex-1 truncate text-[11px] font-semibold text-white/80">{subject.title}</span>
+                              <span className="shrink-0 text-[10px] text-white/30">{availableInSubject}</span>
+                            </button>
+                            {subjectOpen && (
+                              <div className="ml-4 border-l border-white/6 pl-2 space-y-0.5">
+                                {(subject.chapters || []).map((chapter) => {
+                                  const chapterKey = `chapter-${chapter._id}`;
+                                  const chapterOpen = expanded.has(chapterKey);
+                                  const availableTests = (chapter.tests || []).filter(
+                                    (t) => !existingTestIds.includes(String(t._id))
+                                  );
+                                  if (availableTests.length === 0) return null;
+                                  return (
+                                    <div key={chapter._id}>
+                                      <button
+                                        onClick={() => toggle(chapterKey)}
+                                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-white/5 transition-colors"
+                                      >
+                                        <ChevronRight size={11} className={`shrink-0 text-amber-400/70 transition-transform duration-150 ${chapterOpen ? "rotate-90" : ""}`} />
+                                        <FileText size={11} className="shrink-0 text-amber-400" />
+                                        <span className="flex-1 truncate text-[11px] text-white/60">{chapter.title}</span>
+                                        <span className="shrink-0 text-[10px] text-white/25">{availableTests.length}</span>
+                                      </button>
+                                      {chapterOpen && (
+                                        <div className="ml-4 border-l border-white/5 pl-2 space-y-0.5">
+                                          {availableTests.map((test) => (
+                                            <button
+                                              key={test._id}
+                                              onClick={() => { onLink(test._id); close(); }}
+                                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-brand-primary/10 transition-colors group"
+                                            >
+                                              <TypeBadge type={test.type} />
+                                              <span className="flex-1 truncate text-[11px] text-white/70 group-hover:text-brand-primary">{test.title}</span>
+                                              <Plus size={11} className="shrink-0 text-white/20 group-hover:text-brand-primary" />
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-white/8 px-3 py-2">
+        <button
+          onClick={close}
+          className="w-full rounded-xl py-2 text-xs text-white/40 hover:bg-white/5 hover:text-white transition-colors"
+        >
+          Close
+        </button>
+      </div>
     </div>
+  ) : null;
+
+  return (
+    <>
+      <div ref={btnRef}>
+        <Btn
+          variant="outline"
+          className="text-xs py-1.5 px-3"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Link2 size={13} /> Link Test
+        </Btn>
+      </div>
+      {/* Portal: renders directly into <body>, escaping all backdrop-filter stacking contexts */}
+      {createPortal(panel, document.body)}
+    </>
+  );
+}
+
+// Small inline type badge reused by TestPicker rows
+function TypeBadge({ type }) {
+  const cfg = type === "pyq"
+    ? "bg-purple-500/20 text-purple-400"
+    : type === "aits"
+    ? "bg-amber-500/20 text-amber-400"
+    : "bg-brand-primary/20 text-brand-primary";
+  return (
+    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${cfg}`}>
+      {(type || "practice").toUpperCase()}
+    </span>
   );
 }
 
@@ -397,7 +635,7 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
   const [url, setUrl] = useState(video?.youtubeUrl || "");
   const [desc, setDesc] = useState(video?.description || "");
   const [saving, setSaving] = useState(false);
-  const ytId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
+  const ytId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/)?.[1];
 
   const handleSave = async () => {
     if (!title.trim()) return toast.error("Title required");
@@ -460,6 +698,7 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
   const [examId, setExamId] = useState(course?.examId?._id || course?.examId || exams[0]?._id || "");
   const [isPaid, setIsPaid] = useState(course?.isPaid ?? false);
   const [price, setPrice] = useState(course?.price?.toString() || "");
+  const [discountedPrice, setDiscountedPrice] = useState(course?.discountedPrice?.toString() || "");
   const [status, setStatus] = useState(course?.status || "published");
   const [thumb, setThumb] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -475,6 +714,7 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
       fd.append("examId", examId);
       fd.append("isPaid", String(isPaid));
       fd.append("price", isPaid ? String(Number(price) || 0) : "0");
+      fd.append("discountedPrice", isPaid ? String(Number(discountedPrice) || 0) : "0");
       fd.append("status", status);
       if (thumb) fd.append("thumbnail", thumb);
       if (isEdit) await updateCourse(course._id, fd);
@@ -539,9 +779,14 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
             </div>
           </div>
           {isPaid && (
-            <FieldLabel label="Price (₹)" required>
-              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" placeholder="999" className={fi} />
-            </FieldLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <FieldLabel label="Original Price (₹)" required hint="Full MRP shown as strikethrough.">
+                <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" placeholder="1499" className={fi} />
+              </FieldLabel>
+              <FieldLabel label="Selling Price (₹)" hint="What students actually pay. Leave 0 if no discount.">
+                <input type="number" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} min="0" placeholder="999" className={fi} />
+              </FieldLabel>
+            </div>
           )}
           <FieldLabel label="Thumbnail">
             <input
@@ -566,7 +811,7 @@ function CourseFormModal({ course, exams, onClose, onSaved }) {
 
 // ─── Chapter Content Panel ────────────────────────────────────────────────────
 
-function ChapterContentPanel({ chapter, onRefresh }) {
+function ChapterContentPanel({ chapter, examId, onRefresh }) {
   const [tab, setTab] = useState("notes");
   const [noteDrawer, setNoteDrawer] = useState(null);
   const [videoForm, setVideoForm] = useState(null);
@@ -640,6 +885,7 @@ function ChapterContentPanel({ chapter, onRefresh }) {
           {tab === "tests" && (
             <TestPicker
               onLink={handleLinkTest}
+              examId={examId}
               existingTestIds={(chapter.linkedTests || []).map((lt) => String(lt.testId?._id || lt.testId))}
             />
           )}
@@ -697,7 +943,7 @@ function ChapterContentPanel({ chapter, onRefresh }) {
               </div>
             ) : (
               (chapter.videos || []).map((vid) => {
-                const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/)?.[1];
+                const ytId = vid.youtubeId || vid.youtubeUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/)?.[1];
                 return (
                   <div key={vid._id} className="group overflow-hidden rounded-2xl border border-white/8 bg-white/2 transition-all hover:border-brand-primary/25 hover:bg-white/4">
                     <div className="relative aspect-video overflow-hidden bg-black/20">
@@ -1108,7 +1354,7 @@ export default function CourseManager() {
               <Loader2 size={22} className="animate-spin text-brand-primary" />
             </div>
           ) : selectedChapter ? (
-            <ChapterContentPanel chapter={selectedChapter} onRefresh={refreshAll} />
+            <ChapterContentPanel chapter={selectedChapter} examId={selectedExamId} onRefresh={refreshAll} />
           ) : (
             <div className="flex h-40 items-center justify-center rounded-2xl glass-card">
               <p className="text-sm text-white/40">Chapter not found.</p>
@@ -1229,7 +1475,15 @@ export default function CourseManager() {
                               <td className="px-6 py-4 text-sm">
                                 {row.isPaid ? (
                                   <span className="flex items-center gap-1 font-semibold text-amber-400">
-                                    <DollarSign size={12} /> ₹{row.price}
+                                    <DollarSign size={12} />
+                                    {row.discountedPrice > 0 && row.discountedPrice < row.price ? (
+                                      <>
+                                        <span className="line-through text-white/35 text-xs">₹{row.price}</span>
+                                        <span>₹{row.discountedPrice}</span>
+                                      </>
+                                    ) : (
+                                      <span>₹{row.price}</span>
+                                    )}
                                   </span>
                                 ) : (
                                   <span className="font-semibold text-emerald-400">Free</span>

@@ -6,7 +6,6 @@ import { upload } from "../../middlewares/upload.middleware.js";
 import * as svc from "./courses.service.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import mongoose from "mongoose";
-import { Readable } from "node:stream";
 
 const router = express.Router();
 
@@ -305,21 +304,27 @@ router.get(
       }
     }
 
-    const response = await fetch(note.fileUrl);
-    if (!response.ok || !response.body) {
-      return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Unable to load PDF preview" });
+    let pdfBuffer;
+    try {
+      const response = await fetch(note.fileUrl);
+      if (!response.ok) {
+        return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Unable to fetch PDF from storage" });
+      }
+      pdfBuffer = Buffer.from(await response.arrayBuffer());
+    } catch (fetchErr) {
+      return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Failed to retrieve PDF from storage" });
     }
 
-    const safeName = String(note.fileName || note.title || "preview.pdf").replace(/["\r\n]/g, "");
+    const safeName = String(note.fileName || note.title || "preview.pdf")
+      .replace(/["\r\n]/g, "")
+      .replace(/\.pdf$/i, "") + ".pdf";
 
-    res.setHeader("Content-Type", response.headers.get("content-type") || "application/pdf");
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
     res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", pdfBuffer.length);
 
-    const length = response.headers.get("content-length");
-    if (length) res.setHeader("Content-Length", length);
-
-    Readable.fromWeb(response.body).pipe(res);
+    res.end(pdfBuffer);
   })
 );
 

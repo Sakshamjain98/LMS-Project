@@ -1426,14 +1426,21 @@ function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction
           <span className="text-[11px] text-gray-400 font-medium truncate">{examName}</span>
         )}
         <span
-          aria-label={s.isPaid ? `Price: ₹${Number(s.price || 0).toLocaleString()}` : "Price: Free"}
+          aria-label={s.isPaid ? `Price: ₹${Number(s.discountedPrice || s.price || 0).toLocaleString()}` : "Price: Free"}
           className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
             s.isPaid
               ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
               : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
           }`}
         >
-          {s.isPaid ? `₹${Number(s.price || 0).toLocaleString()}` : "Free"}
+          {s.isPaid ? (
+            s.discountedPrice > 0 && s.discountedPrice < s.price ? (
+              <span className="flex items-center gap-1">
+                <span className="line-through opacity-60">₹{Number(s.price || 0).toLocaleString()}</span>
+                <span>₹{Number(s.discountedPrice).toLocaleString()}</span>
+              </span>
+            ) : `₹${Number(s.price || 0).toLocaleString()}`
+          ) : "Free"}
         </span>
       </div>
 
@@ -1723,8 +1730,15 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGe
           </div>
         )}
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/70 to-transparent" />
-        <span className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-emerald-500/80 text-white"}`}>
-          {course.isPaid ? `₹${Number(course.price || 0).toLocaleString()}` : "FREE"}
+        <span className={`absolute top-3 right-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-emerald-500/80 text-white"}`}>
+          {course.isPaid ? (
+            course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+              <>
+                <span className="line-through opacity-70">₹{Number(course.price || 0).toLocaleString()}</span>
+                <span>₹{Number(course.discountedPrice).toLocaleString()}</span>
+              </>
+            ) : `₹${Number(course.price || 0).toLocaleString()}`
+          ) : "FREE"}
         </span>
         {(course.subjectsCount || 0) > 0 && (
           <span className={`absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg backdrop-blur-sm ${palette.badge}`}>
@@ -1777,7 +1791,11 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGe
         )}
 
         <span className="mt-auto w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all inline-flex items-center justify-center gap-1.5">
-          {course.isPaid ? `Enroll for ₹${Number(course.price || 0).toLocaleString()}` : "Start Learning Free"}
+          {course.isPaid ? (
+            course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+              <>Enroll · <span className="line-through opacity-60 mr-0.5">₹{Number(course.price || 0).toLocaleString()}</span> ₹{Number(course.discountedPrice).toLocaleString()}</>
+            ) : `Enroll for ₹${Number(course.price || 0).toLocaleString()}`
+          ) : "Start Learning Free"}
           <FaArrowRight size={11} />
         </span>
       </div>

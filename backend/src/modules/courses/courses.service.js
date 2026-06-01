@@ -33,10 +33,11 @@ async function uniqueSlug(base) {
 // ─── Courses ────────────────────────────────────────────────────────────────
 
 export async function createCourse(data, teacherId) {
-  const { title, description, examId, isPaid, price, tags, thumbnail } = data;
+  const { title, description, examId, isPaid, price, discountedPrice, tags, thumbnail } = data;
   const exam = await Exam.findById(examId);
   if (!exam) throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
 
+  const paid = Boolean(isPaid);
   const slug = await uniqueSlug(title);
   return Course.create({
     title,
@@ -44,8 +45,9 @@ export async function createCourse(data, teacherId) {
     slug,
     examId,
     teacherId,
-    isPaid: Boolean(isPaid),
-    price: isPaid ? Number(price) || 0 : 0,
+    isPaid: paid,
+    price: paid ? Number(price) || 0 : 0,
+    discountedPrice: paid ? Number(discountedPrice) || 0 : 0,
     tags,
     thumbnail,
     status: "published",
@@ -57,7 +59,7 @@ export async function updateCourse(courseId, data, teacherId) {
   const course = await Course.findOne(query);
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
-  const allowed = ["title", "description", "isPaid", "price", "tags", "status", "thumbnail", "order", "examId"];
+  const allowed = ["title", "description", "isPaid", "price", "discountedPrice", "tags", "status", "thumbnail", "order", "examId"];
   allowed.forEach((k) => {
     if (data[k] !== undefined) course[k] = data[k];
   });
@@ -404,6 +406,7 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
     examId: c.examId,
     isPaid: c.isPaid,
     price: c.price,
+    discountedPrice: c.discountedPrice,
     thumbnail: c.thumbnail,
     tags: c.tags,
     subjectsCount: subjectCountMap.get(c._id.toString()) || 0,

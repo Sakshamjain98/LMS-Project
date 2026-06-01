@@ -147,7 +147,7 @@ function VideoSection({ chapter }) {
   if (!vid) return null;
 
   const ytId = vid.youtubeId || vid.youtubeUrl?.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/
   )?.[1];
 
   return (
@@ -352,7 +352,15 @@ function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
           </div>
           {course.isPaid && (
             <div className="sm:ml-auto shrink-0 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 text-sm font-bold text-amber-400">
-              <CreditCard size={14} /> ₹{course.price}
+              <CreditCard size={14} />
+              {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+                <>
+                  <span className="line-through opacity-60 text-xs">₹{course.price}</span>
+                  <span>₹{course.discountedPrice}</span>
+                </>
+              ) : (
+                <span>₹{course.price}</span>
+              )}
             </div>
           )}
         </div>

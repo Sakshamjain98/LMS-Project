@@ -7,9 +7,23 @@ const storage = new CloudinaryStorage({
   params: async (req, file) => {
     try {
       const isCSV = file.mimetype === "text/csv" || file.mimetype === "application/vnd.ms-excel";
-      const isPDF = file.mimetype === "application/pdf";
+      // Accept PDF by MIME type OR by file extension (some browsers send octet-stream)
+      const isPDF =
+        file.mimetype === "application/pdf" ||
+        file.originalname?.toLowerCase().endsWith(".pdf");
       const isImage = file.mimetype.startsWith("image/");
       const isCourseRoute = req.originalUrl?.includes("/courses");
+
+      // Sanitise base name and preserve original extension in the public_id.
+      // For raw resource_type, Cloudinary serves the file at a URL that includes
+      // the extension only when the public_id itself includes it — so we always
+      // include it here to guarantee a usable URL.
+      const ext = file.originalname?.split(".").pop()?.toLowerCase() || "";
+      const baseName = (file.originalname?.split(".").slice(0, -1).join("_") || "file")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 60);
+      // public_id with extension ensures the CDN URL is fetchable without guessing
+      const publicId = ext ? `${Date.now()}-${baseName}.${ext}` : `${Date.now()}-${baseName}`;
 
       let folder = "pharmacist-shubham/others";
       let resource_type = "auto";
@@ -28,11 +42,9 @@ const storage = new CloudinaryStorage({
         resource_type = "raw";
       }
 
-      return {
-        folder,
-        resource_type,
-        public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
-      };
+      // Never set `format` for raw resource_type — it is only valid for
+      // image/video types and will cause the upload to fail for raw files.
+      return { folder, resource_type, public_id: publicId };
     } catch (error) {
       console.error("Cloudinary Params Error:", error);
       throw error;

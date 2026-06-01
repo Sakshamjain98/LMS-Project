@@ -26,6 +26,7 @@ const courseSchema = new mongoose.Schema(
     },
     isPaid: { type: Boolean, default: false },
     price: { type: Number, default: 0, min: 0 },
+    discountedPrice: { type: Number, default: 0, min: 0 },
     thumbnail: { url: String, publicId: String },
     status: { type: String, enum: ["draft", "published"], default: "published" },
     order: { type: Number, default: 0 },

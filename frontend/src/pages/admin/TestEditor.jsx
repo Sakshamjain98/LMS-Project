@@ -107,6 +107,7 @@ const buildQuestionsFromCsv = (text) => {
   const dIdx = idx("optiond", "d");
   const correctIdx = idx("correctindex", "correct", "answer", "correctanswer");
   const marksIdx = idx("marks", "score");
+  const explanationIdx = idx("explanation", "solution", "explain");
 
   const questions = [];
   for (let r = 1; r < rows.length; r++) {
@@ -131,6 +132,7 @@ const buildQuestionsFromCsv = (text) => {
       options: filledOptions.map((t) => ({ text: t })),
       correctOptionIndex: safeCorrect,
       marks: Number(row[marksIdx]) || 1,
+      explanation: row[explanationIdx]?.trim() || "",
     });
   }
   return questions;
@@ -536,7 +538,7 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
           <UploadCloud size={16} className="text-brand-primary" /> Bulk import via CSV
         </h3>
         <p className="mt-1 text-xs text-white/50">
-          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (0–3 or A/B/C/D), marks</code>
+          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (0–3 or A/B/C/D), marks, explanation</code>
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input

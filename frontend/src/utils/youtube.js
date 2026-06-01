@@ -37,6 +37,16 @@ export const normalizeYouTubeUrl = (input) => {
       const qs = params.toString();
       return `https://www.youtube.com/embed/${id}${qs ? `?${qs}` : ""}`;
     }
+    // Live URLs — /live/{id}
+    if (host.includes("youtube.com") && u.pathname.startsWith("/live/")) {
+      const id = u.pathname.split("/live/")[1]?.split("?")[0];
+      return id ? `https://www.youtube.com/embed/${id}` : url;
+    }
+    // Shorts — /shorts/{id}
+    if (host.includes("youtube.com") && u.pathname.startsWith("/shorts/")) {
+      const id = u.pathname.split("/shorts/")[1]?.split("?")[0];
+      return id ? `https://www.youtube.com/embed/${id}` : url;
+    }
     return url;
   } catch {
     return url;
