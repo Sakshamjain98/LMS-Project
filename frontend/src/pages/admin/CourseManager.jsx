@@ -691,11 +691,11 @@ function VideoForm({ chapterId, video, onClose, onSaved }) {
 
 // ─── Course Form Modal ────────────────────────────────────────────────────────
 
-function CourseFormModal({ course, exams, onClose, onSaved }) {
+function CourseFormModal({ course, exams, defaultExamId, onClose, onSaved }) {
   const isEdit = Boolean(course);
   const [title, setTitle] = useState(course?.title || "");
   const [description, setDescription] = useState(course?.description || "");
-  const [examId, setExamId] = useState(course?.examId?._id || course?.examId || exams[0]?._id || "");
+  const [examId, setExamId] = useState(course?.examId?._id || course?.examId || defaultExamId || exams[0]?._id || "");
   const [isPaid, setIsPaid] = useState(course?.isPaid ?? false);
   const [price, setPrice] = useState(course?.price?.toString() || "");
   const [discountedPrice, setDiscountedPrice] = useState(course?.discountedPrice?.toString() || "");
@@ -1237,7 +1237,7 @@ export default function CourseManager() {
   // ── CRUD handlers ─────────────────────────────────────────────────────────────
 
   const handleCreate = () => {
-    if (level === "courses") { setCourseModal({}); return; }
+    if (level === "courses") { setCourseModal({ defaultExamId: selectedExamId }); return; }
     setEntityTitle("");
     setEntityModal({ isOpen: true, mode: "create", editData: null });
   };
@@ -1617,6 +1617,7 @@ export default function CourseManager() {
       {courseModal !== null && (
         <CourseFormModal
           course={courseModal.course}
+          defaultExamId={courseModal.defaultExamId}
           exams={allExams}
           onClose={() => setCourseModal(null)}
           onSaved={() => { setCourseModal(null); refreshAll(); }}
