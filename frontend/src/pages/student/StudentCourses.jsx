@@ -119,17 +119,16 @@ function CourseCard({ course, progress, onClick }) {
         )}
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
         {course.isPaid ? (
-          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-            <DollarSign size={9} />
-            {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-              <>
-                <span className="line-through opacity-70">₹{course.price}</span>
-                <span>₹{course.discountedPrice}</span>
-              </>
-            ) : (
-              <span>₹{course.price}</span>
-            )}
-          </span>
+          course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+            <div className="absolute top-3 right-3 rounded-lg bg-black/60 border border-amber-500/30 backdrop-blur-md px-2.5 py-1.5 shadow-lg flex flex-col items-end gap-px">
+              <span className="text-[9px] font-medium text-white/40 line-through leading-none">₹{Number(course.price).toLocaleString()}</span>
+              <span className="text-[12px] font-extrabold text-amber-400 leading-none">₹{Number(course.discountedPrice).toLocaleString()}</span>
+            </div>
+          ) : (
+            <span className="absolute top-3 right-3 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+              ₹{Number(course.price).toLocaleString()}
+            </span>
+          )
         ) : (
           <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
             FREE

@@ -351,17 +351,18 @@ function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
             </p>
           </div>
           {course.isPaid && (
-            <div className="sm:ml-auto shrink-0 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 text-sm font-bold text-amber-400">
-              <CreditCard size={14} />
-              {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-                <>
-                  <span className="line-through opacity-60 text-xs">₹{course.price}</span>
-                  <span>₹{course.discountedPrice}</span>
-                </>
-              ) : (
-                <span>₹{course.price}</span>
-              )}
-            </div>
+            course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+              <div className="sm:ml-auto shrink-0 rounded-full bg-amber-500/15 border border-amber-500/25 px-4 py-2 inline-flex items-center gap-2.5">
+                <CreditCard size={13} className="text-amber-400 shrink-0" />
+                <span className="text-sm font-extrabold text-amber-300">₹{Number(course.discountedPrice).toLocaleString()}</span>
+                <span className="w-px h-4 bg-amber-500/30 shrink-0" />
+                <span className="text-[10px] font-medium text-white/30 line-through">₹{Number(course.price).toLocaleString()}</span>
+              </div>
+            ) : (
+              <div className="sm:ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 text-sm font-bold text-amber-400">
+                <CreditCard size={14} /> ₹{Number(course.price).toLocaleString()}
+              </div>
+            )
           )}
         </div>
 

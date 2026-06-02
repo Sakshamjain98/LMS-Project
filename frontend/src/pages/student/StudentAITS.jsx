@@ -56,17 +56,18 @@ function AITSCard({ aits, examTitle, categoryTitle, idx, onClick }) {
         </div>
         <div className="flex flex-col items-end gap-1">
           {aits.isPaid ? (
-            <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-300 inline-flex items-center gap-1">
-              <Lock size={8} />
-              {aits.discountedPrice > 0 && aits.discountedPrice < aits.price ? (
-                <>
-                  <span className="line-through opacity-60">₹{Number(aits.price || 0).toLocaleString()}</span>
-                  <span>₹{Number(aits.discountedPrice).toLocaleString()}</span>
-                </>
-              ) : (
-                <span>₹{Number(aits.price || 0).toLocaleString()}</span>
-              )}
-            </span>
+            aits.discountedPrice > 0 && aits.discountedPrice < aits.price ? (
+              <span className="rounded-full bg-amber-500/10 border border-amber-500/25 px-3 py-1.5 inline-flex items-center gap-2">
+                <Lock size={9} className="text-amber-400 shrink-0" />
+                <span className="text-[12px] font-extrabold text-amber-300 tracking-tight">₹{Number(aits.discountedPrice).toLocaleString()}</span>
+                <span className="w-px h-3.5 bg-amber-500/30 shrink-0" />
+                <span className="text-[9px] font-medium text-white/30 line-through tracking-tight">₹{Number(aits.price || 0).toLocaleString()}</span>
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-300 inline-flex items-center gap-1.5">
+                <Lock size={8} /> ₹{Number(aits.price || 0).toLocaleString()}
+              </span>
+            )
           ) : (
             <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-[10px] font-bold text-emerald-300 inline-flex items-center gap-1">
               <Zap size={8} /> Free

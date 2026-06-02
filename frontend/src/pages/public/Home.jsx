@@ -1425,23 +1425,32 @@ function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction
         {examName && (
           <span className="text-[11px] text-gray-400 font-medium truncate">{examName}</span>
         )}
-        <span
-          aria-label={s.isPaid ? `Price: ₹${Number(s.discountedPrice || s.price || 0).toLocaleString()}` : "Price: Free"}
-          className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-            s.isPaid
-              ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
-              : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-          }`}
-        >
-          {s.isPaid ? (
-            s.discountedPrice > 0 && s.discountedPrice < s.price ? (
-              <span className="flex items-center gap-1">
-                <span className="line-through opacity-60">₹{Number(s.price || 0).toLocaleString()}</span>
-                <span>₹{Number(s.discountedPrice).toLocaleString()}</span>
-              </span>
-            ) : `₹${Number(s.price || 0).toLocaleString()}`
-          ) : "Free"}
-        </span>
+        {s.isPaid ? (
+          s.discountedPrice > 0 && s.discountedPrice < s.price ? (
+            <span
+              aria-label={`Price: ₹${Number(s.discountedPrice).toLocaleString()}`}
+              className="ml-auto shrink-0 rounded-full bg-amber-500/10 border border-amber-500/25 px-3 py-1.5 inline-flex items-center gap-2"
+            >
+              <span className="text-[12px] font-extrabold text-amber-300 tracking-tight">₹{Number(s.discountedPrice).toLocaleString()}</span>
+              <span className="w-px h-3.5 bg-amber-500/30 shrink-0" />
+              <span className="text-[9px] font-medium text-white/30 line-through tracking-tight">₹{Number(s.price || 0).toLocaleString()}</span>
+            </span>
+          ) : (
+            <span
+              aria-label={`Price: ₹${Number(s.price || 0).toLocaleString()}`}
+              className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300"
+            >
+              ₹{Number(s.price || 0).toLocaleString()}
+            </span>
+          )
+        ) : (
+          <span
+            aria-label="Price: Free"
+            className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+          >
+            Free
+          </span>
+        )}
       </div>
 
       {/* Icon + title + description */}
@@ -1488,7 +1497,14 @@ function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction
             : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
         }`}
       >
-        {s.isPaid ? `Unlock for ₹${Number(s.price || 0).toLocaleString()}` : "Start Attempting"}
+        {s.isPaid ? (
+          s.discountedPrice > 0 && s.discountedPrice < s.price ? (
+            <span className="inline-flex items-center gap-1.5">
+              Unlock · ₹{Number(s.discountedPrice).toLocaleString()}
+              <span className="text-[9px] opacity-40 line-through font-normal">₹{Number(s.price || 0).toLocaleString()}</span>
+            </span>
+          ) : `Unlock for ₹${Number(s.price || 0).toLocaleString()}`
+        ) : "Start Attempting"}
         <FaArrowRight size={11} className="transition-transform group-hover/btn:translate-x-0.5" />
       </button>
     </div>
@@ -1730,16 +1746,20 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGe
           </div>
         )}
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/70 to-transparent" />
-        <span className={`absolute top-3 right-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg ${course.isPaid ? "bg-amber-500/90 text-white" : "bg-emerald-500/80 text-white"}`}>
-          {course.isPaid ? (
-            course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-              <>
-                <span className="line-through opacity-70">₹{Number(course.price || 0).toLocaleString()}</span>
-                <span>₹{Number(course.discountedPrice).toLocaleString()}</span>
-              </>
-            ) : `₹${Number(course.price || 0).toLocaleString()}`
-          ) : "FREE"}
-        </span>
+        {course.isPaid ? (
+          course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+            <div className="absolute top-3 right-3 rounded-lg bg-black/60 border border-amber-500/30 backdrop-blur-md px-2.5 py-1.5 shadow-lg flex flex-col items-end gap-px">
+              <span className="text-[9px] font-medium text-white/40 line-through leading-none">₹{Number(course.price || 0).toLocaleString()}</span>
+              <span className="text-[12px] font-extrabold text-amber-400 leading-none">₹{Number(course.discountedPrice).toLocaleString()}</span>
+            </div>
+          ) : (
+            <span className="absolute top-3 right-3 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+              ₹{Number(course.price || 0).toLocaleString()}
+            </span>
+          )
+        ) : (
+          <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">FREE</span>
+        )}
         {(course.subjectsCount || 0) > 0 && (
           <span className={`absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg backdrop-blur-sm ${palette.badge}`}>
             <FaLayerGroup size={9} /> {course.subjectsCount} Subject{course.subjectsCount !== 1 ? "s" : ""}
@@ -1793,7 +1813,10 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGe
         <span className="mt-auto w-full rounded-xl border border-brand-primary/30 bg-brand-primary/10 py-2.5 text-xs font-bold text-brand-primary hover:bg-brand-primary hover:text-dark-400 transition-all inline-flex items-center justify-center gap-1.5">
           {course.isPaid ? (
             course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-              <>Enroll · <span className="line-through opacity-60 mr-0.5">₹{Number(course.price || 0).toLocaleString()}</span> ₹{Number(course.discountedPrice).toLocaleString()}</>
+              <span className="inline-flex items-center gap-1.5">
+                Enroll · ₹{Number(course.discountedPrice).toLocaleString()}
+                <span className="text-[9px] opacity-40 line-through font-normal">₹{Number(course.price || 0).toLocaleString()}</span>
+              </span>
             ) : `Enroll for ₹${Number(course.price || 0).toLocaleString()}`
           ) : "Start Learning Free"}
           <FaArrowRight size={11} />

@@ -410,17 +410,18 @@ function SeriesCard({ topic, onClick, delay = 0 }) {
         </div>
         {topic.isPaid ? (
           locked ? (
-            <span className="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
-              <Lock size={10} />
-              {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
-                <>
-                  <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span>
-                  <span>₹{Number(topic.discountedPrice).toLocaleString()}</span>
-                </>
-              ) : (
-                <span>₹{Number(topic.price || 0).toLocaleString()}</span>
-              )}
-            </span>
+            topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+              <span className="shrink-0 rounded-full bg-amber-500/10 border border-amber-500/25 px-3 py-1.5 inline-flex items-center gap-2">
+                <Lock size={9} className="text-amber-400 shrink-0" />
+                <span className="text-[12px] font-extrabold text-amber-300 tracking-tight">₹{Number(topic.discountedPrice).toLocaleString()}</span>
+                <span className="w-px h-3.5 bg-amber-500/30 shrink-0" />
+                <span className="text-[9px] font-medium text-white/30 line-through tracking-tight">₹{Number(topic.price || 0).toLocaleString()}</span>
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[10px] font-bold text-amber-300 inline-flex items-center gap-1.5">
+                <Lock size={9} /> ₹{Number(topic.price || 0).toLocaleString()}
+              </span>
+            )
           ) : (
             <span className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
               Unlocked
@@ -456,10 +457,13 @@ function SeriesCard({ topic, onClick, delay = 0 }) {
       )}
 
       <div className="mt-auto inline-flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold bg-brand-primary/10 text-brand-primary">
-        <span>
+        <span className="inline-flex items-center gap-1.5">
           {locked ? (
             topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
-              <>Unlock for <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span> ₹{Number(topic.discountedPrice).toLocaleString()}</>
+              <>
+                Unlock · ₹{Number(topic.discountedPrice).toLocaleString()}
+                <span className="text-[9px] opacity-40 line-through font-normal">₹{Number(topic.price || 0).toLocaleString()}</span>
+              </>
             ) : (
               <>Unlock for ₹{Number(topic.price || 0).toLocaleString()}</>
             )
@@ -572,17 +576,16 @@ function DashboardCourseCard({ course, delay = 0 }) {
         )}
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
         {course.isPaid ? (
-          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-            <DollarSign size={9} />
-            {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-              <>
-                <span className="line-through opacity-70">₹{course.price}</span>
-                <span>₹{course.discountedPrice}</span>
-              </>
-            ) : (
-              <span>₹{course.price}</span>
-            )}
-          </span>
+          course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+            <div className="absolute top-3 right-3 rounded-lg bg-black/60 border border-amber-500/30 backdrop-blur-md px-2.5 py-1.5 shadow-lg flex flex-col items-end gap-px">
+              <span className="text-[9px] font-medium text-white/40 line-through leading-none">₹{Number(course.price).toLocaleString()}</span>
+              <span className="text-[12px] font-extrabold text-amber-400 leading-none">₹{Number(course.discountedPrice).toLocaleString()}</span>
+            </div>
+          ) : (
+            <span className="absolute top-3 right-3 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
+              ₹{Number(course.price).toLocaleString()}
+            </span>
+          )
         ) : (
           <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
             FREE

@@ -345,13 +345,18 @@ export default function SeriesDetail() {
                             Premium · Unlocked
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                            {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
-                              <>Premium · <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span> ₹{Number(topic.discountedPrice).toLocaleString()}</>
-                            ) : (
-                              <>Premium · ₹{Number(topic.price || 0).toLocaleString()}</>
-                            )}
-                          </span>
+                          topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3.5 py-1.5 inline-flex items-center gap-2 text-amber-300">
+                              <span className="text-[10px] font-black uppercase tracking-widest">Premium</span>
+                              <span className="w-px h-3.5 bg-amber-500/40 shrink-0" />
+                              <span className="text-[13px] font-extrabold tracking-tight">₹{Number(topic.discountedPrice).toLocaleString()}</span>
+                              <span className="text-[9px] font-medium text-amber-200/40 line-through">₹{Number(topic.price || 0).toLocaleString()}</span>
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                              Premium · ₹{Number(topic.price || 0).toLocaleString()}
+                            </span>
+                          )
                         )
                       ) : (
                         <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
@@ -399,14 +404,14 @@ export default function SeriesDetail() {
                         </>
                       ) : (
                         <>
-                          <Lock size={14} /> Unlock for{" "}
+                          <Lock size={14} />
                           {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
-                            <>
-                              <span className="line-through opacity-60 mr-0.5">₹{Number(topic.price || 0).toLocaleString()}</span>
-                              ₹{Number(topic.discountedPrice).toLocaleString()}
-                            </>
+                            <span className="inline-flex items-center gap-1.5">
+                              Unlock · ₹{Number(topic.discountedPrice).toLocaleString()}
+                              <span className="text-[10px] opacity-40 line-through font-normal">₹{Number(topic.price || 0).toLocaleString()}</span>
+                            </span>
                           ) : (
-                            <>₹{Number(topic.price || 0).toLocaleString()}</>
+                            <>Unlock for ₹{Number(topic.price || 0).toLocaleString()}</>
                           )}
                         </>
                       )}
@@ -601,16 +606,15 @@ export default function SeriesDetail() {
                   <div className="flex-1">
                     <p className="font-semibold text-amber-200">This is a premium test series</p>
                     <p className="mt-1 text-amber-100/80">
-                      You can browse the chapters above. Unlock the full series for{" "}
+                      You can browse the chapters above. Unlock the full series to start tests, see solutions, and earn All-India Ranks.
                       {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
-                        <>
-                          <strong className="text-white/40 line-through mr-1">₹{Number(topic.price || 0).toLocaleString()}</strong>
+                        <span className="inline-flex items-baseline gap-1.5 ml-1">
+                          <strong className="text-white/40 line-through text-xs font-medium">₹{Number(topic.price || 0).toLocaleString()}</strong>
                           <strong className="text-white">₹{Number(topic.discountedPrice).toLocaleString()}</strong>
-                        </>
+                        </span>
                       ) : (
-                        <strong className="text-white">₹{Number(topic.price || 0).toLocaleString()}</strong>
-                      )}{" "}
-                      to start tests, see solutions, and earn All-India Ranks.
+                        <strong className="text-white ml-1">₹{Number(topic.price || 0).toLocaleString()}</strong>
+                      )}
                     </p>
                   </div>
                   <button
