@@ -113,7 +113,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { courseId } = req.params;
-    const { hasAccess } = await svc.checkCourseAccess(userId, courseId);
+    const isAdminOrTeacher = req.user.role === "admin" || req.user.role === "teacher";
+    const { hasAccess } = isAdminOrTeacher
+      ? { hasAccess: true }
+      : await svc.checkCourseAccess(userId, courseId);
 
     const tree = await svc.getCourseTree(courseId);
 
@@ -265,15 +268,16 @@ router.get(
     const { noteId } = req.params;
     const note = await svc.getNoteById(noteId);
 
-    // Access check: get chapterId → subjectId → courseId
-    const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
-    const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
-    const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
-    const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
-    if (subject) {
-      const { hasAccess } = await svc.checkCourseAccess(req.user._id, subject.courseId);
-      if (!hasAccess) {
-        return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Course access required" });
+    if (req.user.role !== "admin" && req.user.role !== "teacher") {
+      const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
+      const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
+      const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
+      const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
+      if (subject) {
+        const { hasAccess } = await svc.checkCourseAccess(req.user._id, subject.courseId);
+        if (!hasAccess) {
+          return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Course access required" });
+        }
       }
     }
     res.json({ success: true, note });

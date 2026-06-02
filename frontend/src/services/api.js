@@ -7,6 +7,7 @@ export const apiBaseUrl = normalizedApiBaseUrl
   : "/api";
 
 const TIMEOUT_MS = 15000;
+const UPLOAD_TIMEOUT_MS = 60000;
 
 const buildUrl = (url, params) => {
   const path = `${apiBaseUrl}${url}`;
@@ -37,8 +38,9 @@ const request = async (method, url, data, config = {}) => {
     headers["Content-Type"] = "application/json";
   }
 
+  const timeoutMs = config?.timeout ?? (isFormData ? UPLOAD_TIMEOUT_MS : TIMEOUT_MS);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(buildUrl(url, config.params), {
@@ -80,12 +82,9 @@ const request = async (method, url, data, config = {}) => {
   }
 };
 
-// Surface API errors as a top-right toast unless the caller opts out via
-// `config.silent === true`. Caller-specific messages still get re-thrown.
 const maybeNotify = (error, config) => {
   if (config?.silent) return;
   const status = error?.response?.status;
-  // Auth/validation errors are usually shown by the page itself; don't double up.
   if (status === 401 || status === 422) return;
   const msg = error?.response?.data?.message || error?.message || "Something went wrong";
   toast.error(msg, { id: `api-${status || "err"}-${msg.slice(0, 24)}` });
