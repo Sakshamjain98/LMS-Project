@@ -3,6 +3,10 @@
 # under /etc/nginx/templates/*.template and writes the result to
 # /etc/nginx/conf.d/, so this file is the single source of truth.
 
+types {
+  application/javascript  js mjs cjs;
+}
+
 server {
   listen ${PORT};
   server_name _;
@@ -26,6 +30,7 @@ server {
     text/css
     application/json
     application/javascript
+    text/javascript
     text/xml
     application/xml
     image/svg+xml
