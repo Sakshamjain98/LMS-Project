@@ -411,7 +411,15 @@ function SeriesCard({ topic, onClick, delay = 0 }) {
         {topic.isPaid ? (
           locked ? (
             <span className="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
-              <Lock size={10} /> ₹{Number(topic.price || 0).toLocaleString()}
+              <Lock size={10} />
+              {topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+                <>
+                  <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span>
+                  <span>₹{Number(topic.discountedPrice).toLocaleString()}</span>
+                </>
+              ) : (
+                <span>₹{Number(topic.price || 0).toLocaleString()}</span>
+              )}
             </span>
           ) : (
             <span className="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
@@ -448,7 +456,15 @@ function SeriesCard({ topic, onClick, delay = 0 }) {
       )}
 
       <div className="mt-auto inline-flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold bg-brand-primary/10 text-brand-primary">
-        <span>{locked ? `Unlock for ₹${Number(topic.price || 0).toLocaleString()}` : "Open Series"}</span>
+        <span>
+          {locked ? (
+            topic.discountedPrice > 0 && topic.discountedPrice < topic.price ? (
+              <>Unlock for <span className="line-through opacity-60">₹{Number(topic.price || 0).toLocaleString()}</span> ₹{Number(topic.discountedPrice).toLocaleString()}</>
+            ) : (
+              <>Unlock for ₹{Number(topic.price || 0).toLocaleString()}</>
+            )
+          ) : "Open Series"}
+        </span>
         <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
       </div>
     </button>
@@ -557,7 +573,15 @@ function DashboardCourseCard({ course, delay = 0 }) {
         <div className="absolute inset-0 bg-linear-to-t from-dark-400/60 to-transparent" />
         {course.isPaid ? (
           <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-            <DollarSign size={9} /> ₹{course.price}
+            <DollarSign size={9} />
+            {course.discountedPrice > 0 && course.discountedPrice < course.price ? (
+              <>
+                <span className="line-through opacity-70">₹{course.price}</span>
+                <span>₹{course.discountedPrice}</span>
+              </>
+            ) : (
+              <span>₹{course.price}</span>
+            )}
           </span>
         ) : (
           <span className="absolute top-3 right-3 rounded-full bg-emerald-500/80 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
