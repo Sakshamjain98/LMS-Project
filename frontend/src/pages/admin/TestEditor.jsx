@@ -142,6 +142,7 @@ const emptyQuestion = {
   questionText: "",
   options: [{ text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }],
   marks: 1,
+  explanation: "",
 };
 
 export default function TestEditor() {
@@ -232,6 +233,7 @@ export default function TestEditor() {
         options: filledOptions.map((o) => ({ text: o.text.trim() })),
         correctOptionIndex,
         marks: Number(newQ.marks) || 1,
+        ...(newQ.explanation?.trim() ? { explanation: newQ.explanation.trim() } : {}),
       });
       toast.success("Question added");
       setNewQ(emptyQuestion);
@@ -591,6 +593,15 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
               </div>
             ))}
           </div>
+          <FieldLabel label="Explanation">
+            <textarea
+              rows={2}
+              value={newQ.explanation}
+              onChange={(e) => onNewQChange({ ...newQ, explanation: e.target.value })}
+              placeholder="Optional — shown on the result page when explanations are revealed."
+              className={`${fieldInput} resize-none`}
+            />
+          </FieldLabel>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <FieldLabel label="Marks">
               <input type="number" min="0" value={newQ.marks} onChange={(e) => onNewQChange({ ...newQ, marks: e.target.value })} className={`${fieldInput} max-w-32`} />
