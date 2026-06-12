@@ -1,34 +1,57 @@
 import nodemailer from "nodemailer";
-import { ApiError } from '../error/ApiError.js';
+import { ApiError } from "../error/ApiError.js";
+const getFromAddress = () =>
+  process.env.EMAIL_FROM || process.env.EMAIL_USER || "no-reply@example.com";
+
+const getFrontendUrl = () =>
+  process.env.FRONTEND_URL || "http://localhost:5173";
+
+const createTransporter = () => {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+  const emailHost = process.env.EMAIL_HOST || "smtp.gmail.com";
+  const emailPort = Number(process.env.EMAIL_PORT || 587);
+  const emailSecure = process.env.EMAIL_SECURE === "true";
+  const connectionTimeout = Number(process.env.EMAIL_CONNECTION_TIMEOUT_MS || 10000);
+  const greetingTimeout = Number(process.env.EMAIL_GREETING_TIMEOUT_MS || 10000);
+  const socketTimeout = Number(process.env.EMAIL_SOCKET_TIMEOUT_MS || 10000);
+
+  if (!emailUser || !emailPass) {
+    throw new ApiError(
+      500,
+      "Email service is not configured. Set EMAIL_USER and EMAIL_PASS."
+    );
+  }
+
+  return nodemailer.createTransport({
+    host: emailHost,
+    port: emailPort,
+    secure: emailSecure,
+    requireTLS: !emailSecure,
+    connectionTimeout,
+    greetingTimeout,
+    socketTimeout,
+    auth: { user: emailUser, pass: emailPass },
+  });
+};
+
+const transporter = createTransporter();
 
 export const sendEmail = async ({ to, subject, text }) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-  await transporter.sendMail({
-    from: `"LMS Platform" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    text,
-  });
-}
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE === 'true', 
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+  try {
+    await transporter.sendMail({
+      from: getFromAddress(),
+      to,
+      subject,
+      text,
+    });
+  } catch (error) {
+    throw new ApiError(503, `Failed to send email: ${error.message}`);
+  }
+};
 
 export const sendResetPasswordEmail = async (email, name, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
   const message = `
     <h1>Password Reset Request</h1>
     <p>Hello ${name},</p>
@@ -40,12 +63,12 @@ export const sendResetPasswordEmail = async (email, name, resetToken) => {
 
   try {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: getFromAddress(),
       to: email,
-      subject: 'Password Reset',
+      subject: "Password Reset",
       html: message,
     });
   } catch (error) {
-    console.error('Email sending failed:', error);
+    throw new ApiError(503, `Failed to send password reset email: ${error.message}`);
   }
 };

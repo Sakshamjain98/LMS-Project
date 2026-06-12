@@ -103,20 +103,31 @@ export const forgotPasswordService = async ({ email }) => {
   const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
 
-  const expires = Date.now() + 3600000; 
+  const expires = new Date(Date.now() + 3600000);
 
   user.passwordResetToken = tokenHash;
   user.passwordResetExpires = expires;
   await user.save();
 
 
-  sendResetPasswordEmail(user.email, user.name, resetToken).catch(console.error);
+  await sendResetPasswordEmail(user.email, user.name, resetToken);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info(
+      `[DEV] Password reset URL for ${user.email}: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+    );
+  }
 
   return { message: MESSAGES.FORGOT_PASSWORD_EMAIL_SENT };
 };
 
 
-export const resetPasswordService = async ({ token, password }) => {
+export const resetPasswordService = async ({ token, password, newPassword }) => {
+  const nextPassword = password || newPassword;
+
+  if (!nextPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Password is required");
+  }
 
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -130,13 +141,13 @@ export const resetPasswordService = async ({ token, password }) => {
   }
 
 
-  const hashedPassword = await hashPassword(password);
+  const hashedPassword = await hashPassword(nextPassword);
 
 
   user.password = hashedPassword;
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
-  user.passwordChangedAt = Date.now(); 
+  user.passwordChangedAt = new Date();
   await user.save();
 
   return { message: MESSAGES.PASSWORD_RESET_SUCCESS };

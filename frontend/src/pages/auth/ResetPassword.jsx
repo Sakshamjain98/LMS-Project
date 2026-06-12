@@ -44,7 +44,7 @@ const ResetPassword = () => {
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
-    const hasSpecial = /[@$!%*?&]/.test(password);
+    const hasSpecial = /[@$!%*?&#]/.test(password);
 
     if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecial) {
       return "Password must include uppercase, lowercase, number, and special character";
@@ -79,7 +79,7 @@ const ResetPassword = () => {
 
       const res = await resetPassword({
         token,
-        newPassword: formData.newPassword,
+        password: formData.newPassword,
       });
 
       if (res.success) {
@@ -224,7 +224,7 @@ const ResetPassword = () => {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Must contain: uppercase, lowercase, number, special character (@$!%*?&)
+                Must contain: uppercase, lowercase, number, special character (@$!%*?&#)
               </p>
             </div>
 

@@ -112,6 +112,10 @@ export const resetPasswordSchema = Joi.object({
   password: Joi.string()
     .pattern(passwordRegex)
     .min(8)
-    .max(128)
-    .required(),
-}).options(baseOptions);
+    .max(128),
+
+  newPassword: Joi.string()
+    .pattern(passwordRegex)
+    .min(8)
+    .max(128),
+}).or("password", "newPassword").options(baseOptions);
