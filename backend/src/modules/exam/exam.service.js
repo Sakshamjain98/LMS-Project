@@ -3,6 +3,7 @@ import Exam from "../../models/exam.model.js";
 import ExamCategory from "../../models/examCategory.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import AllIndiaTestSeries from "../../models/allIndiaTestSeries.model.js";
+import Course from "../../models/course.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 
@@ -92,6 +93,18 @@ export const deleteExam = async (examId) => {
       STATUS_CODES.BAD_REQUEST,
       `Cannot delete — ${aitsCount} AITS section(s) exist under this exam. Delete them first.`
     );
+
+  // Cascade-delete every course under this exam (with its full subtree:
+  // subjects, chapters, notes, videos and student access records) so deleted
+  // courses don't linger on the student dashboard as orphans. Imported
+  // dynamically to avoid changing module load order at startup.
+  const courses = await Course.find({ examId: id }).select("_id").lean();
+  if (courses.length) {
+    const { deleteCourse } = await import("../courses/courses.service.js");
+    for (const c of courses) {
+      await deleteCourse(c._id);
+    }
+  }
 
   const deleted = await Exam.findByIdAndDelete(id);
   if (!deleted) throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");

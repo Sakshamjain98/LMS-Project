@@ -157,7 +157,19 @@ router.get(
     const filter = {};
     if (req.query.examId) filter.examId = req.query.examId;
 
-    const courses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).limit(limit).lean();
+    const rawCourses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).lean();
+
+    // Drop orphans: a course whose exam was deleted must not linger on the
+    // student dashboard. Keep only courses whose exam still exists.
+    const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
+    const existingExams = examIds.length
+      ? await Exam.find({ _id: { $in: examIds } }).select("_id").lean()
+      : [];
+    const liveExamIds = new Set(existingExams.map((e) => String(e._id)));
+    const courses = rawCourses
+      .filter((c) => c.examId && liveExamIds.has(String(c.examId)))
+      .slice(0, limit);
+
     const courseIds = courses.map((c) => c._id);
 
     const subjectCounts = courseIds.length
@@ -177,6 +189,7 @@ router.get(
       isPaid: c.isPaid,
       price: c.price,
       discountedPrice: c.discountedPrice,
+      validityMonths: c.validityMonths || 0,
       thumbnail: c.thumbnail,
       tags: c.tags,
       subjectsCount: subjectCountMap.get(c._id.toString()) || 0,

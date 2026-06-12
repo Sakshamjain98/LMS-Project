@@ -396,6 +396,34 @@ export async function checkCourseAccess(userId, courseId) {
   return { hasAccess: false, reason: "locked", expiresAt: null };
 }
 
+// True when `testId` is linked into a course the student currently has access
+// to. This unlocks ONLY that linked test (not the rest of its test series) — the
+// test still requires its own series purchase when reached outside the course.
+export async function userCanAccessTestViaCourse(userId, testId) {
+  if (!userId || !testId) return false;
+
+  const chapters = await CourseChapter.find({ "linkedTests.testId": testId })
+    .select("subjectId")
+    .lean();
+  if (!chapters.length) return false;
+
+  const subjectIds = [...new Set(chapters.map((c) => String(c.subjectId)))];
+  const subjects = await CourseSubject.find({ _id: { $in: subjectIds } })
+    .select("courseId")
+    .lean();
+  const courseIds = [...new Set(subjects.map((s) => String(s.courseId)))];
+
+  for (const courseId of courseIds) {
+    try {
+      const { hasAccess } = await checkCourseAccess(userId, courseId);
+      if (hasAccess) return true;
+    } catch {
+      // Course deleted or invalid — skip and try the next one.
+    }
+  }
+  return false;
+}
+
 export async function grantCourseAccess(userId, courseId, paymentId, expiresAt = null) {
   // Re-purchasing resets the access window and clears any admin-revoked state.
   const access = await CourseAccess.findOneAndUpdate(
@@ -482,7 +510,18 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
   const filter = {};
   if (examId) filter.examId = examId;
 
-  const courses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).limit(limit).lean();
+  const rawCourses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).lean();
+
+  // Exclude orphans whose exam was deleted so they don't surface to students.
+  const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
+  const existingExams = examIds.length
+    ? await Exam.find({ _id: { $in: examIds } }).select("_id").lean()
+    : [];
+  const liveExamIds = new Set(existingExams.map((e) => String(e._id)));
+  const courses = rawCourses
+    .filter((c) => c.examId && liveExamIds.has(String(c.examId)))
+    .slice(0, limit);
+
   const courseIds = courses.map((c) => c._id);
 
   // Count subjects per course

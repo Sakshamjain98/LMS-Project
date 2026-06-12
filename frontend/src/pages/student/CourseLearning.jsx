@@ -3,18 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText, Eye,
   Video, Download, ArrowLeft, Play, BookMarked,
-  CheckCircle2, Circle, Trophy, Menu, X, Layers, CreditCard, ShieldCheck, Sparkles,
+  CheckCircle2, Circle, Trophy, Menu, X, Layers, CreditCard, Clock,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   getCourseFull, getNoteById,
   markChapterComplete, unmarkChapterComplete, getCourseProgress,
+  createCourseOrder, verifyCoursePayment,
 } from "../../services/courseService";
 import { getMyAttempts } from "../../services/studentService";
 import TestResult from "./TestResult";
-import { getPlans, createOrder, verifyPayment } from "../../services/paymentService";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 import AccessExpired from "../../components/student/AccessExpired";
+import { formatValidity } from "../../utils/validity";
 
 const ensureRazorpayLoaded = () =>
   new Promise((resolve, reject) => {
@@ -333,38 +334,28 @@ function TestsSection({ chapter, courseId, attemptsByTest, onViewAnalysis }) {
 
 // ─── Unlock Banner ───────────────────────────────────────────────────────────
 
-function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
+function CourseUnlockBanner({ course, unlocking, onUnlock }) {
+  const hasDiscount =
+    course.discountedPrice > 0 && course.discountedPrice < course.price;
+  const payable = hasDiscount ? course.discountedPrice : course.price;
+
   return (
-    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
+    <div className="rounded-2xl border border-brand-primary/20 bg-white/3 overflow-hidden">
       {/* Top gradient bar */}
       <div className="h-1 w-full bg-linear-to-r from-amber-500 via-brand-primary to-emerald-500" />
 
       <div className="p-6 md:p-8 space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 ring-1 ring-amber-500/25">
-            <Lock size={26} className="text-amber-400" />
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-primary/15 ring-1 ring-brand-primary/25">
+            <Lock size={26} className="text-brand-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Course Access Required</h2>
+            <h2 className="text-lg font-bold text-white">Unlock this course</h2>
             <p className="text-sm text-white/50 mt-0.5">
-              Subscribe to unlock full access to <span className="text-white/80 font-medium">{course.title}</span>
+              Get full access to <span className="text-white/80 font-medium">{course.title}</span>
             </p>
           </div>
-          {course.isPaid && (
-            course.discountedPrice > 0 && course.discountedPrice < course.price ? (
-              <div className="sm:ml-auto shrink-0 rounded-full bg-amber-500/15 border border-amber-500/25 px-4 py-2 inline-flex items-center gap-2.5">
-                <CreditCard size={13} className="text-amber-400 shrink-0" />
-                <span className="text-sm font-extrabold text-amber-300">₹{Number(course.discountedPrice).toLocaleString()}</span>
-                <span className="w-px h-4 bg-amber-500/30 shrink-0" />
-                <span className="text-[10px] font-medium text-white/30 line-through">₹{Number(course.price).toLocaleString()}</span>
-              </div>
-            ) : (
-              <div className="sm:ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 text-sm font-bold text-amber-400">
-                <CreditCard size={14} /> ₹{Number(course.price).toLocaleString()}
-              </div>
-            )
-          )}
         </div>
 
         {/* Feature list */}
@@ -381,60 +372,39 @@ function CourseUnlockBanner({ course, plans, unlocking, onUnlock }) {
           ))}
         </div>
 
-        {/* Plan cards */}
-        {plans.length > 0 ? (
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-white/40 mb-3">Choose a plan</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {plans.map((plan) => {
-                const isYearly = plan.id === "YEARLY";
-                return (
-                  <button
-                    key={plan.id}
-                    onClick={() => onUnlock(plan.id)}
-                    disabled={unlocking}
-                    className={`relative group text-left rounded-2xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isYearly
-                        ? "border-brand-primary/40 bg-brand-primary/8 hover:border-brand-primary/60 hover:shadow-brand-primary/15"
-                        : "border-white/10 bg-white/3 hover:border-white/20"
-                    }`}
-                  >
-                    {isYearly && (
-                      <span className="absolute -top-2.5 right-4 flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-0.5 text-[10px] font-bold text-dark-400">
-                        <Sparkles size={9} /> Best Value
-                      </span>
-                    )}
-                    <p className={`font-bold text-base ${isYearly ? "text-brand-primary" : "text-white"}`}>
-                      {plan.name}
-                    </p>
-                    <p className={`text-2xl font-extrabold mt-1 ${isYearly ? "text-brand-primary" : "text-white"}`}>
-                      ₹{plan.price}
-                      <span className="text-sm font-normal text-white/40 ml-1">
-                        / {plan.duration === 365 ? "year" : plan.duration === 30 ? "month" : `${plan.duration} days`}
-                      </span>
-                    </p>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-xs text-white/40">Full access to all courses</span>
-                      <span className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                        isYearly ? "bg-brand-primary text-dark-400" : "bg-white/8 text-white/70 group-hover:bg-white/12"
-                      }`}>
-                        {unlocking ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-                        {unlocking ? "Processing…" : "Subscribe Now"}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+        {/* Price + validity + buy */}
+        <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/8 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="min-w-0">
+            <div className="flex items-end gap-2">
+              <span className="text-3xl font-extrabold text-white">₹{Number(payable).toLocaleString()}</span>
+              {hasDiscount && (
+                <span className="text-sm font-medium text-white/35 line-through mb-1">
+                  ₹{Number(course.price).toLocaleString()}
+                </span>
+              )}
+              {hasDiscount && (
+                <span className="mb-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                  {Math.round((1 - course.discountedPrice / course.price) * 100)}% OFF
+                </span>
+              )}
             </div>
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-2.5 py-1 text-[11px] font-semibold text-brand-primary">
+              <Clock size={11} /> {formatValidity(course.validityMonths)}
+            </p>
+            <p className="mt-1 text-[11px] text-white/35">One-time payment · access from the moment you buy.</p>
           </div>
-        ) : (
-          <div className="flex justify-center">
-            <Loader2 size={20} className="animate-spin text-white/30" />
-          </div>
-        )}
+          <button
+            onClick={onUnlock}
+            disabled={unlocking}
+            className="sm:ml-auto shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-6 py-3.5 text-sm font-bold text-dark-400 transition-all hover:opacity-90 disabled:opacity-50"
+          >
+            {unlocking ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
+            {unlocking ? "Processing…" : `Buy Now · ₹${Number(payable).toLocaleString()}`}
+          </button>
+        </div>
 
         <p className="text-center text-[11px] text-white/25">
-          Secure payment via Razorpay · Cancel anytime
+          Secure payment via Razorpay
         </p>
       </div>
     </div>
@@ -491,7 +461,6 @@ export default function CourseLearning() {
   const [selectedChapterId, setSelectedChapterId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [plans, setPlans] = useState([]);
   const [unlocking, setUnlocking] = useState(false);
   const [attemptsByTest, setAttemptsByTest] = useState({});
   const [activeResultId, setActiveResultId] = useState(null);
@@ -550,24 +519,22 @@ export default function CourseLearning() {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (!hasAccess && course?.isPaid) {
-      getPlans()
-        .then((d) => setPlans(d?.plans || []))
-        .catch(() => {});
-    }
-  }, [hasAccess, course?.isPaid]);
-
-  const handleUnlockCourse = async (planId) => {
+  // One-time purchase of THIS course at its own price; access lasts for the
+  // course's configured validity period.
+  const handleUnlockCourse = async () => {
     setUnlocking(true);
     try {
       await ensureRazorpayLoaded();
-      const result = await createOrder(planId);
-      const order = result.order;
+      const order = await createCourseOrder(courseId);
+
+      if (order?.alreadyUnlocked) {
+        await load();
+        return;
+      }
 
       const onSuccess = async (response) => {
         try {
-          await verifyPayment({
+          await verifyCoursePayment(courseId, {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
@@ -581,7 +548,7 @@ export default function CourseLearning() {
         }
       };
 
-      if (order.orderId?.startsWith("dev_")) {
+      if (typeof order.orderId === "string" && order.orderId.startsWith("dev_")) {
         return onSuccess({
           razorpay_order_id: order.orderId,
           razorpay_payment_id: `DEV_PAY_${Date.now()}`,
@@ -594,7 +561,7 @@ export default function CourseLearning() {
         amount: order.amountInPaise,
         currency: order.currency || "INR",
         name: "PS Classes",
-        description: `${order.planName} Plan — Full Course Access`,
+        description: order.courseTitle ? `Course: ${order.courseTitle}` : "Course Access",
         order_id: order.orderId,
         prefill: {
           email: localStorage.getItem("userEmail") || "",
@@ -669,8 +636,8 @@ export default function CourseLearning() {
           disabled={accessReason === "disabled"}
           expiresAt={accessExpiresAt}
           busy={unlocking}
-          onRenew={() => handleUnlockCourse(plans[0]?.id)}
-          onBuy={() => handleUnlockCourse(plans[0]?.id)}
+          onRenew={handleUnlockCourse}
+          onBuy={handleUnlockCourse}
         />
       </div>
     );
@@ -803,24 +770,28 @@ export default function CourseLearning() {
               {/* Sidebar unlock CTA for locked paid courses */}
               {!hasAccess && course?.isPaid && (
                 <div className="shrink-0 px-3 py-3 border-b border-white/5">
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 space-y-2.5">
+                  <div className="rounded-xl border border-brand-primary/20 bg-brand-primary/8 p-3 space-y-2.5">
                     <div className="flex items-center gap-2">
-                      <Lock size={12} className="text-amber-400 shrink-0" />
-                      <p className="text-[11px] font-bold text-amber-400">Preview Mode</p>
+                      <Lock size={12} className="text-brand-primary shrink-0" />
+                      <p className="text-[11px] font-bold text-brand-primary">Preview Mode</p>
                     </div>
-                    <p className="text-[11px] text-white/40 leading-relaxed">
-                      Subscribe to unlock all subjects, chapters, notes &amp; videos.
+                    <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/50">
+                      <Clock size={10} /> {formatValidity(course.validityMonths)}
                     </p>
-                    {plans.length > 0 && (
-                      <button
-                        onClick={() => handleUnlockCourse(plans[0]?.id)}
-                        disabled={unlocking}
-                        className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3 py-2 text-[11px] font-bold text-dark-400 hover:opacity-90 disabled:opacity-50 transition-opacity"
-                      >
-                        {unlocking ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
-                        {unlocking ? "Processing…" : `Get Full Access from ₹${plans[0]?.price}`}
-                      </button>
-                    )}
+                    <button
+                      onClick={handleUnlockCourse}
+                      disabled={unlocking}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-brand-primary px-3 py-2 text-[11px] font-bold text-dark-400 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      {unlocking ? <Loader2 size={11} className="animate-spin" /> : <CreditCard size={11} />}
+                      {unlocking
+                        ? "Processing…"
+                        : `Buy Now · ₹${Number(
+                            course.discountedPrice > 0 && course.discountedPrice < course.price
+                              ? course.discountedPrice
+                              : course.price
+                          ).toLocaleString()}`}
+                    </button>
                   </div>
                 </div>
               )}
@@ -950,7 +921,6 @@ export default function CourseLearning() {
               {!hasAccess && course?.isPaid ? (
                 <CourseUnlockBanner
                   course={course}
-                  plans={plans}
                   unlocking={unlocking}
                   onUnlock={handleUnlockCourse}
                 />

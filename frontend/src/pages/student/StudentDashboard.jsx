@@ -26,9 +26,21 @@ import {
   Tag,
   GraduationCap,
   BookOpen,
-  DollarSign,
   Play,
+  TrendingUp,
+  TrendingDown,
+  Flame,
+  Target,
+  AlertTriangle,
+  RefreshCw,
+  Hourglass,
+  Compass,
 } from "lucide-react";
+import { formatValidity } from "../../utils/validity";
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+const daysUntil = (date) =>
+  date ? Math.ceil((new Date(date).getTime() - Date.now()) / DAY_MS) : null;
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -42,6 +54,7 @@ export default function StudentDashboard() {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedExamId, setSelectedExamId] = useState(null);
   const [courses, setCourses] = useState([]);
+  const [topics, setTopics] = useState([]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -58,6 +71,7 @@ export default function StudentDashboard() {
         setCategories(cats);
         if (cats.length > 0) setSelectedCategoryId(cats[0]._id);
         setCourses(coursesRes?.courses || []);
+        setTopics(Array.isArray(testsRes.topics) ? testsRes.topics : []);
       } catch {
         setError("Failed to load some dashboard components.");
       } finally {
@@ -96,6 +110,50 @@ export default function StudentDashboard() {
   const recentTests = sortedAttempts.filter(
     (a) => a.status === "submitted" || a.status === "evaluated"
   ).slice(0, 6);
+
+  // The single most recent in-progress attempt — surfaced as a resume hero CTA.
+  const resumeTarget = continueTests[0] || null;
+
+  // Score trend (oldest → newest) over the last 10 completed attempts, plus the
+  // student's best result — powers the performance panel + sparkline.
+  const completedAttempts = useMemo(
+    () => sortedAttempts.filter((a) => a.status === "submitted" || a.status === "evaluated"),
+    [sortedAttempts]
+  );
+  const scoreTrend = useMemo(
+    () => completedAttempts.slice(0, 10).reverse().map((a) => Number(a.percentage || 0)),
+    [completedAttempts]
+  );
+  const bestScore = completedAttempts.length
+    ? Math.max(...completedAttempts.map((a) => Number(a.percentage || 0)))
+    : 0;
+  const trendDelta =
+    scoreTrend.length >= 2 ? scoreTrend[scoreTrend.length - 1] - scoreTrend[0] : 0;
+  const thisWeekCount = useMemo(() => {
+    const weekAgo = Date.now() - 7 * DAY_MS;
+    return attempts.filter(
+      (a) => new Date(a.updatedAt || a.createdAt || 0).getTime() >= weekAgo
+    ).length;
+  }, [attempts]);
+
+  // Owned (unlocked paid) test series, with expiry awareness, derived from the
+  // access-annotated topic list. Drives the "My Active Series" panel + alerts.
+  const ownedSeries = useMemo(
+    () => topics.filter((t) => t.isPaid && t.isUnlocked),
+    [topics]
+  );
+  const expiringSoon = useMemo(
+    () =>
+      ownedSeries
+        .map((t) => ({ ...t, daysLeft: daysUntil(t.accessExpiresAt) }))
+        .filter((t) => t.daysLeft != null && t.daysLeft >= 0 && t.daysLeft <= 7)
+        .sort((a, b) => a.daysLeft - b.daysLeft),
+    [ownedSeries]
+  );
+  const expiredSeries = useMemo(
+    () => topics.filter((t) => t.isPaid && t.accessExpired),
+    [topics]
+  );
 
   // Derived hierarchy nodes
   const currentCategory = useMemo(
@@ -142,26 +200,95 @@ export default function StudentDashboard() {
           )}
 
           {/* Header */}
-          <header className="flex flex-col gap-2">
-            <p className="inline-flex items-center gap-2 text-xs font-semibold text-brand-primary uppercase tracking-widest">
-              <Sparkles size={14} />
-              {greeting}
-            </p>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
-              Welcome back, {firstName}
-            </h1>
-            <p className="text-sm text-white/60">
-              Pick up where you left off, or start a new test from your enrolled series.
-            </p>
+          <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-2">
+              <p className="inline-flex items-center gap-2 text-xs font-semibold text-brand-primary uppercase tracking-widest">
+                <Sparkles size={14} />
+                {greeting}
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl lg:text-5xl">
+                Welcome back, {firstName}
+              </h1>
+              <p className="text-sm text-white/60">
+                Pick up where you left off, or start a new test from your enrolled series.
+              </p>
+            </div>
+            {/* Quick actions */}
+            <div className="flex flex-wrap gap-2">
+              <QuickAction to="/student/tests" icon={<Compass size={15} />} label="Browse Tests" primary />
+              <QuickAction to="/student/courses" icon={<BookOpen size={15} />} label="My Courses" />
+              <QuickAction to="/student/tests" icon={<Trophy size={15} />} label="Results" />
+            </div>
           </header>
 
-          {/* Top Metrics Row */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard icon={<FileText size={22} />} label="Total Attempts" value={attempts.length} />
-            <MetricCard icon={<Trophy size={22} />} label="Completed Tests" value={completedTests} />
-            <MetricCard icon={<LayoutDashboard size={22} />} label="Ongoing Tests" value={ongoingTests} />
-            <MetricCard icon={<LineChart size={22} />} label="Average Score" value={`${averageScore}%`} isPercentage />
+          {/* Resume in-progress test */}
+          {resumeTarget && (
+            <Link
+              to="/student/tests"
+              className="group flex flex-col gap-4 overflow-hidden rounded-2xl border border-brand-primary/30 bg-linear-to-r from-brand-primary/15 via-brand-primary/5 to-transparent p-5 transition-colors hover:border-brand-primary/50 sm:flex-row sm:items-center"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary/20 text-brand-primary">
+                <PlayCircle size={24} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-brand-primary">Resume your test</p>
+                <h3 className="truncate text-base font-bold text-white">
+                  {resumeTarget.testId?.title || "Practice Assessment"}
+                </h3>
+                <p className="mt-0.5 text-xs text-white/50">
+                  Started {formatDateLabel(resumeTarget.updatedAt || resumeTarget.createdAt)} · pick up where you stopped
+                </p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-bold text-dark-400 transition-transform group-hover:translate-x-0.5">
+                Continue <ArrowRight size={15} />
+              </span>
+            </Link>
+          )}
+
+          {/* Subscription expiry alerts */}
+          {(expiringSoon.length > 0 || expiredSeries.length > 0) && (
+            <ExpiryAlert expiringSoon={expiringSoon} expiredSeries={expiredSeries} navigate={navigate} />
+          )}
+
+          {/* Stats + Performance */}
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:col-span-2">
+              <MetricCard icon={<FileText size={22} />} label="Total Attempts" value={attempts.length} sub={`${thisWeekCount} this week`} />
+              <MetricCard icon={<Trophy size={22} />} label="Completed" value={completedTests} sub={`${ongoingTests} in progress`} />
+              <MetricCard icon={<Target size={22} />} label="Best Score" value={`${bestScore.toFixed(0)}%`} isPercentage />
+              <MetricCard icon={<LineChart size={22} />} label="Average Score" value={`${averageScore}%`} isPercentage />
+            </div>
+            <PerformancePanel
+              trend={scoreTrend}
+              average={averageScore}
+              delta={trendDelta}
+            />
           </div>
+
+          {/* My Active Series */}
+          {ownedSeries.length > 0 && (
+            <section>
+              <div className="mb-5 flex items-end justify-between">
+                <h2 className="flex items-center gap-2 text-xl font-bold text-white tracking-tight">
+                  My Active Series
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">{ownedSeries.length}</span>
+                </h2>
+                <Link to="/student/tests" className="group flex items-center text-sm font-semibold text-brand-primary hover:text-brand-primary/80">
+                  View all<ChevronRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {ownedSeries.slice(0, 6).map((t, idx) => (
+                  <ActiveSeriesCard
+                    key={t._id}
+                    topic={t}
+                    delay={idx * 50}
+                    onClick={() => navigate(`/student/tests/${t._id}`)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Courses */}
           {courses.length > 0 && (
@@ -345,20 +472,174 @@ function DashboardSection({ title, actionLabel, actionTo, children }) {
   );
 }
 
-function MetricCard({ icon, label, value, isPercentage }) {
+function MetricCard({ icon, label, value, isPercentage, sub }) {
   const isNegative = String(value).includes("-");
   return (
-    <div className="flex items-center gap-5 rounded-2xl border border-white/5 bg-dark-200 p-6 shadow-sm transition-colors hover:border-brand-primary/30">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
+    <div className="flex items-center gap-4 rounded-2xl border border-white/5 bg-dark-200 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-primary/30">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
         {icon}
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-sm font-medium text-gray-400">{label}</p>
-        <p className={`mt-1 text-3xl font-bold ${isPercentage && isNegative ? "text-red-400" : "text-white"}`}>
+        <p className={`mt-0.5 text-2xl font-bold lg:text-3xl ${isPercentage && isNegative ? "text-red-400" : "text-white"}`}>
           {value}
         </p>
+        {sub && <p className="mt-0.5 text-[11px] font-medium text-white/35 truncate">{sub}</p>}
       </div>
     </div>
+  );
+}
+
+function QuickAction({ to, icon, label, primary }) {
+  return (
+    <Link
+      to={to}
+      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all hover:-translate-y-0.5 ${
+        primary
+          ? "bg-brand-primary text-dark-400 hover:opacity-90"
+          : "border border-white/10 bg-dark-200 text-white/75 hover:border-brand-primary/40 hover:text-white"
+      }`}
+    >
+      {icon}
+      {label}
+    </Link>
+  );
+}
+
+// Compact score-trend chart over recent completed attempts.
+function Sparkline({ values, width = 240, height = 56 }) {
+  if (!values || values.length < 2) return null;
+  const max = Math.max(...values, 100);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return [x, y];
+  });
+  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const area = `${line} L ${width} ${height} L 0 ${height} Z`;
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full overflow-visible" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgb(0 200 133 / 0.35)" />
+          <stop offset="100%" stopColor="rgb(0 200 133 / 0)" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#sparkFill)" />
+      <path d={line} fill="none" stroke="#00c885" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p[0]} cy={p[1]} r="2.5" fill="#00c885">
+          <title>{values[i].toFixed(1)}%</title>
+        </circle>
+      ))}
+    </svg>
+  );
+}
+
+function PerformancePanel({ trend, average, delta }) {
+  const up = delta >= 0;
+  return (
+    <div className="flex flex-col rounded-2xl border border-white/5 bg-dark-200 p-5">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-2 text-sm font-bold text-white">
+          <TrendingUp size={16} className="text-brand-primary" /> Performance
+        </p>
+        {trend.length >= 2 && (
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${up ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
+            {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {up ? "+" : ""}{delta.toFixed(0)}%
+          </span>
+        )}
+      </div>
+      <div className="mt-3 flex items-end gap-2">
+        <span className="text-3xl font-bold text-white">{average}%</span>
+        <span className="mb-1 text-[11px] text-white/40">avg over recent tests</span>
+      </div>
+      <div className="mt-auto pt-4">
+        {trend.length >= 2 ? (
+          <Sparkline values={trend} />
+        ) : (
+          <p className="py-4 text-center text-xs text-white/30">Take a few tests to see your trend.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExpiryAlert({ expiringSoon, expiredSeries, navigate }) {
+  const hasExpired = expiredSeries.length > 0;
+  const soonest = expiringSoon[0];
+  return (
+    <div className={`flex flex-col gap-3 rounded-2xl border p-5 sm:flex-row sm:items-center ${hasExpired ? "border-red-500/30 bg-red-500/8" : "border-amber-500/30 bg-amber-500/8"}`}>
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${hasExpired ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>
+        {hasExpired ? <AlertTriangle size={22} /> : <Hourglass size={22} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        {hasExpired ? (
+          <>
+            <p className="text-sm font-bold text-white">
+              {expiredSeries.length} test series {expiredSeries.length === 1 ? "has" : "have"} expired
+            </p>
+            <p className="mt-0.5 text-xs text-white/55 truncate">
+              Renew to regain access: {expiredSeries.slice(0, 2).map((t) => t.title).join(", ")}
+              {expiredSeries.length > 2 ? ` +${expiredSeries.length - 2} more` : ""}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-bold text-white">
+              {expiringSoon.length} subscription{expiringSoon.length === 1 ? "" : "s"} expiring soon
+            </p>
+            <p className="mt-0.5 text-xs text-white/55 truncate">
+              {soonest.title} expires in {soonest.daysLeft === 0 ? "less than a day" : `${soonest.daysLeft} day${soonest.daysLeft === 1 ? "" : "s"}`}
+            </p>
+          </>
+        )}
+      </div>
+      <button
+        onClick={() => navigate(`/student/tests/${(hasExpired ? expiredSeries[0] : soonest)._id}`)}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-opacity hover:opacity-90 ${hasExpired ? "bg-red-500 text-white" : "bg-amber-500 text-dark-400"}`}
+      >
+        <RefreshCw size={15} /> {hasExpired ? "Renew Now" : "View"}
+      </button>
+    </div>
+  );
+}
+
+function ActiveSeriesCard({ topic, onClick, delay = 0 }) {
+  const daysLeft = daysUntil(topic.accessExpiresAt);
+  const chip =
+    daysLeft == null
+      ? { label: "Lifetime", cls: "text-emerald-300" }
+      : daysLeft <= 7
+        ? { label: `${daysLeft}d left`, cls: "text-red-300" }
+        : daysLeft <= 30
+          ? { label: `${daysLeft}d left`, cls: "text-amber-300" }
+          : { label: `${daysLeft}d left`, cls: "text-emerald-300" };
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${delay}ms` }}
+      className="group flex animate-fade-up flex-col gap-3 rounded-2xl border border-white/5 bg-dark-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-brand-primary/40"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
+          <Layers size={18} />
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold">
+          <Clock size={9} className={chip.cls} />
+          <span className={chip.cls}>{chip.label}</span>
+        </span>
+      </div>
+      <h3 className="text-base font-bold text-white line-clamp-1">{topic.title}</h3>
+      <p className="text-[11px] text-white/40">{formatValidity(topic.validityMonths)}</p>
+      <div className="mt-auto inline-flex items-center justify-between rounded-xl bg-brand-primary/10 px-3 py-2 text-xs font-bold text-brand-primary">
+        <span>Open Series</span>
+        <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </button>
   );
 }
 

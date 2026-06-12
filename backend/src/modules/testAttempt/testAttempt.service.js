@@ -4,6 +4,7 @@ import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";
+import { userCanAccessTestViaCourse } from "../courses/courses.service.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import {
@@ -82,16 +83,21 @@ export const startTest = async (testId, studentId) => {
   }
 
   // Paid-topic gating — pricing lives on the parent test series (topic).
-  // Access requires a valid per-topic unlock (time-bound; renew when expired).
+  // Access requires a valid per-topic unlock (time-bound; renew when expired),
+  // OR the test being linked into a course the student has purchased — in which
+  // case only that linked test opens, not the whole series.
   if (test.topicId) {
     const topic = await TestSeriesTopic.findById(test.topicId).lean();
     if (topic?.isPaid) {
       const topicOk = await hasValidTopicAccess(objStudentId, topic._id);
       if (!topicOk) {
-        throw new ApiError(
-          STATUS_CODES.FORBIDDEN,
-          `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to start.`
-        );
+        const viaCourse = await userCanAccessTestViaCourse(objStudentId, objTestId);
+        if (!viaCourse) {
+          throw new ApiError(
+            STATUS_CODES.FORBIDDEN,
+            `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to start.`
+          );
+        }
       }
     }
   }
@@ -184,10 +190,13 @@ export const getTestPreview = async (testId, studentId) => {
     if (topic?.isPaid) {
       const topicOk = await hasValidTopicAccess(objStudentId, topic._id);
       if (!topicOk) {
-        throw new ApiError(
-          STATUS_CODES.FORBIDDEN,
-          `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to view details.`
-        );
+        const viaCourse = await userCanAccessTestViaCourse(objStudentId, objTestId);
+        if (!viaCourse) {
+          throw new ApiError(
+            STATUS_CODES.FORBIDDEN,
+            `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to view details.`
+          );
+        }
       }
     }
   }

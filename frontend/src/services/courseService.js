@@ -239,6 +239,25 @@ export const getCourseFull = async (courseId) => {
   }
 };
 
+// ─── Per-course one-time purchase (uses the course's own price + validity) ───
+export const createCourseOrder = async (courseId) => {
+  try {
+    const res = await api.post(`/payment/course/${courseId}/order`);
+    return res.data.order;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to create course order" };
+  }
+};
+
+export const verifyCoursePayment = async (courseId, payload) => {
+  try {
+    const res = await api.post(`/payment/course/${courseId}/verify`, payload);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Course payment verification failed" };
+  }
+};
+
 export const checkCourseAccess = async (courseId) => {
   try {
     const res = await api.get(`/courses/${courseId}/access`);
