@@ -23,6 +23,11 @@ router.post("/topic/:topicId/order", authMiddleware, authorize("student"), contr
 router.post("/topic/:topicId/verify", authMiddleware, authorize("student"), controller.verifyTopicPayment);
 router.get("/topic/:topicId/access", authMiddleware, authorize("student"), controller.checkTopicAccess);
 
+// Per-course unlock via Razorpay (one-time per course, time-bound)
+router.post("/course/:courseId/order", authMiddleware, authorize("student"), controller.createCourseOrder);
+router.post("/course/:courseId/verify", authMiddleware, authorize("student"), controller.verifyCoursePayment);
+router.get("/course/:courseId/access", authMiddleware, authorize("student"), controller.checkCourseAccess);
+
 // Admin routes — payment approval
 router.get("/pending-approval", authMiddleware, authorize("admin"), controller.getPendingApprovalPayments);
 router.put("/:id/approve", authMiddleware, authorize("admin"), controller.approvePayment);

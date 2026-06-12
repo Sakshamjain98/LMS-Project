@@ -35,7 +35,8 @@ import {
   FaLayerGroup,
   FaSpinner,
 } from "react-icons/fa";
-import { Search, BookOpen } from "lucide-react";
+import { Search, BookOpen, Clock } from "lucide-react";
+import { formatValidity } from "../../utils/validity";
 import { normalizeYouTubeUrl } from "../../utils/youtube";
 
 /* ─────────────────────────────────────────────────────────────
@@ -1472,6 +1473,12 @@ function TestSeriesPublicCard({ series: s, idx, seriesNumber, examName, onAction
         </div>
       </div>
 
+      {s.isPaid && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-2.5 py-1 text-[10px] font-semibold text-brand-primary">
+          <Clock size={10} /> {formatValidity(s.validityMonths)}
+        </span>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
         <div>
@@ -1785,6 +1792,12 @@ function PublicCourseCard({ course, idx, isAuthenticated, onNavigateCourse, onGe
           <p className="flex-1 text-sm text-white/50 line-clamp-2 leading-relaxed">{plainDesc}</p>
         ) : (
           <p className="flex-1 text-sm text-white/35 italic leading-relaxed">Comprehensive notes, video lectures and practice tests.</p>
+        )}
+
+        {course.isPaid && (
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-2.5 py-1 text-[10px] font-semibold text-brand-primary">
+            <Clock size={10} /> {formatValidity(course.validityMonths)}
+          </span>
         )}
 
         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">

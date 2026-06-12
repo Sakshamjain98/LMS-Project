@@ -16,6 +16,20 @@ const courseAccessSchema = new mongoose.Schema(
     },
     paymentId: { type: String, default: null },
     purchasedAt: { type: Date, default: Date.now },
+    // null = does not expire on its own (still subject to platform subscription
+    // / admin disable); a date = time-bound grant.
+    expiresAt: { type: Date, default: null },
+    // Admin can disable a single course grant without deleting the record, so
+    // the user keeps their progress and must repay to regain access.
+    disabled: { type: Boolean, default: false },
+    disabledAt: { type: Date, default: null },
+    // Cron-maintained stored status for admin reporting/filtering. Real-time
+    // access still relies on expiresAt/disabled.
+    status: {
+      type: String,
+      enum: ["ACTIVE", "EXPIRED"],
+      default: "ACTIVE",
+    },
   },
   { timestamps: true }
 );

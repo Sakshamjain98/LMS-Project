@@ -1,6 +1,7 @@
 import "./config/env.js";
 import app from "./app.js";
 import connectDB from "./config/db.js";
+import { startExpirySweepJob } from "./infrastucture/jobs/expirySweep.job.js";
 
 const PORT = process.env.PORT || 4040;
 
@@ -14,6 +15,9 @@ const startServer = async () => {
 
     server.keepAliveTimeout = 65_000;
     server.headersTimeout = 66_000;
+
+    // Daily subscription/access expiry sweep (keeps stored status accurate).
+    startExpirySweepJob();
 
     const shutdown = (signal) => {
       console.log(`${signal} received. Closing server gracefully...`);

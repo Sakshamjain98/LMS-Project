@@ -33,6 +33,7 @@ import {
   verifyTopicPayment,
 } from "../../services/studentService";
 import TestResult from "./TestResult";
+import { formatValidity } from "../../utils/validity";
 
 const PAGE_SIZE = 8;
 
@@ -149,16 +150,11 @@ export default function StudentTests() {
 
   useEffect(() => { loadData(); }, []);
 
-  const subActive =
-    subscription?.status === "ACTIVE" &&
-    subscription?.plan &&
-    subscription.plan !== "FREE";
-
+  // Access is purely per-test-series — the platform subscription no longer
+  // unlocks individual series, matching the server-side per-topic gating.
   const isTopicUnlocked = (topic) => {
     if (!topic?.isPaid) return true;
-    if (topic.isUnlocked) return true;
-    if (subActive) return true;
-    return false;
+    return Boolean(topic.isUnlocked);
   };
 
   // Global stats
@@ -554,21 +550,28 @@ function SeriesAndAITSTable({ items, totalCount, isUnlocked, unlockingId, onUnlo
                       )}
                     </td>
                     <td className="px-6 py-4 text-xs">
-                      {item.isPaid ? (
-                        unlocked ? (
-                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
-                            Unlocked
-                          </span>
+                      <div className="flex flex-col items-start gap-1.5">
+                        {item.isPaid ? (
+                          unlocked ? (
+                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
+                              Unlocked
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
+                              <Lock size={10} /> ₹{Number(item.price || 0).toLocaleString()}
+                            </span>
+                          )
                         ) : (
-                          <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1">
-                            <Lock size={10} /> ₹{Number(item.price || 0).toLocaleString()}
+                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
+                            Free
                           </span>
-                        )
-                      ) : (
-                        <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 font-bold uppercase tracking-wider text-emerald-300">
-                          Free
-                        </span>
-                      )}
+                        )}
+                        {item.isPaid && !isAits && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary/90">
+                            <Clock size={9} /> {formatValidity(item.validityMonths)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

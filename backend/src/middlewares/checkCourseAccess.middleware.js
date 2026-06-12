@@ -11,7 +11,8 @@ export const checkCourseAccess = async (req, res, next) => {
   const sub = await Subscription.findOne({
     userId,
     status: "ACTIVE",
-    plan: { $ne: "FREE" },//
+    plan: { $ne: "FREE" },
+    $or: [{ endDate: null }, { endDate: { $gt: new Date() } }],
   });
   if (!sub) {
     throw new ApiError(403, "This course requires a paid subscription");

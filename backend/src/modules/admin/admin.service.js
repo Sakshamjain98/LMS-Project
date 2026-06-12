@@ -5,6 +5,10 @@ import Payment from "../../models/payment.model.js";
 import News from "../../models/news.model.js";
 import Comment from "../../models/comment.model.js";
 import SubscriptionPlan from "../../models/subscriptionPlan.model.js";
+import Subscription from "../../models/subscription.model.js";
+import CourseAccess from "../../models/courseAccess.model.js";
+import TopicAccess from "../../models/topicAccess.model.js";
+import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import Test from "../../models/test.model.js"
 import TestAttempt from "../../models/testAttempt.model.js";
 import PlatformSettings, { DEFAULT_TEACHER_SETTINGS } from "../../models/platformSettings.model.js";
@@ -12,6 +16,7 @@ import SiteContent from "../../models/siteContent.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { comparePassword, hashPassword } from "../../shared/utils/bcrypt.js";
+import { syncMappedSeriesToCourse } from "../courses/courses.service.js";
 
 // -------------------- Admin Creation --------------------
 export const createAdminService = async ({ name, email, password }) => {
@@ -234,33 +239,194 @@ export const getAdminDashboard = async () => {
 };
 
 // -------------------- User Management --------------------
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Turn a stored Subscription doc into the view the admin UI needs:
+// plan, derived status (live expiry), purchase/expiry dates, days remaining.
+const deriveSubscriptionView = (s, now = new Date()) => {
+  if (!s) return null;
+  const isExpired =
+    s.plan !== "FREE" && s.endDate && new Date(s.endDate) <= now;
+  let status = s.status;
+  if (s.status === "ACTIVE" && isExpired) status = "EXPIRED";
+
+  const daysRemaining =
+    s.plan === "FREE"
+      ? null
+      : s.endDate
+        ? Math.max(0, Math.ceil((new Date(s.endDate) - now) / DAY_MS))
+        : null;
+
+  return {
+    plan: s.plan,
+    status, // ACTIVE | EXPIRED | CANCELLED | PENDING (live-derived)
+    purchaseDate: s.startDate || null,
+    expiryDate: s.endDate || null,
+    daysRemaining,
+    disabledReason: s.disabledReason || null,
+    disabledAt: s.disabledAt || null,
+  };
+};
+
+// Resolve a subscription document for write operations.
+const getSubscriptionOrThrow = async (userId) => {
+  const sub = await Subscription.findOne({ userId });
+  if (!sub) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "User has no subscription. Use 'grant plan' to create one."
+    );
+  }
+  return sub;
+};
+
+// Distinct userIds (as strings) across both access collections matching a query.
+// `dateField` differs (CourseAccess.purchasedAt vs TopicAccess.createdAt) so the
+// per-collection query is built by the caller.
+const distinctAccessUsers = async (courseQuery, topicQuery) => {
+  const [courseIds, topicIds] = await Promise.all([
+    CourseAccess.find(courseQuery).distinct("userId"),
+    TopicAccess.find(topicQuery).distinct("userId"),
+  ]);
+  return new Set([...courseIds, ...topicIds].map(String));
+};
+
+// Per-user counts (total / active / expired) and last-purchase date across a
+// page of users, aggregated in one pass per collection.
+const aggregateAccessCounts = async (model, ids, dateField, now) => {
+  if (!ids.length) return new Map();
+  const rows = await model.aggregate([
+    { $match: { userId: { $in: ids } } },
+    {
+      $group: {
+        _id: "$userId",
+        total: { $sum: 1 },
+        active: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$disabled", true] },
+                  { $or: [{ $eq: ["$expiresAt", null] }, { $gt: ["$expiresAt", now] }] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        expired: {
+          $sum: {
+            $cond: [
+              { $and: [{ $ne: ["$expiresAt", null] }, { $lte: ["$expiresAt", now] }] },
+              1,
+              0,
+            ],
+          },
+        },
+        last: { $max: `$${dateField}` },
+      },
+    },
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r]));
+};
+
 export const getAllUsers = async (query) => {
-  const { role, search } = query;
+  const { role, search, subStatus, expiringInDays, purchasedWithinMonths } = query;
   const page = Math.max(parseInt(query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
   const skip = (page - 1) * limit;
+  const now = new Date();
 
-  const filter = {};
-  if (role) filter.role = role;
+  const userFilter = {};
+  if (role) userFilter.role = role;
   if (search?.trim()) {
-    filter.$or = [
+    userFilter.$or = [
       { name: { $regex: search.trim(), $options: "i" } },
       { email: { $regex: search.trim(), $options: "i" } },
     ];
   }
 
+  // Access-based filtering (per-item model). Each filter resolves a set of
+  // matching userIds from CourseAccess + TopicAccess; multiple filters intersect.
+  const days = Math.max(parseInt(expiringInDays, 10) || 0, 0);
+  const months = Math.max(parseInt(purchasedWithinMonths, 10) || 0, 0);
+  const idSets = [];
+  let noneFilter = false;
+
+  if (subStatus === "active") {
+    const q = { disabled: { $ne: true }, $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] };
+    idSets.push(await distinctAccessUsers(q, q));
+  } else if (subStatus === "expired") {
+    const q = { expiresAt: { $ne: null, $lte: now } };
+    idSets.push(await distinctAccessUsers(q, q));
+  } else if (subStatus === "disabled") {
+    const q = { disabled: true };
+    idSets.push(await distinctAccessUsers(q, q));
+  } else if (subStatus === "none") {
+    noneFilter = true;
+  }
+
+  if (days > 0) {
+    const horizon = new Date(now.getTime() + days * DAY_MS);
+    const q = { disabled: { $ne: true }, expiresAt: { $gt: now, $lte: horizon } };
+    idSets.push(await distinctAccessUsers(q, q));
+  }
+
+  if (months > 0) {
+    const cutoff = new Date(now);
+    cutoff.setMonth(cutoff.getMonth() - months);
+    idSets.push(
+      await distinctAccessUsers({ purchasedAt: { $gte: cutoff } }, { createdAt: { $gte: cutoff } })
+    );
+  }
+
+  if (noneFilter) {
+    // Users with no course/topic purchase at all.
+    const anyAccess = await distinctAccessUsers({}, {});
+    userFilter._id = { $nin: [...anyAccess] };
+  } else if (idSets.length) {
+    // Intersect all active filter sets.
+    let result = idSets[0];
+    for (let i = 1; i < idSets.length; i++) {
+      result = new Set([...result].filter((x) => idSets[i].has(x)));
+    }
+    userFilter._id = { $in: [...result] };
+  }
+
   const [users, total] = await Promise.all([
-    User.find(filter)
+    User.find(userFilter)
       .select("name email role isApproved createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
-    User.countDocuments(filter),
+    User.countDocuments(userFilter),
   ]);
 
+  // Enrich the page with per-item purchase counts + last purchase date.
+  const ids = users.map((u) => u._id);
+  const [courseCounts, topicCounts] = await Promise.all([
+    aggregateAccessCounts(CourseAccess, ids, "purchasedAt", now),
+    aggregateAccessCounts(TopicAccess, ids, "createdAt", now),
+  ]);
+
+  const enriched = users.map((u) => {
+    const c = courseCounts.get(String(u._id)) || { total: 0, active: 0, expired: 0, last: null };
+    const t = topicCounts.get(String(u._id)) || { total: 0, active: 0, expired: 0, last: null };
+    const lastDates = [c.last, t.last].filter(Boolean).map((d) => new Date(d).getTime());
+    return {
+      ...u,
+      purchasedCoursesCount: c.total,
+      purchasedTestSeriesCount: t.total,
+      activeSubscriptions: c.active + t.active,
+      expiredSubscriptions: c.expired + t.expired,
+      lastPurchaseDate: lastDates.length ? new Date(Math.max(...lastDates)) : null,
+    };
+  });
+
   return {
-    users,
+    users: enriched,
     pagination: {
       page,
       limit,
@@ -272,10 +438,271 @@ export const getAllUsers = async (query) => {
   };
 };
 
+export const getUserSubscriptionDetail = async (userId) => {
+  const user = await User.findById(userId)
+    .select("name email role createdAt")
+    .lean();
+  if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+
+  const sub = await Subscription.findOne({ userId }).lean();
+  const payments = await Payment.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+
+  return { user, subscription: deriveSubscriptionView(sub), payments };
+};
+
+// Disable premium access WITHOUT deleting anything. The account, history,
+// payments and progress are all preserved; the user keeps account access but
+// loses premium content and must repay to reactivate.
+export const disableUserAccess = async (userId, adminId, reason) => {
+  const sub = await getSubscriptionOrThrow(userId);
+  sub.status = "CANCELLED";
+  sub.cancelledAt = new Date();
+  sub.disabledAt = new Date();
+  sub.disabledBy = adminId;
+  sub.disabledReason = reason?.trim() || "Disabled by admin";
+  await sub.save();
+  return deriveSubscriptionView(sub.toObject());
+};
+
+// Reverse a disable. If the stored endDate is already in the past the pre-save
+// hook will flip it back to EXPIRED — the caller should extend in that case.
+export const enableUserAccess = async (userId, _adminId, { endDate } = {}) => {
+  const sub = await getSubscriptionOrThrow(userId);
+  sub.status = "ACTIVE";
+  sub.cancelledAt = null;
+  sub.disabledAt = null;
+  sub.disabledBy = null;
+  sub.disabledReason = null;
+  if (endDate) sub.endDate = new Date(endDate);
+  await sub.save();
+  return deriveSubscriptionView(sub.toObject());
+};
+
+// Extend by +days (added to remaining time if still active, else from now) or
+// to an explicit date. Also reactivates and clears any disabled state.
+export const extendUserAccess = async (userId, _adminId, { days, until } = {}) => {
+  const sub = await getSubscriptionOrThrow(userId);
+  const now = new Date();
+
+  let newEnd;
+  if (until) {
+    newEnd = new Date(until);
+    if (Number.isNaN(newEnd.getTime())) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid 'until' date");
+    }
+  } else {
+    const d = parseInt(days, 10);
+    if (!d || d <= 0) {
+      throw new ApiError(
+        STATUS_CODES.BAD_REQUEST,
+        "Provide a positive number of days or an 'until' date"
+      );
+    }
+    const base = sub.endDate && sub.endDate > now ? new Date(sub.endDate) : now;
+    newEnd = new Date(base.getTime() + d * DAY_MS);
+  }
+
+  sub.endDate = newEnd;
+  sub.status = "ACTIVE";
+  sub.cancelledAt = null;
+  sub.disabledAt = null;
+  sub.disabledBy = null;
+  sub.disabledReason = null;
+  sub.lastExtendedAt = now;
+  await sub.save();
+  return deriveSubscriptionView(sub.toObject());
+};
+
+// Manually grant or change a plan (e.g. offline payment, comp). Upserts.
+export const grantUserPlan = async (userId, _adminId, { plan, durationDays } = {}) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+
+  const allowed = ["FREE", "MONTHLY", "QUARTERLY", "YEARLY"];
+  if (!allowed.includes(plan)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid plan");
+  }
+
+  const now = new Date();
+  let endDate;
+  if (plan === "FREE") {
+    endDate = new Date(now);
+    endDate.setFullYear(endDate.getFullYear() + 100);
+  } else {
+    const fallback = plan === "YEARLY" ? 365 : plan === "QUARTERLY" ? 90 : 30;
+    const d = parseInt(durationDays, 10) || fallback;
+    endDate = new Date(now.getTime() + d * DAY_MS);
+  }
+
+  const sub = await Subscription.findOneAndUpdate(
+    { userId },
+    {
+      $set: {
+        plan,
+        status: "ACTIVE",
+        startDate: now,
+        endDate,
+        billingCycle: plan === "FREE" ? "ONE_TIME" : plan,
+        source: "ADMIN_GRANT",
+        cancelledAt: null,
+        disabledAt: null,
+        disabledBy: null,
+        disabledReason: null,
+      },
+    },
+    { upsert: true, new: true }
+  ).lean();
+
+  return deriveSubscriptionView(sub, now);
+};
+
+// List a user's one-time content purchases (courses + test series), with their
+// revoked state, so an admin can disable/restore each one individually.
+export const getUserContentAccess = async (userId) => {
+  const user = await User.findById(userId).select("name email").lean();
+  if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+
+  const [courseGrants, topicGrants] = await Promise.all([
+    CourseAccess.find({ userId }).sort({ createdAt: -1 }).lean(),
+    TopicAccess.find({ userId }).sort({ createdAt: -1 }).lean(),
+  ]);
+
+  const courseIds = courseGrants.map((g) => g.courseId);
+  const topicIds = topicGrants.map((g) => g.topicId);
+
+  const [courses, topics] = await Promise.all([
+    courseIds.length ? Course.find({ _id: { $in: courseIds } }).select("title").lean() : [],
+    topicIds.length ? TestSeriesTopic.find({ _id: { $in: topicIds } }).select("title").lean() : [],
+  ]);
+  const courseTitle = new Map(courses.map((c) => [String(c._id), c.title]));
+  const topicTitle = new Map(topics.map((t) => [String(t._id), t.title]));
+
+  const now = new Date();
+  const accessStatus = (g) => {
+    if (g.disabled) return "DISABLED";
+    if (g.expiresAt && new Date(g.expiresAt) <= now) return "EXPIRED";
+    return "ACTIVE";
+  };
+
+  return {
+    user,
+    courses: courseGrants.map((g) => ({
+      courseId: g.courseId,
+      title: courseTitle.get(String(g.courseId)) || "(deleted course)",
+      purchasedAt: g.purchasedAt,
+      expiresAt: g.expiresAt || null,
+      disabled: Boolean(g.disabled),
+      status: accessStatus(g),
+    })),
+    topics: topicGrants.map((g) => ({
+      topicId: g.topicId,
+      title: topicTitle.get(String(g.topicId)) || "(deleted series)",
+      purchasedAt: g.createdAt,
+      expiresAt: g.expiresAt || null,
+      amount: g.amount,
+      disabled: Boolean(g.disabled),
+      // Where the unlock came from — COURSE_UNLOCK rows follow their course.
+      source: g.source || "DIRECT_PURCHASE",
+      sourceCourseId: g.sourceCourseId || null,
+      status: accessStatus(g),
+    })),
+  };
+};
+
+// Revoke (disabled=true) or restore (disabled=false) a single course grant.
+// Revoking preserves the record and the user's progress; the user must repay.
+// The change cascades to any test series this course auto-unlocked.
+export const setCourseAccessDisabled = async (userId, courseId, disabled) => {
+  const grant = await CourseAccess.findOneAndUpdate(
+    { userId, courseId },
+    {
+      $set: {
+        disabled: Boolean(disabled),
+        disabledAt: disabled ? new Date() : null,
+        status: disabled ? "EXPIRED" : "ACTIVE",
+      },
+    },
+    { new: true }
+  ).lean();
+  if (!grant) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course access record not found");
+  await syncMappedSeriesToCourse(userId, courseId, { disabled: Boolean(disabled) });
+  return grant;
+};
+
+export const setTopicAccessDisabled = async (userId, topicId, disabled) => {
+  const grant = await TopicAccess.findOneAndUpdate(
+    { userId, topicId },
+    {
+      $set: {
+        disabled: Boolean(disabled),
+        disabledAt: disabled ? new Date() : null,
+        status: disabled ? "EXPIRED" : "ACTIVE",
+      },
+    },
+    { new: true }
+  ).lean();
+  if (!grant) throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series access record not found");
+  return grant;
+};
+
+// Compute a new expiry from +days (extends remaining time, or from now if
+// already lapsed) or an explicit `until` date.
+const computeNewExpiry = (currentExpiresAt, { days, until }, now) => {
+  if (until) {
+    const d = new Date(until);
+    if (Number.isNaN(d.getTime())) throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid 'until' date");
+    return d;
+  }
+  const n = parseInt(days, 10);
+  if (!n || n <= 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Provide a positive number of days or an 'until' date");
+  }
+  const base = currentExpiresAt && new Date(currentExpiresAt) > now ? new Date(currentExpiresAt) : now;
+  return new Date(base.getTime() + n * DAY_MS);
+};
+
+// Extend / change expiry / reactivate a single course grant. Reactivation clears
+// the disabled flag and sets status ACTIVE; the new expiry cascades to mapped series.
+export const setCourseAccessExpiry = async (userId, courseId, { days, until } = {}) => {
+  const now = new Date();
+  const grant = await CourseAccess.findOne({ userId, courseId });
+  if (!grant) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course access record not found");
+
+  grant.expiresAt = computeNewExpiry(grant.expiresAt, { days, until }, now);
+  grant.disabled = false;
+  grant.disabledAt = null;
+  grant.status = "ACTIVE";
+  await grant.save();
+
+  await syncMappedSeriesToCourse(userId, courseId, {
+    disabled: false,
+    expiresAt: grant.expiresAt,
+  });
+  return grant.toObject();
+};
+
+export const setTopicAccessExpiry = async (userId, topicId, { days, until } = {}) => {
+  const now = new Date();
+  const grant = await TopicAccess.findOne({ userId, topicId });
+  if (!grant) throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series access record not found");
+
+  grant.expiresAt = computeNewExpiry(grant.expiresAt, { days, until }, now);
+  grant.disabled = false;
+  grant.disabledAt = null;
+  grant.status = "ACTIVE";
+  await grant.save();
+  return grant.toObject();
+};
+
 export const updateUserRole = async (userId, role) => {
   return User.findByIdAndUpdate(userId, { role }, { new: true }).select("-password");
 };
 
+// Retained for an explicit GDPR "permanently delete" path only. Normal admin
+// flows should use disableUserAccess so data and history are preserved.
 export const deleteUser = async (userId) => {
   return User.findByIdAndDelete(userId);
 };

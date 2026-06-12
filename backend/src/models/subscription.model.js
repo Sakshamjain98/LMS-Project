@@ -58,6 +58,19 @@ const subscriptionSchema = new mongoose.Schema(
         plan: String,
       },
     ],
+    // --- Admin access management ---
+    // When an admin disables a user's premium access, we set status=CANCELLED
+    // and record who/why. The account & all history are preserved; the user
+    // must repay to reactivate.
+    disabledAt: { type: Date, default: null },
+    disabledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    disabledReason: { type: String, default: null },
+    lastExtendedAt: { type: Date, default: null },
+    source: {
+      type: String,
+      enum: ["PAYMENT", "ADMIN_GRANT", "MIGRATION", "FREE"],
+      default: "PAYMENT",
+    },
   },
   { timestamps: true }
 );
@@ -76,12 +89,13 @@ subscriptionSchema.methods.daysRemaining = function () {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 };
 
-// Pre-save: auto-expire if endDate passed
-subscriptionSchema.pre("save", function (next) {
+// Pre-save: auto-expire if endDate passed.
+// Mongoose 9 uses synchronous/promise-style middleware — a hook that takes no
+// `next` argument runs synchronously, so we must NOT call next() here.
+subscriptionSchema.pre("save", function () {
   if (this.endDate && this.endDate < new Date() && this.status === "ACTIVE") {
     this.status = "EXPIRED";
   }
-  next();
 });
 
 // Index for expiry queries

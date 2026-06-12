@@ -14,6 +14,7 @@ import { getMyAttempts } from "../../services/studentService";
 import TestResult from "./TestResult";
 import { getPlans, createOrder, verifyPayment } from "../../services/paymentService";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
+import AccessExpired from "../../components/student/AccessExpired";
 
 const ensureRazorpayLoaded = () =>
   new Promise((resolve, reject) => {
@@ -480,6 +481,8 @@ export default function CourseLearning() {
 
   const [course, setCourse] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
+  const [accessReason, setAccessReason] = useState(null);
+  const [accessExpiresAt, setAccessExpiresAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState({ completedChapterIds: [], totalChapters: 0, completedCount: 0, percentage: 0 });
   const [markingComplete, setMarkingComplete] = useState(false);
@@ -499,6 +502,8 @@ export default function CourseLearning() {
       const res = await getCourseFull(courseId);
       setCourse(res.course);
       setHasAccess(res.hasAccess);
+      setAccessReason(res.accessReason || null);
+      setAccessExpiresAt(res.expiresAt || null);
 
       const firstSubject = res.course?.subjects?.[0];
       if (firstSubject) {
@@ -645,6 +650,30 @@ export default function CourseLearning() {
 
   if (activeResultId) {
     return <TestResult attemptId={activeResultId} onBack={() => setActiveResultId(null)} />;
+  }
+
+  // Subscription lapsed (or admin-revoked) on a previously-purchased course →
+  // show the dedicated renew screen instead of the generic locked preview.
+  if (!hasAccess && course.isPaid && (accessReason === "expired" || accessReason === "disabled")) {
+    return (
+      <div className="min-h-screen">
+        <div className="mx-auto max-w-3xl px-4 pt-6">
+          <button
+            onClick={() => navigate("/student/courses")}
+            className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white"
+          >
+            <ArrowLeft size={15} /> Back to courses
+          </button>
+        </div>
+        <AccessExpired
+          disabled={accessReason === "disabled"}
+          expiresAt={accessExpiresAt}
+          busy={unlocking}
+          onRenew={() => handleUnlockCourse(plans[0]?.id)}
+          onBuy={() => handleUnlockCourse(plans[0]?.id)}
+        />
+      </div>
+    );
   }
 
   return (

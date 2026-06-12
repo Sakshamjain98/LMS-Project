@@ -28,6 +28,8 @@ import {
 } from "../../services/studentService";
 import TestPlayer from "./TestPlayer";
 import TestResult from "./TestResult";
+import AccessExpired from "../../components/student/AccessExpired";
+import { formatValidity } from "../../utils/validity";
 
 const PAGE_SIZE = 8;
 
@@ -113,11 +115,9 @@ export default function SeriesDetail() {
     loadData();
   }, [loadData, view]);
 
-  const subActive =
-    subscription?.status === "ACTIVE" &&
-    subscription?.plan &&
-    subscription.plan !== "FREE";
-  const isUnlocked = !topic?.isPaid || Boolean(topic?.isUnlocked) || subActive;
+  // Access is purely per-test-series. The platform subscription no longer
+  // unlocks series, so UI matches the server-side per-topic gating.
+  const isUnlocked = !topic?.isPaid || Boolean(topic?.isUnlocked);
 
   // Build attempts map for status badges in the test list.
   const attemptsByTest = useMemo(() => {
@@ -327,6 +327,13 @@ export default function SeriesDetail() {
             <div className="mt-12 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
               {error}
             </div>
+          ) : topic && topic.isPaid && !isUnlocked && topic.accessExpired ? (
+            <AccessExpired
+              expiresAt={topic.accessExpiresAt}
+              busy={unlocking}
+              onRenew={handleUnlock}
+              onBuy={handleUnlock}
+            />
           ) : topic ? (
             <>
               {/* Hero — title, paid badge, stats, unlock CTA */}
@@ -361,6 +368,11 @@ export default function SeriesDetail() {
                       ) : (
                         <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
                           Free Series
+                        </span>
+                      )}
+                      {topic.isPaid && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-3 py-1 text-[11px] font-bold text-brand-primary">
+                          <Clock size={11} /> {formatValidity(topic.validityMonths)}
                         </span>
                       )}
                       {!isUnlocked && (

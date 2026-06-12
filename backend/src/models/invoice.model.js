@@ -46,13 +46,13 @@ const invoiceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate invoice number
-invoiceSchema.pre("save", async function (next) {
+// Auto-generate invoice number.
+// Mongoose 9 uses promise-style async middleware — no `next` callback.
+invoiceSchema.pre("save", async function () {
   if (!this.invoiceNumber) {
     const count = await this.constructor.countDocuments();
     this.invoiceNumber = `INV-${Date.now()}-${(count + 1).toString().padStart(6, "0")}`;
   }
-  next();
 });
 
 export default mongoose.model("Invoice", invoiceSchema);

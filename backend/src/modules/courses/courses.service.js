@@ -5,6 +5,7 @@ import CourseNote from "../../models/courseNote.model.js";
 import CourseVideo from "../../models/courseVideo.model.js";
 import CourseAccess from "../../models/courseAccess.model.js";
 import CourseProgress from "../../models/courseProgress.model.js";
+import TopicAccess from "../../models/topicAccess.model.js";
 import Exam from "../../models/exam.model.js";
 import ExamCategory from "../../models/examCategory.model.js";
 import Test from "../../models/test.model.js";
@@ -20,6 +21,21 @@ const slugify = (str) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+// Multipart form fields arrive as strings; mappedTestSeries may be a JSON array
+// string or an already-parsed array. Normalize to an array of ids.
+function parseIdArray(v) {
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (typeof v === "string" && v.trim()) {
+    try {
+      const p = JSON.parse(v);
+      return Array.isArray(p) ? p.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // Ensure slug is unique by appending a counter when needed.
 async function uniqueSlug(base) {
   let slug = slugify(base);
@@ -33,7 +49,7 @@ async function uniqueSlug(base) {
 // ─── Courses ────────────────────────────────────────────────────────────────
 
 export async function createCourse(data, teacherId) {
-  const { title, description, examId, isPaid, price, discountedPrice, tags, thumbnail } = data;
+  const { title, description, examId, isPaid, price, discountedPrice, tags, thumbnail, validityMonths, mappedTestSeries } = data;
   const exam = await Exam.findById(examId);
   if (!exam) throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
 
@@ -48,6 +64,8 @@ export async function createCourse(data, teacherId) {
     isPaid: paid,
     price: paid ? Number(price) || 0 : 0,
     discountedPrice: paid ? Number(discountedPrice) || 0 : 0,
+    validityMonths: Math.max(0, Number(validityMonths) || 0),
+    mappedTestSeries: parseIdArray(mappedTestSeries),
     tags,
     thumbnail,
     status: "published",
@@ -63,6 +81,8 @@ export async function updateCourse(courseId, data, teacherId) {
   allowed.forEach((k) => {
     if (data[k] !== undefined) course[k] = data[k];
   });
+  if (data.validityMonths !== undefined) course.validityMonths = Math.max(0, Number(data.validityMonths) || 0);
+  if (data.mappedTestSeries !== undefined) course.mappedTestSeries = parseIdArray(data.mappedTestSeries);
   return course.save();
 }
 
@@ -359,23 +379,99 @@ export async function unlinkTest(chapterId, testId, teacherId) {
 export async function checkCourseAccess(userId, courseId) {
   const course = await Course.findById(courseId).select("isPaid").lean();
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
-  if (!course.isPaid) return { hasAccess: true, reason: "free" };
+  if (!course.isPaid) return { hasAccess: true, reason: "free", expiresAt: null };
+
+  const now = new Date();
+
+  // Access is purely per-course: a non-disabled, non-expired grant unlocks it.
+  // Otherwise the student must (re)pay for this specific course.
   const access = await CourseAccess.findOne({ userId, courseId }).lean();
-  if (access) return { hasAccess: true, reason: "purchased" };
+  if (access && !access.disabled && (!access.expiresAt || access.expiresAt > now)) {
+    return { hasAccess: true, reason: "purchased", expiresAt: access.expiresAt || null };
+  }
 
-  // Also check active subscription (non-free plan)
-  const { default: Subscription } = await import("../../models/subscription.model.js");
-  const sub = await Subscription.findOne({ userId, status: "ACTIVE", plan: { $ne: "FREE" } }).lean();
-  if (sub) return { hasAccess: true, reason: "subscription" };
-
-  return { hasAccess: false, reason: "locked" };
+  if (access && access.disabled) return { hasAccess: false, reason: "disabled", expiresAt: null };
+  if (access && access.expiresAt && access.expiresAt <= now)
+    return { hasAccess: false, reason: "expired", expiresAt: access.expiresAt };
+  return { hasAccess: false, reason: "locked", expiresAt: null };
 }
 
-export async function grantCourseAccess(userId, courseId, paymentId) {
-  return CourseAccess.findOneAndUpdate(
+export async function grantCourseAccess(userId, courseId, paymentId, expiresAt = null) {
+  // Re-purchasing resets the access window and clears any admin-revoked state.
+  const access = await CourseAccess.findOneAndUpdate(
     { userId, courseId },
-    { $set: { paymentId, purchasedAt: new Date() } },
+    {
+      $set: {
+        paymentId,
+        purchasedAt: new Date(),
+        expiresAt: expiresAt || null,
+        disabled: false,
+        disabledAt: null,
+        status: "ACTIVE",
+      },
+    },
     { upsert: true, new: true }
+  );
+
+  // Auto-unlock any test series mapped to this course, inheriting its expiry.
+  await cascadeUnlockMappedSeries(userId, courseId, expiresAt || null, paymentId);
+
+  return access;
+}
+
+/**
+ * Unlock every test series (topic) mapped to a course for a user, inheriting
+ * the course's access window. A series the user already bought DIRECTLY is left
+ * untouched so its independent validity is preserved. COURSE_UNLOCK rows are
+ * upserted/refreshed so re-purchasing the course re-extends them.
+ */
+export async function cascadeUnlockMappedSeries(userId, courseId, expiresAt = null, paymentId = null) {
+  const course = await Course.findById(courseId).select("mappedTestSeries").lean();
+  const topicIds = course?.mappedTestSeries || [];
+  if (!topicIds.length) return;
+
+  for (const topicId of topicIds) {
+    const existing = await TopicAccess.findOne({ userId, topicId });
+
+    // A direct purchase always wins — never downgrade or overwrite it.
+    if (existing && existing.source === "DIRECT_PURCHASE") continue;
+
+    await TopicAccess.findOneAndUpdate(
+      { userId, topicId },
+      {
+        $set: {
+          source: "COURSE_UNLOCK",
+          sourceCourseId: courseId,
+          expiresAt: expiresAt || null,
+          disabled: false,
+          disabledAt: null,
+          status: "ACTIVE",
+          paymentId: paymentId || null,
+        },
+        $setOnInsert: { amount: 0, currency: "INR" },
+      },
+      { upsert: true, new: true }
+    );
+  }
+}
+
+/**
+ * Propagate a course-access change to every COURSE_UNLOCK test series it
+ * unlocked: when a course is disabled or its expiry changes, the linked series
+ * follow. Direct purchases are never touched.
+ */
+export async function syncMappedSeriesToCourse(userId, courseId, { disabled, expiresAt } = {}) {
+  const set = {};
+  if (disabled !== undefined) {
+    set.disabled = Boolean(disabled);
+    set.disabledAt = disabled ? new Date() : null;
+  }
+  if (expiresAt !== undefined) set.expiresAt = expiresAt || null;
+  if (!Object.keys(set).length) return;
+
+  await TopicAccess.updateMany(
+    { userId, sourceCourseId: courseId, source: "COURSE_UNLOCK" },
+    { $set: set }
   );
 }
 
@@ -407,6 +503,7 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
     isPaid: c.isPaid,
     price: c.price,
     discountedPrice: c.discountedPrice,
+    validityMonths: c.validityMonths || 0,
     thumbnail: c.thumbnail,
     tags: c.tags,
     subjectsCount: subjectCountMap.get(c._id.toString()) || 0,

@@ -48,6 +48,7 @@ import {
   Tag,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
+import ValidityDurationField from "../../components/ui/ValidityDurationField";
 
 // ─── Level definitions ──────────────────────────────────────────────────────
 const LEVELS = ["categories", "exams", "series", "subjects", "chapters", "tests"];
@@ -80,7 +81,7 @@ const ICON_COLOR = {
 };
 
 // ─── Empty form defaults ─────────────────────────────────────────────────────
-const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, discountedPrice: 0, examId: "" };
+const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, discountedPrice: 0, validityMonths: 0, examId: "" };
 const emptyTestForm = {
   title: "", description: "", duration: 60, passingMarks: 0, instructions: "",
   isPaid: false, attemptLimit: 0, isProctored: false, isOpenTest: true,
@@ -304,7 +305,8 @@ export default function AdminTestSeries() {
       setEntityForm({
         title: data.title || "", description: data.description || "",
         isPaid: Boolean(data.isPaid), price: Number(data.price) || 0,
-        discountedPrice: Number(data.discountedPrice) || 0, examId: data.examId || "",
+        discountedPrice: Number(data.discountedPrice) || 0,
+        validityMonths: Number(data.validityMonths) || 0, examId: data.examId || "",
       });
       setModalState({ isOpen: true, type, mode, editId: data._id });
       return;
@@ -851,6 +853,15 @@ function EntityForm({ form, onChange, level, categories, exams, selectedCategory
                   placeholder="999" className={fi} />
               </FieldLabel>
             </div>
+          )}
+          {form.isPaid && level === "series" && (
+            <FieldLabel label="Validity Duration" hint="Access starts at purchase and expires after this; then the student must repay.">
+              <ValidityDurationField
+                months={form.validityMonths ?? 0}
+                onChange={(m) => onChange({ ...form, validityMonths: m })}
+                className={fi}
+              />
+            </FieldLabel>
           )}
         </>
       )}

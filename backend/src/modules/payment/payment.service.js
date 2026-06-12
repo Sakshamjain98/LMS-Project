@@ -10,11 +10,22 @@ import mongoose from "mongoose";
 import Subscription from "../../models/subscription.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";
+import Course from "../../models/course.model.js";
+import { grantCourseAccess } from "../courses/courses.service.js";
 
 const getPlanDurationInDays = (plan) => {
   if (plan === "YEARLY") return 365;
   if (plan === "QUARTERLY") return 90;
   return 30;
+};
+
+// Returns a Date `months` from now, or null for 0/no-expiry (lifetime).
+const expiryFromMonths = (months) => {
+  const m = Number(months) || 0;
+  if (m <= 0) return null;
+  const d = new Date();
+  d.setMonth(d.getMonth() + m);
+  return d;
 };
 
 const activatePaidSubscription = async (payment) => {
@@ -46,6 +57,11 @@ const activatePaidSubscription = async (payment) => {
         startDate: currentSubscription?.plan === payment.plan ? currentSubscription.startDate || now : now,
         endDate,
         billingCycle: payment.plan,
+        source: "PAYMENT",
+        // Repaying clears any admin-disabled state so access is fully restored.
+        disabledAt: null,
+        disabledBy: null,
+        disabledReason: null,
       },
       $push: {
         paymentHistory: {
@@ -328,6 +344,8 @@ export const userHasTopicAccess = async (userId, topicId) => {
   const access = await TopicAccess.findOne({
     userId: new mongoose.Types.ObjectId(userId),
     topicId: new mongoose.Types.ObjectId(topicId),
+    disabled: { $ne: true },
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
   }).lean();
   return Boolean(access);
 };
@@ -412,12 +430,17 @@ export const verifyTopicPayment = async ({
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
   }
 
-  // Idempotency: if already unlocked, succeed without reprocessing.
+  // Idempotency: if already unlocked, not admin-disabled AND not expired,
+  // succeed without reprocessing. A disabled or expired record means the user
+  // is (re)paying, so we re-enable/renew it below instead of blocking.
   const existing = await TopicAccess.findOne({
     userId: new mongoose.Types.ObjectId(userId),
     topicId: new mongoose.Types.ObjectId(topicId),
-  }).lean();
-  if (existing) {
+  });
+  const now = new Date();
+  const stillValid =
+    existing && !existing.disabled && (!existing.expiresAt || existing.expiresAt > now);
+  if (stillValid) {
     return { alreadyProcessed: true, success: true };
   }
 
@@ -435,14 +458,167 @@ export const verifyTopicPayment = async ({
     }
   }
 
-  await TopicAccess.create({
-    userId: new mongoose.Types.ObjectId(userId),
-    topicId: new mongoose.Types.ObjectId(topicId),
-    orderId: razorpay_order_id,
-    paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
-    amount: topic.price,
-    currency: "INR",
-  });
+  const expiresAt = expiryFromMonths(topic.validityMonths);
 
-  return { success: true, message: "Test series unlocked" };
+  if (existing) {
+    // Renew/re-enable a previously expired or admin-revoked unlock on repayment.
+    // A direct payment also promotes a course-unlocked row to an independent
+    // DIRECT_PURCHASE so a later course expiry never revokes it.
+    existing.disabled = false;
+    existing.disabledAt = null;
+    existing.status = "ACTIVE";
+    existing.source = "DIRECT_PURCHASE";
+    existing.sourceCourseId = null;
+    existing.expiresAt = expiresAt;
+    existing.orderId = razorpay_order_id;
+    existing.paymentId = razorpay_payment_id || `DEV_PAY_${Date.now()}`;
+    existing.amount = topic.price;
+    existing.currency = "INR";
+    await existing.save();
+  } else {
+    await TopicAccess.create({
+      userId: new mongoose.Types.ObjectId(userId),
+      topicId: new mongoose.Types.ObjectId(topicId),
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
+      amount: topic.price,
+      currency: "INR",
+      source: "DIRECT_PURCHASE",
+      status: "ACTIVE",
+      expiresAt,
+    });
+  }
+
+  return { success: true, message: "Test series unlocked", expiresAt };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-course one-time purchase — uses the course's own price + validityMonths.
+// Mirrors the topic flow. Access lives in CourseAccess (see courses.service).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const userHasCourseAccess = async (userId, courseId) => {
+  if (!userId || !courseId) return false;
+  if (!mongoose.Types.ObjectId.isValid(courseId)) return false;
+  const { default: CourseAccess } = await import("../../models/courseAccess.model.js");
+  const access = await CourseAccess.findOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    courseId: new mongoose.Types.ObjectId(courseId),
+    disabled: { $ne: true },
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+  }).lean();
+  return Boolean(access);
+};
+
+const courseChargeAmount = (course) =>
+  course.discountedPrice > 0 && course.discountedPrice < course.price
+    ? course.discountedPrice
+    : course.price;
+
+export const createCourseOrder = async (userId, courseId) => {
+  if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid courseId");
+  }
+
+  const course = await Course.findById(courseId).lean();
+  if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
+  if (!course.isPaid || !(course.price > 0)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "This course is free");
+  }
+
+  // Already has valid access — no need to charge again.
+  if (await userHasCourseAccess(userId, courseId)) {
+    return { alreadyUnlocked: true };
+  }
+
+  const amount = courseChargeAmount(course);
+  let orderId;
+  let razorpayOrderData = null;
+
+  if (process.env.PAYMENT_MODE === "DEV") {
+    orderId = `dev_course_${Date.now()}_${userId}`;
+  } else {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new ApiError(STATUS_CODES.SERVER_ERROR, "Razorpay configuration missing");
+    }
+    try {
+      razorpayOrderData = await razorpay.orders.create({
+        amount: Math.round(amount * 100),
+        currency: "INR",
+        receipt: `crs_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`,
+        notes: {
+          userId: userId.toString(),
+          courseId: course._id.toString(),
+          kind: "COURSE",
+        },
+      });
+      orderId = razorpayOrderData.id;
+    } catch (err) {
+      console.error("Razorpay course order error:", err);
+      throw new ApiError(
+        STATUS_CODES.SERVER_ERROR,
+        err.error?.description || "Failed to create order with payment gateway"
+      );
+    }
+  }
+
+  return {
+    orderId,
+    amount,
+    amountInPaise: Math.round(amount * 100),
+    currency: "INR",
+    courseId: course._id.toString(),
+    courseTitle: course.title,
+    validityMonths: course.validityMonths || 0,
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID || "DEV_KEY",
+    ...(razorpayOrderData && { razorpayOrder: razorpayOrderData }),
+  };
+};
+
+export const verifyCoursePayment = async ({
+  userId,
+  courseId,
+  razorpay_order_id,
+  razorpay_payment_id,
+  razorpay_signature,
+}) => {
+  if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid courseId");
+  }
+  if (!razorpay_order_id) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Order id is required");
+  }
+
+  const course = await Course.findById(courseId).lean();
+  if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
+
+  // Idempotency: if access is already valid, succeed without reprocessing.
+  if (await userHasCourseAccess(userId, courseId)) {
+    return { alreadyProcessed: true, success: true };
+  }
+
+  if (process.env.PAYMENT_MODE !== "DEV") {
+    if (!razorpay_payment_id || !razorpay_signature) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing payment verification fields");
+    }
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid payment signature");
+    }
+  }
+
+  const expiresAt = expiryFromMonths(course.validityMonths);
+  // grantCourseAccess upserts CourseAccess, resets the window, clears revoked state.
+  await grantCourseAccess(
+    userId,
+    courseId,
+    razorpay_payment_id || `DEV_PAY_${Date.now()}`,
+    expiresAt
+  );
+
+  return { success: true, message: "Course unlocked", expiresAt };
 };

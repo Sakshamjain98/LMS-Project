@@ -21,6 +21,8 @@ import {
 } from "../../services/courseService";
 import api from "../../services/api";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
+import ValidityDurationField from "../../components/ui/ValidityDurationField";
+import { getTeacherTestSeries } from "../../services/teacherService";
 
 // ─── Level definitions ────────────────────────────────────────────────────────
 
@@ -699,9 +701,26 @@ function CourseFormModal({ course, exams, defaultExamId, onClose, onSaved }) {
   const [isPaid, setIsPaid] = useState(course?.isPaid ?? false);
   const [price, setPrice] = useState(course?.price?.toString() || "");
   const [discountedPrice, setDiscountedPrice] = useState(course?.discountedPrice?.toString() || "");
+  const [validityMonths, setValidityMonths] = useState(Number(course?.validityMonths) || 0);
+  const [mappedTestSeries, setMappedTestSeries] = useState(
+    (course?.mappedTestSeries || []).map((t) => (typeof t === "object" ? t._id : t)).map(String)
+  );
+  const [topics, setTopics] = useState([]);
   const [status, setStatus] = useState(course?.status || "published");
   const [thumb, setThumb] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Load the test series (topics) available to map to this course.
+  useEffect(() => {
+    getTeacherTestSeries()
+      .then((res) => setTopics(res?.topics || []))
+      .catch(() => setTopics([]));
+  }, []);
+
+  const toggleMappedSeries = (id) =>
+    setMappedTestSeries((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
 
   const handleSave = async () => {
     if (!title.trim()) return toast.error("Title required");
@@ -715,6 +734,8 @@ function CourseFormModal({ course, exams, defaultExamId, onClose, onSaved }) {
       fd.append("isPaid", String(isPaid));
       fd.append("price", isPaid ? String(Number(price) || 0) : "0");
       fd.append("discountedPrice", isPaid ? String(Number(discountedPrice) || 0) : "0");
+      fd.append("validityMonths", String(validityMonths || 0));
+      fd.append("mappedTestSeries", JSON.stringify(mappedTestSeries));
       fd.append("status", status);
       if (thumb) fd.append("thumbnail", thumb);
       if (isEdit) await updateCourse(course._id, fd);
@@ -779,15 +800,43 @@ function CourseFormModal({ course, exams, defaultExamId, onClose, onSaved }) {
             </div>
           </div>
           {isPaid && (
-            <div className="grid grid-cols-2 gap-4">
-              <FieldLabel label="Original Price (₹)" required hint="Full MRP shown as strikethrough.">
-                <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" placeholder="1499" className={fi} />
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <FieldLabel label="Original Price (₹)" required hint="Full MRP shown as strikethrough.">
+                  <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" placeholder="1499" className={fi} />
+                </FieldLabel>
+                <FieldLabel label="Selling Price (₹)" hint="What students actually pay. Leave 0 if no discount.">
+                  <input type="number" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} min="0" placeholder="999" className={fi} />
+                </FieldLabel>
+              </div>
+              <FieldLabel label="Validity Duration" hint="Access starts at purchase and expires after this. Then the student must repay.">
+                <ValidityDurationField months={validityMonths} onChange={setValidityMonths} className={fi} />
               </FieldLabel>
-              <FieldLabel label="Selling Price (₹)" hint="What students actually pay. Leave 0 if no discount.">
-                <input type="number" value={discountedPrice} onChange={(e) => setDiscountedPrice(e.target.value)} min="0" placeholder="999" className={fi} />
-              </FieldLabel>
-            </div>
+            </>
           )}
+          <FieldLabel label="Mapped Test Series" hint="Buying this course auto-unlocks these test series for the same validity period.">
+            <div className="max-h-44 overflow-y-auto rounded-xl border border-white/10 bg-dark-300 p-2 space-y-1">
+              {topics.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-white/40">No test series available.</p>
+              ) : (
+                topics.map((t) => (
+                  <label
+                    key={t._id}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-white/80 hover:bg-white/5 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={mappedTestSeries.includes(String(t._id))}
+                      onChange={() => toggleMappedSeries(String(t._id))}
+                      className="accent-brand-primary"
+                    />
+                    <span className="truncate">{t.title}</span>
+                    {t.isPaid && <span className="ml-auto text-[10px] text-white/40">paid</span>}
+                  </label>
+                ))
+              )}
+            </div>
+          </FieldLabel>
           <FieldLabel label="Thumbnail">
             <input
               type="file"

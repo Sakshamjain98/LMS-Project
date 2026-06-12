@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint *)",
+      "Bash(grep -n \"TopicAccess.exists\\({ userId: objStudentId, topicId: topic._id }\\)\" src/modules/testAttempt/testAttempt.service.js)",
+      "Bash(node --check src/models/subscription.model.js)",
+      "Bash(node --check src/models/invoice.model.js)",
+      "Bash(cd \"/Users/siddharthgautam/Desktop/LMS Project/backend/src\" *)",
+      "Read(//Users/siddharthgautam/Desktop/**)",
+      "Read(//Users/siddharthgautam/frontend/src/pages/student/**)",
+      "Bash(timeout 180 npm test)"
+    ]
+  }
+}

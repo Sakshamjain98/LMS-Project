@@ -114,9 +114,10 @@ router.get(
     const userId = req.user._id;
     const { courseId } = req.params;
     const isAdminOrTeacher = req.user.role === "admin" || req.user.role === "teacher";
-    const { hasAccess } = isAdminOrTeacher
-      ? { hasAccess: true }
+    const access = isAdminOrTeacher
+      ? { hasAccess: true, reason: "admin", expiresAt: null }
       : await svc.checkCourseAccess(userId, courseId);
+    const { hasAccess, reason, expiresAt } = access;
 
     const tree = await svc.getCourseTree(courseId);
 
@@ -134,9 +135,11 @@ router.get(
           })),
         })),
       };
-      return res.json({ success: true, course: preview, hasAccess: false });
+      // reason distinguishes a lapsed/revoked purchase ("expired"/"disabled")
+      // from one never bought ("locked") so the UI can show a renew screen.
+      return res.json({ success: true, course: preview, hasAccess: false, accessReason: reason, expiresAt });
     }
-    res.json({ success: true, course: tree, hasAccess: true });
+    res.json({ success: true, course: tree, hasAccess: true, accessReason: reason, expiresAt });
   })
 );
 

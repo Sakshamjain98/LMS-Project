@@ -3,7 +3,6 @@ import TestAttempt from "../../models/testAttempt.model.js";
 import Test from "../test/test.model.js";
 import Question from "../../models/question.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
-import Subscription from "../../models/subscription.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
@@ -17,14 +16,16 @@ import {
   generateDetailedResult,
 } from "../../shared/utils/evaluation.utils.js";
 
-// True when the student has an active paid subscription that unlocks paid topics.
-const hasActivePaidSubscription = async (studentId) => {
-  const sub = await Subscription.findOne({ userId: studentId }).lean();
-  if (!sub) return false;
-  if (sub.status !== "ACTIVE") return false;
-  if (!sub.plan || sub.plan === "FREE") return false;
-  if (sub.expiresAt && new Date(sub.expiresAt) < new Date()) return false;
-  return true;
+// True when the student holds a valid (non-disabled, non-expired) unlock for
+// the given paid topic. Access is purely per-topic — there is no subscription.
+const hasValidTopicAccess = async (studentId, topicId) => {
+  const access = await TopicAccess.findOne({
+    userId: studentId,
+    topicId,
+    disabled: { $ne: true },
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+  }).lean();
+  return Boolean(access);
 };
 
 /**
@@ -81,15 +82,12 @@ export const startTest = async (testId, studentId) => {
   }
 
   // Paid-topic gating — pricing lives on the parent test series (topic).
-  // Access is granted by EITHER an active paid subscription OR a per-topic unlock.
+  // Access requires a valid per-topic unlock (time-bound; renew when expired).
   if (test.topicId) {
     const topic = await TestSeriesTopic.findById(test.topicId).lean();
     if (topic?.isPaid) {
-      const [subOk, topicOk] = await Promise.all([
-        hasActivePaidSubscription(objStudentId),
-        TopicAccess.exists({ userId: objStudentId, topicId: topic._id }),
-      ]);
-      if (!subOk && !topicOk) {
+      const topicOk = await hasValidTopicAccess(objStudentId, topic._id);
+      if (!topicOk) {
         throw new ApiError(
           STATUS_CODES.FORBIDDEN,
           `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to start.`
@@ -184,11 +182,8 @@ export const getTestPreview = async (testId, studentId) => {
   if (test.topicId) {
     const topic = await TestSeriesTopic.findById(test.topicId).lean();
     if (topic?.isPaid) {
-      const [subOk, topicOk] = await Promise.all([
-        hasActivePaidSubscription(objStudentId),
-        TopicAccess.exists({ userId: objStudentId, topicId: topic._id }),
-      ]);
-      if (!subOk && !topicOk) {
+      const topicOk = await hasValidTopicAccess(objStudentId, topic._id);
+      if (!topicOk) {
         throw new ApiError(
           STATUS_CODES.FORBIDDEN,
           `This test belongs to a premium series. Unlock it for ₹${Number(topic.price || 0).toLocaleString()} to view details.`

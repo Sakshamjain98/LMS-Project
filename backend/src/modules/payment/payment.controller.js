@@ -121,3 +121,31 @@ export const checkTopicAccess = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({ success: true, unlocked });
 });
 
+// Per-course one-time purchase via Razorpay
+export const createCourseOrder = asyncHandler(async (req, res) => {
+  const order = await service.createCourseOrder(req.user._id, req.params.courseId);
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: "Course order created",
+    order,
+  });
+});
+
+export const verifyCoursePayment = asyncHandler(async (req, res) => {
+  const result = await service.verifyCoursePayment({
+    userId: req.user._id,
+    courseId: req.params.courseId,
+    ...req.body,
+  });
+  res.status(STATUS_CODES.SUCCESS).json({
+    success: true,
+    message: result.alreadyProcessed ? "Already unlocked" : MESSAGES.PAYMENT_SUCCESS,
+    ...result,
+  });
+});
+
+export const checkCourseAccess = asyncHandler(async (req, res) => {
+  const unlocked = await service.userHasCourseAccess(req.user._id, req.params.courseId);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, unlocked });
+});
+

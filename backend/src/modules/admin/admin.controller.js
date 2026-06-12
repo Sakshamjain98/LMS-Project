@@ -71,6 +71,94 @@ export const removeUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "User deleted successfully" });
 });
 
+// -------------------- Subscription / Access Management --------------------
+export const userSubscription = asyncHandler(async (req, res) => {
+  const data = await service.getUserSubscriptionDetail(req.params.id);
+  res.json({ success: true, ...data });
+});
+
+export const disableUserAccess = asyncHandler(async (req, res) => {
+  const subscription = await service.disableUserAccess(
+    req.params.id,
+    req.user._id,
+    req.body?.reason
+  );
+  res.json({
+    success: true,
+    message: "Premium access disabled. The user must repay to reactivate.",
+    subscription,
+  });
+});
+
+export const enableUserAccess = asyncHandler(async (req, res) => {
+  const subscription = await service.enableUserAccess(req.params.id, req.user._id, req.body || {});
+  res.json({ success: true, message: "Access re-enabled", subscription });
+});
+
+export const extendUserAccess = asyncHandler(async (req, res) => {
+  const subscription = await service.extendUserAccess(req.params.id, req.user._id, req.body || {});
+  res.json({ success: true, message: "Access extended", subscription });
+});
+
+export const grantUserPlan = asyncHandler(async (req, res) => {
+  const subscription = await service.grantUserPlan(req.params.id, req.user._id, req.body || {});
+  res.json({ success: true, message: "Plan granted", subscription });
+});
+
+// One-time content purchases (courses / test series)
+export const userContentAccess = asyncHandler(async (req, res) => {
+  const data = await service.getUserContentAccess(req.params.id);
+  res.json({ success: true, ...data });
+});
+
+export const setCourseAccess = asyncHandler(async (req, res) => {
+  const grant = await service.setCourseAccessDisabled(
+    req.params.id,
+    req.params.courseId,
+    req.body?.disabled
+  );
+  res.json({
+    success: true,
+    message: req.body?.disabled
+      ? "Course access revoked — user must repay to reaccess."
+      : "Course access restored.",
+    grant,
+  });
+});
+
+export const setTopicAccess = asyncHandler(async (req, res) => {
+  const grant = await service.setTopicAccessDisabled(
+    req.params.id,
+    req.params.topicId,
+    req.body?.disabled
+  );
+  res.json({
+    success: true,
+    message: req.body?.disabled
+      ? "Test series access revoked — user must repay to reaccess."
+      : "Test series access restored.",
+    grant,
+  });
+});
+
+// Extend / change expiry / reactivate a single course grant.
+export const extendCourseAccess = asyncHandler(async (req, res) => {
+  const grant = await service.setCourseAccessExpiry(req.params.id, req.params.courseId, {
+    days: req.body?.days,
+    until: req.body?.until,
+  });
+  res.json({ success: true, message: "Course access updated.", grant });
+});
+
+// Extend / change expiry / reactivate a single test series grant.
+export const extendTopicAccess = asyncHandler(async (req, res) => {
+  const grant = await service.setTopicAccessExpiry(req.params.id, req.params.topicId, {
+    days: req.body?.days,
+    until: req.body?.until,
+  });
+  res.json({ success: true, message: "Test series access updated.", grant });
+});
+
 // -------------------- Pending Content --------------------
 export const pendingContent = asyncHandler(async (req, res) => {
   const result = await service.getPendingContent(req.query);

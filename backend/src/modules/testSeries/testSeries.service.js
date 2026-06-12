@@ -75,6 +75,7 @@ export const createTopic = async (payload, teacherId) => {
   const isPaid = Boolean(payload?.isPaid);
   const price = Math.max(0, Number(payload?.price) || 0);
   const discountedPrice = Math.max(0, Number(payload?.discountedPrice) || 0);
+  const validityMonths = Math.max(0, Number(payload?.validityMonths) || 0);
 
   let examId = null;
   if (payload?.examId) {
@@ -87,6 +88,7 @@ export const createTopic = async (payload, teacherId) => {
     isPaid,
     price: isPaid ? price : 0,
     discountedPrice: isPaid ? discountedPrice : 0,
+    validityMonths: isPaid ? validityMonths : 0,
     teacherId: validateObjectId(teacherId, "teacherId"),
     examId,
   });
@@ -109,10 +111,14 @@ export const updateTopic = async (topicId, payload, teacherId) => {
   if (payload?.discountedPrice !== undefined) {
     updates.discountedPrice = Math.max(0, Number(payload.discountedPrice) || 0);
   }
-  // If admin marks topic free, force price to 0 to keep state consistent.
+  if (payload?.validityMonths !== undefined) {
+    updates.validityMonths = Math.max(0, Number(payload.validityMonths) || 0);
+  }
+  // If admin marks topic free, force price/validity to 0 to keep state consistent.
   if (updates.isPaid === false) {
     updates.price = 0;
     updates.discountedPrice = 0;
+    updates.validityMonths = 0;
   }
 
   const updated = await TestSeriesTopic.findOneAndUpdate(

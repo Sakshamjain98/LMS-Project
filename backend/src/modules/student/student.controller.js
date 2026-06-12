@@ -189,26 +189,10 @@ export const paidNotes = asyncHandler(async (req, res) => {
 
 export const getAvailableTests = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const sub = await service.getUserSubscription(userId);
-  const subActive =
-    sub?.status === "ACTIVE" && sub?.plan && sub.plan !== "FREE" &&
-    (!sub.endDate || new Date(sub.endDate) > new Date());
+  const now = new Date();
 
   // Flat topic list for backward-compatible `topics` key (used by SeriesDetail)
   const topics = await testSeriesService.getStudentSeriesTree();
-
-  const paidTopicIds = topics.filter((t) => t.isPaid).map((t) => t._id);
-  const accessDocs = paidTopicIds.length
-    ? await TopicAccess.find({ userId, topicId: { $in: paidTopicIds } })
-        .select("topicId")
-        .lean()
-    : [];
-  const unlockedSet = new Set(accessDocs.map((a) => a.topicId.toString()));
-
-  const annotatedTopics = topics.map((topic) => ({
-    ...topic,
-    isUnlocked: !topic.isPaid || subActive || unlockedSet.has(topic._id.toString()),
-  }));
 
   // Full hierarchy for the new category/exam browse flow
   const categories = await testSeriesService.getFullHierarchyTree({ publishedOnly: true });
@@ -221,27 +205,56 @@ export const getAvailableTests = asyncHandler(async (req, res) => {
         examId: exam._id,
         subjects: [],
         tests: aits.tests || [],
-        isUnlocked: !aits.isPaid || subActive,
       }))
     )
   );
 
-  // Annotate isUnlocked on testSeries topics within the hierarchy
-  const unlockedSetCopy = unlockedSet;
+  // Access is purely per-topic: fetch the user's valid (non-disabled,
+  // non-expired) unlocks across every paid series/AITS, with their expiry.
+  const paidIds = [
+    ...topics.filter((t) => t.isPaid).map((t) => t._id),
+    ...flatAitsSections.filter((a) => a.isPaid).map((a) => a._id),
+  ];
+  // Fetch ALL access docs (including lapsed/revoked) so we can tell a series
+  // that was never bought ("locked") from one that was bought and expired,
+  // letting the UI show a dedicated renew screen for the latter.
+  const accessDocs = paidIds.length
+    ? await TopicAccess.find({ userId, topicId: { $in: paidIds } })
+        .select("topicId expiresAt disabled")
+        .lean()
+    : [];
+  const accessByTopic = new Map(); // valid unlocks → expiry
+  const lapsedTopics = new Map();  // had a record but now expired/disabled → expiry
+  for (const a of accessDocs) {
+    const id = a.topicId.toString();
+    const valid = !a.disabled && (!a.expiresAt || new Date(a.expiresAt) > now);
+    if (valid) accessByTopic.set(id, a.expiresAt || null);
+    else lapsedTopics.set(id, a.expiresAt || null);
+  }
+
+  const isUnlocked = (t) => !t.isPaid || accessByTopic.has(t._id?.toString());
+  const expiryOf = (t) =>
+    accessByTopic.get(t._id?.toString()) ?? lapsedTopics.get(t._id?.toString()) ?? null;
+  const isExpired = (t) =>
+    t.isPaid && !accessByTopic.has(t._id?.toString()) && lapsedTopics.has(t._id?.toString());
+  const annotate = (t) => ({
+    ...t,
+    isUnlocked: isUnlocked(t),
+    accessExpiresAt: expiryOf(t),
+    accessExpired: isExpired(t),
+  });
+
   const annotateTopicsInHierarchy = (cat) => ({
     ...cat,
     exams: (cat.exams || []).map((exam) => ({
       ...exam,
-      testSeries: (exam.testSeries || []).map((ts) => ({
-        ...ts,
-        isUnlocked: !ts.isPaid || subActive || unlockedSetCopy.has(ts._id?.toString()),
-      })),
+      testSeries: (exam.testSeries || []).map(annotate),
     })),
   });
 
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
-    topics: [...annotatedTopics, ...flatAitsSections],
+    topics: [...topics.map(annotate), ...flatAitsSections.map(annotate)],
     categories: categories.map(annotateTopicsInHierarchy),
   });
 });

@@ -12,6 +12,9 @@ const testSeriesTopicSchema = new mongoose.Schema(
     isPaid: { type: Boolean, default: false },
     price: { type: Number, default: 0, min: 0 },
     discountedPrice: { type: Number, default: 0, min: 0 },
+    // Months of access a purchase grants. 0 = no expiry (lifetime). Drives
+    // TopicAccess.expiresAt; after it lapses the student must pay again.
+    validityMonths: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

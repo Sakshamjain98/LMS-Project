@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Tag, GraduationCap, ChevronRight, Loader2, Lock,
   DollarSign, Search, BookMarked, CheckCircle2, ArrowRight,
-  Sparkles, Layers, Play,
+  Sparkles, Layers, Play, Clock,
 } from "lucide-react";
 import { getPublicCourses, getMultipleCourseProgress } from "../../services/courseService";
+import { formatValidity } from "../../utils/validity";
 import { getPublicExamCategories } from "../../services/studentService";
 import StudentNavbar from "../../components/layout/StudentNavbar";
 
@@ -156,6 +157,11 @@ function CourseCard({ course, progress, onClick }) {
           </h3>
           {course.description && (
             <p className="text-xs text-white/45 line-clamp-2 mt-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: course.description }} />
+          )}
+          {course.isPaid && (
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-2.5 py-1 text-[10px] font-semibold text-brand-primary">
+              <Clock size={10} /> {formatValidity(course.validityMonths)}
+            </span>
           )}
         </div>
 

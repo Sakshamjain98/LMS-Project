@@ -27,6 +27,20 @@ const courseSchema = new mongoose.Schema(
     isPaid: { type: Boolean, default: false },
     price: { type: Number, default: 0, min: 0 },
     discountedPrice: { type: Number, default: 0, min: 0 },
+    // How many months of access a purchase grants. 0 = no expiry (lifetime).
+    // For paid courses this drives CourseAccess.expiresAt; after it lapses the
+    // student must pay again.
+    validityMonths: { type: Number, default: 0, min: 0 },
+    // Test series (topics) that are automatically unlocked when this course is
+    // purchased. The unlocked TopicAccess rows inherit the course's expiry and
+    // are revoked when the course access lapses (source = COURSE_UNLOCK).
+    mappedTestSeries: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TestSeriesTopic",
+        index: true,
+      },
+    ],
     thumbnail: { url: String, publicId: String },
     status: { type: String, enum: ["draft", "published"], default: "published" },
     order: { type: Number, default: 0 },

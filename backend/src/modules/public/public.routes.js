@@ -74,6 +74,7 @@ router.get(
         isPaid: Boolean(topic.isPaid),
         price: Number(topic.price) || 0,
         discountedPrice: Number(topic.discountedPrice) || 0,
+        validityMonths: Number(topic.validityMonths) || 0,
         subjectsCount: topicSubjects.length,
         chaptersCount: topicChapters.length,
         testsCount: topicTests.length,

@@ -22,6 +22,62 @@ export const deleteUser = async (userId) => {
   return res.data;
 };
 
+// ==================== USER SUBSCRIPTION / ACCESS ====================
+export const getUserSubscription = async (userId) => {
+  const res = await API.get(`/admin/users/${userId}/subscription`);
+  return res.data;
+};
+
+// Disable premium access without deleting the account — user must repay.
+export const disableUserAccess = async (userId, reason) => {
+  const res = await API.post(`/admin/users/${userId}/subscription/disable`, { reason });
+  return res.data;
+};
+
+export const enableUserAccess = async (userId, payload = {}) => {
+  const res = await API.post(`/admin/users/${userId}/subscription/enable`, payload);
+  return res.data;
+};
+
+// payload: { days } or { until }
+export const extendUserAccess = async (userId, payload = {}) => {
+  const res = await API.post(`/admin/users/${userId}/subscription/extend`, payload);
+  return res.data;
+};
+
+// payload: { plan, durationDays }
+export const grantUserPlan = async (userId, payload = {}) => {
+  const res = await API.post(`/admin/users/${userId}/subscription/grant`, payload);
+  return res.data;
+};
+
+// One-time content purchases (individual courses / test series)
+export const getUserContentAccess = async (userId) => {
+  const res = await API.get(`/admin/users/${userId}/content-access`);
+  return res.data;
+};
+
+export const setCourseAccessDisabled = async (userId, courseId, disabled) => {
+  const res = await API.post(`/admin/users/${userId}/content-access/course/${courseId}`, { disabled });
+  return res.data;
+};
+
+export const setTopicAccessDisabled = async (userId, topicId, disabled) => {
+  const res = await API.post(`/admin/users/${userId}/content-access/topic/${topicId}`, { disabled });
+  return res.data;
+};
+
+// Extend / change expiry / reactivate a single course grant. Pass { days } or { until }.
+export const extendCourseAccess = async (userId, courseId, payload = {}) => {
+  const res = await API.post(`/admin/users/${userId}/content-access/course/${courseId}/extend`, payload);
+  return res.data;
+};
+
+export const extendTopicAccess = async (userId, topicId, payload = {}) => {
+  const res = await API.post(`/admin/users/${userId}/content-access/topic/${topicId}/extend`, payload);
+  return res.data;
+};
+
 // ==================== PENDING CONTENT ====================
 export const getPendingContent = async (params = {}) => {
   const res = await API.get("/admin/content/pending", { params });
