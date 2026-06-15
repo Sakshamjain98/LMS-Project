@@ -16,7 +16,7 @@ Express-based API for LMS with MongoDB and Redis integration.
   - `helmet`
   - `hpp`
   - `express-mongo-sanitize`
-- Configurable CORS allowlist from `CORS_ORIGIN`.
+- Configurable CORS allowlist from `CORS_ORIGIN`, plus `https://psclasses.in` and `https://www.psclasses.in`.
 - Request compression enabled.
 - Configurable body-size limit (`REQUEST_SIZE_LIMIT`).
 - DB connection tuning:

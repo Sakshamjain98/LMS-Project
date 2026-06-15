@@ -32,7 +32,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - TRUST_PROXY=true
       - ENABLE_SWAGGER=false
-      - CORS_ORIGIN=http://localhost:5173,http://localhost:80
+      - CORS_ORIGIN=http://localhost:5173,http://localhost:80,https://psclasses.in,https://www.psclasses.in
     depends_on:
       redis:
         condition: service_healthy

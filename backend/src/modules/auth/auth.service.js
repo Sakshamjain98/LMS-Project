@@ -6,7 +6,7 @@ import { hashPassword, comparePassword } from "../../shared/utils/bcrypt.js";
 import { generateToken } from "../../shared/utils/token.js";
 import { OAuth2Client } from "google-auth-library";
 import crypto from 'crypto';
-import { sendResetPasswordEmail} from "../../shared/utils/email.util.js"
+import { sendResetPasswordEmail, sendWelcomeEmail } from "../../shared/utils/email.util.js";
 export const registerUserService = async ({ name, email, password, role }) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -21,6 +21,13 @@ export const registerUserService = async ({ name, email, password, role }) => {
     role,
     isApproved,
   });
+
+  try {
+    await sendWelcomeEmail(user.email, user.name);
+  } catch (error) {
+    console.warn(`Failed to send welcome email to ${user.email}: ${error.message}`);
+  }
+
   return user;
 };
 

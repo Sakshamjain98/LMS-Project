@@ -36,6 +36,12 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const corsOrigins = new Set([
+  ...allowedOrigins,
+  "https://psclasses.in",
+  "https://www.psclasses.in",
+]);
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -50,7 +56,7 @@ app.use(cors({
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    if (corsOrigins.has(origin)) {
       return callback(null, true);
     }
 
