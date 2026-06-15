@@ -6,7 +6,8 @@ const getFromAddress = () =>
 const getBrandUrl = () => process.env.BRAND_SITE_URL || "https://psclasses.in";
 
 const getLogoUrl = () =>
-  process.env.EMAIL_LOGO_URL || `${getBrandUrl()}/logo.png`;
+  process.env.EMAIL_LOGO_URL ||
+  "https://www.psclasses.in/assets/logo-DHy9Va5o.png";
 
 const getFrontendUrl = () =>
   process.env.FRONTEND_URL || "http://localhost:5173";

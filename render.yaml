@@ -45,6 +45,10 @@ services:
         value: PS Classes <noreply@psclasses.in>
       - key: FRONTEND_URL
         value: https://psclasses.in
+      - key: BRAND_SITE_URL
+        value: https://psclasses.in
+      - key: EMAIL_LOGO_URL
+        value: https://www.psclasses.in/assets/logo-DHy9Va5o.png
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

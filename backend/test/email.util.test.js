@@ -20,8 +20,13 @@ describe("email util", () => {
     vi.resetModules();
     delete process.env.EMAIL_FROM;
     delete process.env.FRONTEND_URL;
+    delete process.env.BRAND_SITE_URL;
+    delete process.env.EMAIL_LOGO_URL;
     process.env.RESEND_API_KEY = "re_test_key";
     process.env.EMAIL_FROM = "PS Classes <noreply@psclasses.in>";
+    process.env.FRONTEND_URL = "https://psclasses.in";
+    process.env.BRAND_SITE_URL = "https://psclasses.in";
+    process.env.EMAIL_LOGO_URL = "https://www.psclasses.in/assets/logo-DHy9Va5o.png";
     send.mockResolvedValue({ data: { id: "email_123" }, error: null });
   });
 
@@ -39,7 +44,14 @@ describe("email util", () => {
         to: "sakshamdevs007@gmail.com",
         subject: "Password Reset",
         html: expect.stringContaining(
-          "http://localhost:5173/reset-password?token=token123"
+          "https://psclasses.in/reset-password?token=token123"
+        ),
+      })
+    );
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          "https://www.psclasses.in/assets/logo-DHy9Va5o.png"
         ),
       })
     );
