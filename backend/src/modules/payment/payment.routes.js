@@ -33,6 +33,10 @@ router.get("/pending-approval", authMiddleware, authorize("admin"), controller.g
 router.put("/:id/approve", authMiddleware, authorize("admin"), controller.approvePayment);
 router.put("/:id/reject", authMiddleware, authorize("admin"), controller.rejectPayment);
 
+// Admin recovery — rescue a paid-but-not-unlocked order by Razorpay id.
+// Body: { paymentId } or { orderId } (from the Razorpay dashboard / email).
+router.post("/reconcile", authMiddleware, authorize("admin"), controller.reconcilePayment);
+
 export default router;
 
 

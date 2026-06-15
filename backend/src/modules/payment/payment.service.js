@@ -28,6 +28,14 @@ const expiryFromMonths = (months) => {
   return d;
 };
 
+// The amount actually charged for a paid item (course / test-series topic):
+// the discounted/selling price when it's a genuine discount below the original
+// price, otherwise the original price. Mirrors the frontend display rule.
+const sellingPrice = (item) =>
+  item.discountedPrice > 0 && item.discountedPrice < item.price
+    ? item.discountedPrice
+    : item.price;
+
 const activatePaidSubscription = async (payment) => {
   const durationInDays = getPlanDurationInDays(payment.plan);
   const now = new Date();
@@ -369,6 +377,7 @@ export const createTopicOrder = async (userId, topicId) => {
     return { alreadyUnlocked: true };
   }
 
+  const amount = sellingPrice(topic);
   let orderId;
   let razorpayOrderData = null;
 
@@ -380,7 +389,7 @@ export const createTopicOrder = async (userId, topicId) => {
     }
     try {
       razorpayOrderData = await razorpay.orders.create({
-        amount: Math.round(topic.price * 100),
+        amount: Math.round(amount * 100),
         currency: "INR",
         receipt: `tpc_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`,
         notes: {
@@ -401,14 +410,72 @@ export const createTopicOrder = async (userId, topicId) => {
 
   return {
     orderId,
-    amount: topic.price,
-    amountInPaise: Math.round(topic.price * 100),
+    amount,
+    amountInPaise: Math.round(amount * 100),
     currency: "INR",
     topicId: topic._id.toString(),
     topicTitle: topic.title,
     razorpayKeyId: process.env.RAZORPAY_KEY_ID || "DEV_KEY",
     ...(razorpayOrderData && { razorpayOrder: razorpayOrderData }),
   };
+};
+
+// Idempotently grant (or renew) a direct test-series unlock. Shared by the
+// client verify endpoint, the Razorpay webhook, and the admin reconcile tool —
+// so a paid order always unlocks regardless of which path confirms it.
+export const fulfillTopicAccess = async (userId, topicId, { orderId = null, paymentId = null } = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(topicId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid topicId");
+  }
+  const topic = await TestSeriesTopic.findById(topicId).lean();
+  if (!topic) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
+  }
+
+  const existing = await TopicAccess.findOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    topicId: new mongoose.Types.ObjectId(topicId),
+  });
+  const now = new Date();
+  const stillValid =
+    existing && !existing.disabled && (!existing.expiresAt || existing.expiresAt > now);
+  if (stillValid) {
+    return { alreadyProcessed: true, success: true };
+  }
+
+  const expiresAt = expiryFromMonths(topic.validityMonths);
+  const pid = paymentId || `MANUAL_${Date.now()}`;
+
+  if (existing) {
+    // Renew/re-enable a previously expired or admin-revoked unlock on repayment.
+    // A direct payment also promotes a course-unlocked row to an independent
+    // DIRECT_PURCHASE so a later course expiry never revokes it.
+    existing.disabled = false;
+    existing.disabledAt = null;
+    existing.status = "ACTIVE";
+    existing.source = "DIRECT_PURCHASE";
+    existing.sourceCourseId = null;
+    existing.expiresAt = expiresAt;
+    if (orderId) existing.orderId = orderId;
+    existing.paymentId = pid;
+    existing.amount = sellingPrice(topic);
+    existing.currency = "INR";
+    await existing.save();
+  } else {
+    await TopicAccess.create({
+      userId: new mongoose.Types.ObjectId(userId),
+      topicId: new mongoose.Types.ObjectId(topicId),
+      orderId,
+      paymentId: pid,
+      amount: sellingPrice(topic),
+      currency: "INR",
+      source: "DIRECT_PURCHASE",
+      status: "ACTIVE",
+      expiresAt,
+    });
+  }
+
+  return { success: true, expiresAt };
 };
 
 export const verifyTopicPayment = async ({
@@ -425,25 +492,6 @@ export const verifyTopicPayment = async ({
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Order id is required");
   }
 
-  const topic = await TestSeriesTopic.findById(topicId).lean();
-  if (!topic) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, "Test series not found");
-  }
-
-  // Idempotency: if already unlocked, not admin-disabled AND not expired,
-  // succeed without reprocessing. A disabled or expired record means the user
-  // is (re)paying, so we re-enable/renew it below instead of blocking.
-  const existing = await TopicAccess.findOne({
-    userId: new mongoose.Types.ObjectId(userId),
-    topicId: new mongoose.Types.ObjectId(topicId),
-  });
-  const now = new Date();
-  const stillValid =
-    existing && !existing.disabled && (!existing.expiresAt || existing.expiresAt > now);
-  if (stillValid) {
-    return { alreadyProcessed: true, success: true };
-  }
-
   if (process.env.PAYMENT_MODE !== "DEV") {
     if (!razorpay_payment_id || !razorpay_signature) {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing payment verification fields");
@@ -458,38 +506,11 @@ export const verifyTopicPayment = async ({
     }
   }
 
-  const expiresAt = expiryFromMonths(topic.validityMonths);
-
-  if (existing) {
-    // Renew/re-enable a previously expired or admin-revoked unlock on repayment.
-    // A direct payment also promotes a course-unlocked row to an independent
-    // DIRECT_PURCHASE so a later course expiry never revokes it.
-    existing.disabled = false;
-    existing.disabledAt = null;
-    existing.status = "ACTIVE";
-    existing.source = "DIRECT_PURCHASE";
-    existing.sourceCourseId = null;
-    existing.expiresAt = expiresAt;
-    existing.orderId = razorpay_order_id;
-    existing.paymentId = razorpay_payment_id || `DEV_PAY_${Date.now()}`;
-    existing.amount = topic.price;
-    existing.currency = "INR";
-    await existing.save();
-  } else {
-    await TopicAccess.create({
-      userId: new mongoose.Types.ObjectId(userId),
-      topicId: new mongoose.Types.ObjectId(topicId),
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
-      amount: topic.price,
-      currency: "INR",
-      source: "DIRECT_PURCHASE",
-      status: "ACTIVE",
-      expiresAt,
-    });
-  }
-
-  return { success: true, message: "Test series unlocked", expiresAt };
+  const result = await fulfillTopicAccess(userId, topicId, {
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
+  });
+  return { success: true, message: "Test series unlocked", ...result };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,10 +531,7 @@ export const userHasCourseAccess = async (userId, courseId) => {
   return Boolean(access);
 };
 
-const courseChargeAmount = (course) =>
-  course.discountedPrice > 0 && course.discountedPrice < course.price
-    ? course.discountedPrice
-    : course.price;
+const courseChargeAmount = (course) => sellingPrice(course);
 
 export const createCourseOrder = async (userId, courseId) => {
   if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -589,14 +607,6 @@ export const verifyCoursePayment = async ({
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Order id is required");
   }
 
-  const course = await Course.findById(courseId).lean();
-  if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
-
-  // Idempotency: if access is already valid, succeed without reprocessing.
-  if (await userHasCourseAccess(userId, courseId)) {
-    return { alreadyProcessed: true, success: true };
-  }
-
   if (process.env.PAYMENT_MODE !== "DEV") {
     if (!razorpay_payment_id || !razorpay_signature) {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "Missing payment verification fields");
@@ -611,14 +621,146 @@ export const verifyCoursePayment = async ({
     }
   }
 
+  const result = await fulfillCourseAccess(userId, courseId, {
+    paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
+  });
+  return { success: true, message: "Course unlocked", ...result };
+};
+
+// Idempotently grant a course purchase. Shared by verify, webhook and reconcile.
+export const fulfillCourseAccess = async (userId, courseId, { paymentId = null } = {}) => {
+  if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid courseId");
+  }
+  const course = await Course.findById(courseId).lean();
+  if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
+
+  if (await userHasCourseAccess(userId, courseId)) {
+    return { alreadyProcessed: true, success: true };
+  }
+
   const expiresAt = expiryFromMonths(course.validityMonths);
   // grantCourseAccess upserts CourseAccess, resets the window, clears revoked state.
-  await grantCourseAccess(
-    userId,
-    courseId,
-    razorpay_payment_id || `DEV_PAY_${Date.now()}`,
-    expiresAt
-  );
+  await grantCourseAccess(userId, courseId, paymentId || `MANUAL_${Date.now()}`, expiresAt);
 
-  return { success: true, message: "Course unlocked", expiresAt };
+  return { success: true, expiresAt };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subscription / course / topic orders all carry routing info in their Razorpay
+// `notes` (set at order creation). The webhook and the admin reconcile tool use
+// these to grant the right access server-side, even if the browser callback that
+// normally calls /verify never fires (tab closed, network drop, redirect flow).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Subscription orders are tracked in the Payment collection by orderId, so we
+// activate by promoting that record (mirrors the /verify subscription path).
+export const fulfillSubscriptionByOrderId = async (orderId, paymentId = null) => {
+  const payment = await Payment.findOne({ orderId });
+  if (!payment) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Payment order not found for subscription");
+  }
+  if (payment.status === "SUCCESS" && payment.adminApproved) {
+    return { alreadyProcessed: true, success: true };
+  }
+  payment.paymentId = paymentId || payment.paymentId;
+  payment.status = "SUCCESS";
+  payment.adminApproved = true;
+  payment.verifiedAt = payment.verifiedAt || new Date();
+  payment.approvedAt = payment.approvedAt || new Date();
+  await payment.save();
+  await activatePaidSubscription(payment);
+  return { success: true };
+};
+
+// Map a paid order's notes to the correct fulfillment. Idempotent end-to-end.
+const routeOrderFulfillment = async (notes = {}, { orderId = null, paymentId = null } = {}) => {
+  if (notes.kind === "TOPIC" && notes.topicId && notes.userId) {
+    return fulfillTopicAccess(notes.userId, notes.topicId, { orderId, paymentId });
+  }
+  if (notes.kind === "COURSE" && notes.courseId && notes.userId) {
+    return fulfillCourseAccess(notes.userId, notes.courseId, { paymentId });
+  }
+  if (notes.planId) {
+    return fulfillSubscriptionByOrderId(orderId, paymentId);
+  }
+  throw new ApiError(STATUS_CODES.BAD_REQUEST, "Order notes do not map to any purchasable item");
+};
+
+// Verify the webhook HMAC (signed with the dashboard webhook secret, NOT the API
+// key secret) over the RAW request body, then fulfill the paid order.
+export const handleRazorpayWebhook = async (rawBody, signature) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new ApiError(STATUS_CODES.SERVER_ERROR, "RAZORPAY_WEBHOOK_SECRET is not configured");
+  }
+  const body = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody || "");
+  const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
+  const sig = Buffer.from(signature || "", "utf8");
+  const exp = Buffer.from(expected, "utf8");
+  if (sig.length !== exp.length || !crypto.timingSafeEqual(sig, exp)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid webhook signature");
+  }
+
+  const event = JSON.parse(body.toString("utf8"));
+  const type = event?.event;
+
+  if (type === "order.paid") {
+    const order = event.payload?.order?.entity || {};
+    const payment = event.payload?.payment?.entity || {};
+    await routeOrderFulfillment(order.notes || {}, {
+      orderId: order.id || payment.order_id || null,
+      paymentId: payment.id || null,
+    });
+    return { handled: true, event: type };
+  }
+
+  if (type === "payment.captured") {
+    const payment = event.payload?.payment?.entity || {};
+    const orderId = payment.order_id || null;
+    let notes = payment.notes || {};
+    // Notes are set on the order; the payment entity may not echo them.
+    if ((!notes || !notes.kind) && orderId && razorpay) {
+      try {
+        const order = await razorpay.orders.fetch(orderId);
+        notes = order?.notes || notes;
+      } catch (e) {
+        console.error("Webhook: could not fetch order notes:", e?.message);
+      }
+    }
+    await routeOrderFulfillment(notes || {}, { orderId, paymentId: payment.id || null });
+    return { handled: true, event: type };
+  }
+
+  return { handled: false, event: type };
+};
+
+// Admin recovery: given a Razorpay paymentId or orderId, confirm it's actually
+// paid at Razorpay, then grant the access it should have. Use this to rescue any
+// payment that was taken but never unlocked (e.g. before the webhook existed).
+export const reconcilePayment = async ({ paymentId = null, orderId = null }) => {
+  if (!razorpay) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Reconcile is unavailable while PAYMENT_MODE=DEV");
+  }
+  let payment = null;
+  if (paymentId) {
+    payment = await razorpay.payments.fetch(paymentId);
+    orderId = orderId || payment.order_id;
+  }
+  if (!orderId) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Provide a Razorpay paymentId or orderId");
+  }
+  const order = await razorpay.orders.fetch(orderId);
+  const paid = order?.status === "paid" || (payment && payment.status === "captured");
+  if (!paid) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      `Order ${orderId} is not paid yet (status: ${order?.status})`
+    );
+  }
+  const result = await routeOrderFulfillment(order.notes || {}, {
+    orderId,
+    paymentId: paymentId || payment?.id || null,
+  });
+  return { success: true, orderId, notes: order.notes || {}, ...result };
 };

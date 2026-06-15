@@ -456,12 +456,16 @@ export const saveConfig = asyncHandler(async (req, res) => {
 
 // ================= PUBLISH =================
 export const publishTestController = asyncHandler(async (req, res) => {
-  const { startTime = null, endTime = null } = req.body;
+  const { startTime = null, endTime = null, unpublish = false } = req.body || {};
 
-  if (!endTime) {
-    throw new ApiError(400, "endTime is required to publish a test");
+  // Unpublish → back to draft (hides it from students again).
+  if (unpublish) {
+    const test = await testService.setTestStatus(req.params.id, "draft", req.user._id);
+    return res.json({ success: true, message: "Test moved to draft", test });
   }
 
+  // Open tests have no schedule, so they publish immediately. endTime is only
+  // validated when an actual schedule window is supplied.
   if (startTime && isNaN(new Date(startTime))) {
     throw new ApiError(400, "Invalid startTime");
   }

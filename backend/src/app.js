@@ -13,6 +13,7 @@ import studentRoutes from "./modules/student/student.route.js";
 import teacherRoutes from "./modules/teacher/teacher.route.js";
 import notesRoutes from "./modules/teacher/note.routes.js";
 import paymentRoutes from "./modules/payment/payment.routes.js";
+import { razorpayWebhook } from "./modules/payment/payment.controller.js";
 import questionRoutes from "./modules/question/question.routes.js";
 import testAttemptRoutes from "./modules/testAttempt/testAttempt.routes.js";
 import adminRoutes from "./modules/admin/admin.route.js";
@@ -62,6 +63,15 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 }));
+// Razorpay webhook MUST receive the raw body for HMAC signature verification, so
+// it is registered before express.json() (which would otherwise consume/replace
+// the raw stream with a parsed object).
+app.post(
+  "/api/payment/webhook",
+  express.raw({ type: "application/json" }),
+  razorpayWebhook
+);
+
 app.use(express.json({ limit: process.env.REQUEST_SIZE_LIMIT || "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: process.env.REQUEST_SIZE_LIMIT || "10mb" }));
 app.use(requestLogger);

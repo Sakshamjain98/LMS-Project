@@ -282,6 +282,17 @@ export const publishTest = async (testId, payload, teacherId) => {
 };
 
 /**
+ * Directly set a test's lifecycle status (e.g. unpublish back to draft).
+ */
+export const setTestStatus = async (testId, status, teacherId) => {
+  const allowed = ["draft", "scheduled", "published", "closed"];
+  if (!allowed.includes(status)) {
+    throw new ApiError(400, "Invalid test status");
+  }
+  return updateTest(testId, { status }, teacherId);
+};
+
+/**
  * Get teacher's tests
  */
 export const getTeacherTests = async (teacherId, query = {}) => {

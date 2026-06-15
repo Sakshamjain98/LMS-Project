@@ -290,7 +290,7 @@ export default function SeriesDetail() {
           contact: localStorage.getItem("userPhone") || "",
         },
         theme: { color: "#00c885" },
-     
+        handler: onSuccess,
         modal: { ondismiss: () => setUnlocking(false) },
       });
       rzp.open();

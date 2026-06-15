@@ -149,3 +149,29 @@ export const checkCourseAccess = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({ success: true, unlocked });
 });
 
+// Razorpay webhook — server-to-server confirmation that unlocks a paid order even
+// when the browser never calls /verify. Mounted with express.raw() in app.js so
+// `req.body` is the raw Buffer needed for HMAC verification. Not wrapped in
+// asyncHandler because it needs custom status codes for Razorpay's retry logic.
+export const razorpayWebhook = async (req, res) => {
+  try {
+    const signature = req.headers["x-razorpay-signature"];
+    const result = await service.handleRazorpayWebhook(req.body, signature);
+    return res.status(200).json({ received: true, ...result });
+  } catch (err) {
+    const status = err?.statusCode || 500;
+    console.error("Razorpay webhook error:", err?.message);
+    // 4xx (e.g. bad signature) → Razorpay won't retry. 5xx → it retries later.
+    return res
+      .status(status >= 400 && status < 500 ? status : 500)
+      .json({ received: false, message: err?.message || "Webhook processing failed" });
+  }
+};
+
+// Admin recovery for a payment that was taken but never unlocked.
+export const reconcilePayment = asyncHandler(async (req, res) => {
+  const { paymentId, orderId } = req.body || {};
+  const result = await service.reconcilePayment({ paymentId, orderId });
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Payment reconciled", ...result });
+});
+

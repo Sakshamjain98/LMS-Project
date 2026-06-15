@@ -9,6 +9,7 @@ import {
   createAITSTest,
   deleteTeacherTest,
   uploadTestCSV,
+  publishTeacherTest,
 } from "../../services/teacherService";
 import {
   Trophy,
@@ -29,8 +30,11 @@ import {
   Clock,
   AlertCircle,
   X,
+  Send,
+  EyeOff,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
+import toast from "react-hot-toast";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const emptyAitsForm   = { title: "", description: "", isPaid: false, price: 0, examId: "" };
@@ -207,7 +211,7 @@ function CsvFormFields({ form, onChange }) {
           </FieldLabel>
         </div>
       )}
-      <FieldLabel label="CSV File" hint="Columns: questionText, optionA–D, correctIndex (0–3), marks." required>
+      <FieldLabel label="CSV File" hint="Columns: question, optionA, optionB, optionC, optionD, answer (1-4 or A-D), marks, explanation (optional)." required>
         <input type="file" accept=".csv"
           onChange={(e) => onChange({ ...form, file: e.target.files?.[0] || null })}
           className={fi} />
@@ -368,12 +372,19 @@ export default function AITSManager() {
   // ── Test create ──────────────────────────────────────────────────────────
   const handleCreateTest = async () => {
     if (!testForm.title.trim()) return;
+    if (testForm.title.trim().length < 3) {
+      toast.error("Title must be at least 3 characters");
+      return;
+    }
     setActionLoading(true);
     try {
       await createAITSTest(selectedAits._id, buildPayload(testForm));
       await refreshTests();
       setTestModal({ open: false, mode: "manual" });
       setTestForm(emptyTestForm);
+      toast.success("Test created");
+    } catch (err) {
+      toast.error(err?.message || "Failed to create test");
     } finally { setActionLoading(false); }
   };
 
@@ -396,10 +407,32 @@ export default function AITSManager() {
         if (csvForm.startTime) fd.append("startTime", new Date(csvForm.startTime).toISOString());
         if (csvForm.endTime)   fd.append("endTime",   new Date(csvForm.endTime).toISOString());
       }
-      await uploadTestCSV(fd);
+      const res = await uploadTestCSV(fd);
       await refreshTests();
       setTestModal({ open: false, mode: "manual" });
       setCsvForm(emptyCsvForm);
+      toast.success(res?.message || "Test created from CSV");
+    } catch (err) {
+      toast.error(err?.message || "Failed to upload CSV");
+    } finally { setActionLoading(false); }
+  };
+
+  // Publish makes the test visible to students; unpublish hides it again.
+  // Drafts never appear in the student section, so a test must be published.
+  const handleTogglePublish = async (test) => {
+    const publish = test.status !== "published";
+    setActionLoading(true);
+    try {
+      await publishTeacherTest(
+        test._id,
+        publish
+          ? (test.endTime ? { startTime: test.startTime, endTime: test.endTime } : {})
+          : { unpublish: true }
+      );
+      await refreshTests();
+      toast.success(publish ? "Test published — now visible to students" : "Test moved to draft");
+    } catch (err) {
+      toast.error(err?.message || "Failed to update status");
     } finally { setActionLoading(false); }
   };
 
@@ -526,6 +559,20 @@ export default function AITSManager() {
                       <td className="px-6 py-4"><StatusBadge status={test.status} /></td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleTogglePublish(test)}
+                            disabled={actionLoading}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                              test.status === "published"
+                                ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                                : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                            }`}
+                            title={test.status === "published" ? "Unpublish — hide from students" : "Publish — show to students"}
+                          >
+                            {test.status === "published"
+                              ? <><EyeOff size={12} /> Unpublish</>
+                              : <><Send size={12} /> Publish</>}
+                          </button>
                           <button
                             onClick={() => navigate(`/admin/test-series/test/${test._id}`)}
                             className="inline-flex items-center gap-1.5 rounded-lg glass-pill px-3 py-1.5 text-xs text-white/70 hover:text-white"
