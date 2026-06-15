@@ -116,8 +116,17 @@ export const forgotPasswordService = async ({ email }) => {
   user.passwordResetExpires = expires;
   await user.save();
 
-
-  await sendResetPasswordEmail(user.email, user.name, resetToken);
+  try {
+    await sendResetPasswordEmail(user.email, user.name, resetToken);
+  } catch (error) {
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+    throw new ApiError(
+      STATUS_CODES.SERVICE_UNAVAILABLE,
+      `Failed to send password reset email: ${error.message}`
+    );
+  }
 
   if (process.env.NODE_ENV !== "production") {
     console.info(

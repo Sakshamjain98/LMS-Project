@@ -55,4 +55,29 @@ describe("forgotPasswordService", () => {
     expect(user.passwordResetExpires.getTime()).toBeGreaterThan(Date.now());
     expect(save).toHaveBeenCalledTimes(1);
   });
+
+  it("fails and clears the reset token if email delivery fails", async () => {
+    const email = "student@example.com";
+    const name = "Student One";
+    const userId = new mongoose.Types.ObjectId();
+
+    const user = {
+      _id: userId,
+      email,
+      name,
+      save,
+    };
+
+    findOne.mockResolvedValue(user);
+    save.mockResolvedValue(user);
+    sendResetPasswordEmail.mockRejectedValue(new Error("mail failed"));
+
+    await expect(forgotPasswordService({ email })).rejects.toThrow(
+      "Failed to send password reset email: mail failed"
+    );
+
+    expect(user.passwordResetToken).toBeNull();
+    expect(user.passwordResetExpires).toBeNull();
+    expect(save).toHaveBeenCalledTimes(2);
+  });
 });
