@@ -25,6 +25,12 @@ const createResendClient = () => {
 const resend = createResendClient();
 
 const sendResendEmail = async ({ to, subject, text, html }) => {
+  console.info("[mail] sending email", {
+    to,
+    subject,
+    from: getFromAddress(),
+  });
+
   const { error } = await resend.emails.send({
     from: getFromAddress(),
     to,
@@ -34,8 +40,20 @@ const sendResendEmail = async ({ to, subject, text, html }) => {
   });
 
   if (error) {
+    console.error("[mail] resend rejected email", {
+      to,
+      subject,
+      from: getFromAddress(),
+      error: error.message,
+    });
     throw new ApiError(503, `Failed to send email: ${error.message}`);
   }
+
+  console.info("[mail] email sent", {
+    to,
+    subject,
+    from: getFromAddress(),
+  });
 };
 
 const createEmailShell = ({ title, intro, content, ctaText, ctaUrl }) => `
