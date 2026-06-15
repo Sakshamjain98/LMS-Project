@@ -98,11 +98,23 @@ export const googleLoginService = async ({ token, role }) => {
 
 
 export const forgotPasswordService = async ({ email }) => {
-  const user = await User.findOne({ email });
-  if (!user) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  console.info("[auth] forgot-password request received", {
+    email: normalizedEmail,
+  });
 
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    console.warn("[auth] forgot-password user not found", {
+      email: normalizedEmail,
+    });
     return { message: MESSAGES.FORGOT_PASSWORD_EMAIL_SENT };
   }
+
+  console.info("[auth] forgot-password user found", {
+    email: normalizedEmail,
+    userId: user._id,
+  });
 
 
   const resetToken = crypto.randomBytes(32).toString('hex');
@@ -118,7 +130,16 @@ export const forgotPasswordService = async ({ email }) => {
 
   try {
     await sendResetPasswordEmail(user.email, user.name, resetToken);
+    console.info("[auth] forgot-password reset email sent", {
+      email: normalizedEmail,
+      userId: user._id,
+    });
   } catch (error) {
+    console.error("[auth] forgot-password reset email failed", {
+      email: normalizedEmail,
+      userId: user._id,
+      error: error.message,
+    });
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
     await user.save();
