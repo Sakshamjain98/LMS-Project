@@ -44,7 +44,7 @@ services:
       - key: EMAIL_FROM
         value: PS Classes <noreply@psclasses.in>
       - key: FRONTEND_URL
-        sync: false
+        value: https://psclasses.in
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

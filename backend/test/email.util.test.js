@@ -55,7 +55,7 @@ describe("email util", () => {
         from: "PS Classes <noreply@psclasses.in>",
         to: "sakshamdevs007@gmail.com",
         subject: "Welcome to LMS",
-        html: expect.stringContaining("Welcome to LMS"),
+        html: expect.stringContaining("Welcome to PS Classes"),
       })
     );
   });
