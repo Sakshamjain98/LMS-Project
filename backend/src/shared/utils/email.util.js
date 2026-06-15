@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import { ApiError } from "../error/ApiError.js";
 const getFromAddress = () =>
-  process.env.EMAIL_FROM || "pharmacistshubhamsir@gmail.com";
+  process.env.EMAIL_FROM || "noreply@psclasses.in";
 
 const getFrontendUrl = () =>
   process.env.FRONTEND_URL || "http://localhost:5173";

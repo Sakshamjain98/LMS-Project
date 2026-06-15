@@ -21,7 +21,7 @@ describe("email util", () => {
     delete process.env.EMAIL_FROM;
     delete process.env.FRONTEND_URL;
     process.env.RESEND_API_KEY = "re_test_key";
-    process.env.EMAIL_FROM = "pharmacistshubhamsir@gmail.com";
+    process.env.EMAIL_FROM = "PS Classes <noreply@psclasses.in>";
     send.mockResolvedValue({ data: { id: "email_123" }, error: null });
   });
 
@@ -35,7 +35,7 @@ describe("email util", () => {
     expect(resendCtor).toHaveBeenCalledWith("re_test_key");
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: "pharmacistshubhamsir@gmail.com",
+        from: "PS Classes <noreply@psclasses.in>",
         to: "sakshamdevs007@gmail.com",
         subject: "Password Reset",
         html: expect.stringContaining(
@@ -52,7 +52,7 @@ describe("email util", () => {
 
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: "pharmacistshubhamsir@gmail.com",
+        from: "PS Classes <noreply@psclasses.in>",
         to: "sakshamdevs007@gmail.com",
         subject: "Welcome to LMS",
         html: expect.stringContaining("Welcome to LMS"),

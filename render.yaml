@@ -40,9 +40,9 @@ services:
       - key: OTP_EXPIRY_MINUTES
         value: 10
       - key: RESEND_API_KEY
-        value: re_AT9nCVgH_5DVtPZh9oP1cfH3ocYVSCx1B
+        value: re_JhpuKmnf_NRecdLdbT3CevAJ5DERxQQ5V
       - key: EMAIL_FROM
-        value: pharmacistshubhamsir@gmail.com
+        value: PS Classes <noreply@psclasses.in>
       - key: FRONTEND_URL
         sync: false
       - key: CLOUDINARY_CLOUD_NAME
