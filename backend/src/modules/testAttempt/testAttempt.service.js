@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import TestAttempt from "../../models/testAttempt.model.js";
-import Test from "../test/test.model.js";
+import Test from "../../models/test.model.js";
 import Question from "../../models/question.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";

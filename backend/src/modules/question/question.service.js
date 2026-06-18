@@ -1,5 +1,5 @@
 import Question from "../../models/question.model.js";
-import Test from "../test/test.model.js";
+import Test from "../../models/test.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 

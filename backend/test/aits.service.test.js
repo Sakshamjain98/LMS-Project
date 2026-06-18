@@ -10,7 +10,7 @@ vi.mock("../src/models/allIndiaTestSeries.model.js", () => ({
   default: { findOne },
 }));
 
-vi.mock("../src/modules/test/test.model.js", () => ({
+vi.mock("../src/models/test.model.js", () => ({
   default: { create },
 }));
 

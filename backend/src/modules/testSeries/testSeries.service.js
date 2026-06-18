@@ -5,7 +5,7 @@ import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
 import ExamCategory from "../../models/examCategory.model.js";
 import Exam from "../../models/exam.model.js";
 import AllIndiaTestSeries from "../../models/allIndiaTestSeries.model.js";
-import Test from "../test/test.model.js";
+import Test from "../../models/test.model.js";
 import Question from "../../models/question.model.js";
 import TestAttempt from "../../models/testAttempt.model.js";
 import TestConfig from "../../models/testConfig.model.js";

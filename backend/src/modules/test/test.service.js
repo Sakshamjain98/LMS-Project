@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Test from "./test.model.js";
+import Test from "../../models/test.model.js";
 import TestSeriesChapter from "../../models/testSeriesChapter.model.js";
 import TestSeriesSubject from "../../models/testSeriesSubject.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";

@@ -1,6 +1,6 @@
 import { Queue, Worker } from "bullmq";
 import redis from "../../config/redis.js";
-import Test from "../../modules/test/test.model.js";
+import Test from "../../models/test.model.js";
 import logger from "../logger/logger.js";
 
 export const testPublishQueue = new Queue("test-publish", {

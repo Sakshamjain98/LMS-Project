@@ -1,7 +1,7 @@
 import Course from "../../models/course.model.js";
 import Blog from "../../models/blog.model.js";
 import User from "../../models/user.model.js";
-import Test from "../test/test.model.js";
+import Test from "../../models/test.model.js";
 import * as testCoreService from "../test/test.service.js";
 import TestConfig from "../../models/testConfig.model.js";
 import QuestionAnalytics from "../../models/questionAnalysis.model.js";
