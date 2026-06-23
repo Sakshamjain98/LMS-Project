@@ -389,9 +389,14 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
                   <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
                     Question {currentIndex + 1}
                   </p>
-                  <h2 className="text-base font-medium leading-relaxed text-white">
-                    {currentQuestion.questionText}
-                  </h2>
+                  <div className="text-base font-medium leading-relaxed text-white quill-content" dangerouslySetInnerHTML={{ __html: currentQuestion.questionText || "" }} />
+                  {currentQuestion.imageUrl && (
+                    <img
+                      src={currentQuestion.imageUrl}
+                      alt={`Question ${currentIndex + 1}`}
+                      className="mt-4 max-h-72 rounded-2xl border border-dark-100 object-contain"
+                    />
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   <span className="rounded-md bg-dark-100 px-2.5 py-1 text-xs font-bold text-gray-400">

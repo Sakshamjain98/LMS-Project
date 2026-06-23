@@ -91,7 +91,7 @@ router.get(
 router.get(
   "/exam-categories",
   asyncHandler(async (_req, res) => {
-    const categories = await ExamCategory.find({}).sort({ order: 1, createdAt: 1 }).lean();
+    const categories = await ExamCategory.find({ isVisible: { $ne: false } }).sort({ order: 1, createdAt: 1 }).lean();
     if (!categories.length) return res.json({ success: true, categories: [] });
 
     const exams = await Exam.find({ examCategoryId: { $in: categories.map((c) => c._id) } })
@@ -162,8 +162,13 @@ router.get(
     // Drop orphans: a course whose exam was deleted must not linger on the
     // student dashboard. Keep only courses whose exam still exists.
     const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
+    const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
+    const visibleCategoryIds = visibleCategories.map((category) => category._id);
     const existingExams = examIds.length
-      ? await Exam.find({ _id: { $in: examIds } }).select("_id").lean()
+      ? await Exam.find({
+          _id: { $in: examIds },
+          examCategoryId: { $in: visibleCategoryIds },
+        }).select("_id").lean()
       : [];
     const liveExamIds = new Set(existingExams.map((e) => String(e._id)));
     const courses = rawCourses

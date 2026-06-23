@@ -514,12 +514,17 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
 
   // Exclude orphans whose exam was deleted so they don't surface to students.
   const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
+  const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
+  const visibleCategoryIds = visibleCategories.map((category) => category._id);
   const existingExams = examIds.length
-    ? await Exam.find({ _id: { $in: examIds } }).select("_id").lean()
+    ? await Exam.find({
+        _id: { $in: examIds },
+        examCategoryId: { $in: visibleCategoryIds },
+      }).select("_id").lean()
     : [];
   const liveExamIds = new Set(existingExams.map((e) => String(e._id)));
   const courses = rawCourses
-    .filter((c) => c.examId && liveExamIds.has(String(c.examId)))
+    .filter((c) => !c.examId || liveExamIds.has(String(c.examId)))
     .slice(0, limit);
 
   const courseIds = courses.map((c) => c._id);

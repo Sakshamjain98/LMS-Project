@@ -26,6 +26,7 @@ export const createIndexes = async () => {
     // Exam category + exam indexes
     await ExamCategory.collection.createIndex({ slug: 1 }, { unique: true });
     await ExamCategory.collection.createIndex({ order: 1 });
+    await ExamCategory.collection.createIndex({ isVisible: 1, order: 1 });
     await Exam.collection.createIndex({ slug: 1 }, { unique: true });
     await Exam.collection.createIndex({ examCategoryId: 1, order: 1 });
 

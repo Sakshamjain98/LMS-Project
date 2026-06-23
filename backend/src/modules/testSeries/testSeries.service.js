@@ -545,7 +545,20 @@ export const getTopicAnalytics = async (topicId, teacherId) => {
 };
 
 export const getStudentSeriesTree = async () => {
-  const topics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).lean();
+  // Only expose topics whose exam belongs to a visible ExamCategory.
+  // Topics that have no examId (orphans / uncategorised) are always shown.
+  const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
+  const visibleCatIds = visibleCategories.map((c) => c._id);
+  const visibleExams = visibleCatIds.length
+    ? await Exam.find({ examCategoryId: { $in: visibleCatIds } }).select("_id").lean()
+    : [];
+  const visibleExamIds = new Set(visibleExams.map((e) => String(e._id)));
+
+  const allTopics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).lean();
+  // Keep topic if it is uncategorised (no examId) OR its exam is in a visible category
+  const topics = allTopics.filter(
+    (t) => !t.examId || visibleExamIds.has(String(t.examId))
+  );
   if (!topics.length) {
     return [];
   }
@@ -613,9 +626,12 @@ export const getStudentSeriesTree = async () => {
 // teacherId: if set, filter to that teacher's content only
 // ─────────────────────────────────────────────────────────────────────────────
 export const getFullHierarchyTree = async ({ publishedOnly = false, teacherId = null } = {}) => {
-  const categories = await ExamCategory.find({}).sort({ order: 1, createdAt: 1 }).lean();
+  const categoryQuery = publishedOnly ? { isVisible: { $ne: false } } : {};
+  const categories = await ExamCategory.find(categoryQuery).sort({ order: 1, createdAt: 1 }).lean();
 
-  const exams = await Exam.find({}).sort({ order: 1, createdAt: 1 }).lean();
+  const exams = await Exam.find({
+    ...(categories.length ? { examCategoryId: { $in: categories.map((c) => c._id) } } : {}),
+  }).sort({ order: 1, createdAt: 1 }).lean();
 
   const topicQuery = {};
   if (teacherId) topicQuery.teacherId = validateObjectId(teacherId, "teacherId");

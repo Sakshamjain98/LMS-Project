@@ -611,6 +611,7 @@ export const createTestFromCSV = async (req, res, next) => {
 
         parsedQuestions.push({
           questionText: normalized.question,
+          imageUrl: normalized.imageUrl || "",
           questionType: "MCQ",
           options,
           correctOptionIndex,
@@ -737,3 +738,14 @@ export const createTestFromCSV = async (req, res, next) => {
     next(error);
   }
 };
+
+export const uploadQuestionImage = asyncHandler(async (req, res) => {
+  if (!req.file?.path) {
+    return res.status(400).json({ success: false, message: "No image uploaded" });
+  }
+  res.json({
+    success: true,
+    url: req.file.path,
+    public_id: req.file.filename,
+  });
+});

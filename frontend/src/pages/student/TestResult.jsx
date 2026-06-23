@@ -253,7 +253,16 @@ export default function TestResult({ attemptId, onBack }) {
                           <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-xs font-bold text-gray-400">
                             Q{absoluteIndex + 1}
                           </span>
-                          <p className="font-medium text-white text-sm leading-relaxed">{q.questionText}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-white text-sm leading-relaxed quill-content" dangerouslySetInnerHTML={{ __html: q.questionText || "" }} />
+                            {q.imageUrl && (
+                              <img
+                                src={q.imageUrl}
+                                alt={`Question ${absoluteIndex + 1}`}
+                                className="mt-3 max-h-60 rounded-xl border border-dark-100 object-contain"
+                              />
+                            )}
+                          </div>
                         </div>
                         <div className="pl-8 space-y-1.5 text-sm">
                           <p className={`font-semibold ${statusColor}`}>
@@ -269,8 +278,8 @@ export default function TestResult({ attemptId, onBack }) {
                           )}
                           {q.explanation && (
                             <div className="mt-2 rounded-lg bg-dark-200 p-3 text-gray-400 text-xs">
-                              <span className="font-bold text-white">Explanation: </span>
-                              {q.explanation}
+                              <span className="font-bold text-white">Explanation:</span>
+                              <div className="mt-2 quill-content" dangerouslySetInnerHTML={{ __html: q.explanation }} />
                             </div>
                           )}
                         </div>

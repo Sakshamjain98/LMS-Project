@@ -46,6 +46,8 @@ import {
   GraduationCap,
   Trophy,
   Tag,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import ValidityDurationField from "../../components/ui/ValidityDurationField";
@@ -81,7 +83,7 @@ const ICON_COLOR = {
 };
 
 // ─── Empty form defaults ─────────────────────────────────────────────────────
-const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, discountedPrice: 0, validityMonths: 0, examId: "" };
+const emptyEntityForm = { title: "", description: "", isPaid: false, price: 0, discountedPrice: 0, validityMonths: 0, examId: "", isVisible: true };
 const emptyTestForm = {
   title: "", description: "", duration: 60, passingMarks: 0, instructions: "",
   isPaid: false, attemptLimit: 0, isProctored: false, isOpenTest: true,
@@ -307,6 +309,7 @@ export default function AdminTestSeries() {
         isPaid: Boolean(data.isPaid), price: Number(data.price) || 0,
         discountedPrice: Number(data.discountedPrice) || 0,
         validityMonths: Number(data.validityMonths) || 0, examId: data.examId || "",
+        isVisible: data.isVisible !== false,
       });
       setModalState({ isOpen: true, type, mode, editId: data._id });
       return;
@@ -489,7 +492,7 @@ export default function AdminTestSeries() {
   const handleEditRow = (row) => {
     if (aitsView && !selectedAitsId) {
       // editing an AITS section — store id for update
-      setEntityForm({ title: row.title, description: row.description || "", isPaid: Boolean(row.isPaid), price: Number(row.price) || 0, discountedPrice: Number(row.discountedPrice) || 0, examId: selectedExamId });
+      setEntityForm({ title: row.title, description: row.description || "", isPaid: Boolean(row.isPaid), price: Number(row.price) || 0, discountedPrice: Number(row.discountedPrice) || 0, examId: selectedExamId, isVisible: row.isVisible !== false });
       setModalState({ isOpen: true, type: "entity", mode: "edit", editId: row._id });
       return;
     }
@@ -622,6 +625,19 @@ export default function AdminTestSeries() {
                       )}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {level === "categories" && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await updateExamCategory(row._id, { isVisible: row.isVisible === false });
+                                await fetchData();
+                              }}
+                              className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
+                              title={row.isVisible === false ? "Show category" : "Hide category"}
+                            >
+                              {row.isVisible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          )}
                           {!isTestLevel && (
                             <button onClick={() => handleRowSelect(row)} className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white">
                               View
@@ -807,6 +823,18 @@ function EntityForm({ form, onChange, level, categories, exams, selectedCategory
         <textarea value={form.description} onChange={(e) => onChange({ ...form, description: e.target.value })}
           rows={2} placeholder="Short description..." className={`${fi} resize-none`} />
       </FieldLabel>
+
+      {level === "categories" && (
+        <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white/80 cursor-pointer">
+          <input
+            type="checkbox"
+            className={fc}
+            checked={form.isVisible !== false}
+            onChange={(e) => onChange({ ...form, isVisible: e.target.checked })}
+          />
+          <span>Visible to students and public website</span>
+        </label>
+      )}
 
       {/* For exams: select parent category */}
       {level === "exams" && (

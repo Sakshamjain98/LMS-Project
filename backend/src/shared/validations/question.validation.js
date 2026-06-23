@@ -86,6 +86,11 @@ export const createQuestionSchema = Joi.object({
     .messages({
       "array.max": "Maximum 10 tags allowed",
     }),
+
+  imageUrl: Joi.string()
+    .trim()
+    .allow("")
+    .optional(),
 }).unknown(false); // Reject unknown fields
 
 /**
@@ -154,4 +159,9 @@ export const updateQuestionSchema = Joi.object({
     .items(Joi.string().trim().min(1).max(50))
     .optional()
     .max(10),
+
+  imageUrl: Joi.string()
+    .trim()
+    .allow("")
+    .optional(),
 }).unknown(false);

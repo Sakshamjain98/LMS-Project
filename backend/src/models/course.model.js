@@ -45,6 +45,7 @@ const courseSchema = new mongoose.Schema(
     status: { type: String, enum: ["draft", "published"], default: "published" },
     order: { type: Number, default: 0 },
     tags: [String],
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );

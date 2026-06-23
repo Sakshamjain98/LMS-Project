@@ -17,9 +17,13 @@ import {
   getTestQuestions,
   addQuestionToTest,
   bulkAddQuestionsToTest,
+  updateQuestion,
   deleteQuestion,
+  uploadQuestionImage,
 } from "../../services/teacherService";
 import toast from "react-hot-toast";
+import RichTextEditor from "../../components/editor/RichTextEditor";
+import { isRichTextEmpty } from "../../utils/richText";
 
 const fieldInput =
   "w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-brand-primary focus:outline-none transition-colors";
@@ -108,6 +112,7 @@ const buildQuestionsFromCsv = (text) => {
   const correctIdx = idx("correctindex", "correct", "answer", "correctanswer");
   const marksIdx = idx("marks", "score");
   const explanationIdx = idx("explanation", "solution", "explain");
+  const imageUrlIdx = idx("imageurl", "questionimage", "image");
 
   const questions = [];
   for (let r = 1; r < rows.length; r++) {
@@ -128,6 +133,7 @@ const buildQuestionsFromCsv = (text) => {
     const safeCorrect = Math.min(Math.max(correctOption, 0), filledOptions.length - 1);
     questions.push({
       questionText: text,
+      imageUrl: row[imageUrlIdx]?.trim() || "",
       questionType: "MCQ",
       options: filledOptions.map((t) => ({ text: t })),
       correctOptionIndex: safeCorrect,
@@ -140,6 +146,7 @@ const buildQuestionsFromCsv = (text) => {
 
 const emptyQuestion = {
   questionText: "",
+  imageUrl: "",
   options: [{ text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }],
   marks: 1,
   explanation: "",
@@ -157,9 +164,26 @@ export default function TestEditor() {
   const [questions, setQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [newQ, setNewQ] = useState(emptyQuestion);
+  const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [addingQ, setAddingQ] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [csvUploading, setCsvUploading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [resetCounter, setResetCounter] = useState(0);
+
+  const handleUploadImage = async (file) => {
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const data = await uploadQuestionImage(file);
+      setNewQ((prev) => ({ ...prev, imageUrl: data.url }));
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      toast.error(error.message || "Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const fetchTest = useCallback(async () => {
     try {
@@ -219,30 +243,67 @@ export default function TestEditor() {
     }
   };
 
-  const handleAddQuestion = async () => {
-    if (!newQ.questionText.trim()) return toast.error("Enter a question");
+  const handleSaveQuestion = async () => {
+    if (isRichTextEmpty(newQ.questionText)) return toast.error("Enter a question");
     const filledOptions = newQ.options.filter((o) => o.text.trim());
     if (filledOptions.length < 2) return toast.error("At least 2 options required");
     const correctOptionIndex = filledOptions.findIndex((o) => o.isCorrect);
     if (correctOptionIndex < 0) return toast.error("Mark one option as correct");
     setAddingQ(true);
     try {
-      await addQuestionToTest(testId, {
+      const payload = {
         questionText: newQ.questionText.trim(),
+        imageUrl: newQ.imageUrl?.trim() || "",
         questionType: "MCQ",
         options: filledOptions.map((o) => ({ text: o.text.trim() })),
         correctOptionIndex,
         marks: Number(newQ.marks) || 1,
         ...(newQ.explanation?.trim() ? { explanation: newQ.explanation.trim() } : {}),
-      });
-      toast.success("Question added");
-      setNewQ(emptyQuestion);
+      };
+
+      if (editingQuestionId) {
+        await updateQuestion(editingQuestionId, payload);
+        toast.success("Question updated");
+      } else {
+        await addQuestionToTest(testId, payload);
+        toast.success("Question added");
+      }
+      setNewQ(JSON.parse(JSON.stringify(emptyQuestion)));
+      setEditingQuestionId(null);
+      setResetCounter((prev) => prev + 1);
       await fetchQuestions();
     } catch (err) {
-      toast.error(err.message || "Add failed");
+      toast.error(err.message || "Save failed");
     } finally {
       setAddingQ(false);
     }
+  };
+
+  const handleEditQuestion = (question) => {
+    setEditingQuestionId(question._id);
+    const baseOptions = question.options || [];
+    const options = Array.from({ length: 4 }, (_, i) => {
+      const opt = baseOptions[i] || {};
+      return {
+        text: opt.text || "",
+        isCorrect: question.correctOptionIndex === i || Boolean(opt.isCorrect),
+      };
+    });
+    setNewQ({
+      questionText: question.questionText || "",
+      imageUrl: question.imageUrl || "",
+      options,
+      marks: question.marks ?? 1,
+      explanation: question.explanation || "",
+    });
+    setResetCounter((prev) => prev + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelQuestionEdit = () => {
+    setEditingQuestionId(null);
+    setNewQ(JSON.parse(JSON.stringify(emptyQuestion)));
+    setResetCounter((prev) => prev + 1);
   };
 
   const handleDeleteQuestion = async (qid) => {
@@ -341,13 +402,19 @@ export default function TestEditor() {
             loading={questionsLoading}
             newQ={newQ}
             onNewQChange={setNewQ}
-            onAdd={handleAddQuestion}
+            onAdd={handleSaveQuestion}
             addingQ={addingQ}
             onDelete={handleDeleteQuestion}
+            onEdit={handleEditQuestion}
+            editingQuestionId={editingQuestionId}
+            onCancelEdit={handleCancelQuestionEdit}
             csvFile={csvFile}
             onCsvFileChange={setCsvFile}
             onCsvUpload={handleCsvUpload}
             csvUploading={csvUploading}
+            uploadingImage={uploadingImage}
+            onUploadImage={handleUploadImage}
+            resetCounter={resetCounter}
           />
         )}
       </div>
@@ -532,7 +599,7 @@ function ConfigTab({ form, onChange }) {
   );
 }
 
-function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, onDelete, csvFile, onCsvFileChange, onCsvUpload, csvUploading }) {
+function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, onDelete, onEdit, editingQuestionId, onCancelEdit, csvFile, onCsvFileChange, onCsvUpload, csvUploading, uploadingImage, onUploadImage, resetCounter }) {
   return (
     <div className="space-y-6">
       <section className="rounded-2xl glass-card p-5">
@@ -540,7 +607,7 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
           <UploadCloud size={16} className="text-brand-primary" /> Bulk import via CSV
         </h3>
         <p className="mt-1 text-xs text-white/50">
-          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (0–3 or A/B/C/D), marks, explanation</code>
+          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (0–3 or A/B/C/D), marks, explanation, imageUrl</code>
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -562,17 +629,42 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
 
       <section className="rounded-2xl glass-card p-5">
         <h3 className="text-sm font-bold text-white inline-flex items-center gap-2">
-          <Plus size={16} className="text-brand-primary" /> Add a question manually
+          <Plus size={16} className="text-brand-primary" /> {editingQuestionId ? "Edit question" : "Add a question manually"}
         </h3>
         <div className="mt-4 space-y-4">
           <FieldLabel label="Question" required>
-            <textarea
-              rows={2}
+            <RichTextEditor
+              key={editingQuestionId ? `q-${editingQuestionId}-${resetCounter}` : `q-new-${resetCounter}`}
               value={newQ.questionText}
-              onChange={(e) => onNewQChange({ ...newQ, questionText: e.target.value })}
-              placeholder="What is the chemical name of aspirin?"
-              className={`${fieldInput} resize-none`}
+              onChange={(questionText) => onNewQChange({ ...newQ, questionText })}
+              placeholder="Write the question with formatting, lists, links, or inline images…"
             />
+          </FieldLabel>
+          <FieldLabel label="Question Image URL" hint="Optional image shown above the options. You can paste a URL or upload a file.">
+            <div className="flex gap-2">
+              <input
+                value={newQ.imageUrl}
+                onChange={(e) => onNewQChange({ ...newQ, imageUrl: e.target.value })}
+                placeholder="https://..."
+                className={fieldInput}
+              />
+              <label className={`flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-dark-300 px-4 cursor-pointer hover:bg-white/5 transition-colors ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                {uploadingImage ? <Loader2 size={14} className="animate-spin text-brand-primary" /> : <UploadCloud size={14} className="text-brand-primary" />}
+                <span className="text-sm font-bold text-white/80">{uploadingImage ? 'Uploading...' : 'Upload'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onUploadImage(file);
+                  }}
+                />
+              </label>
+            </div>
+            {newQ.imageUrl && (
+              <img src={newQ.imageUrl} alt="Preview" className="mt-2 max-h-32 rounded-lg border border-white/10 object-contain" />
+            )}
           </FieldLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {newQ.options.map((opt, i) => (
@@ -594,12 +686,11 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
             ))}
           </div>
           <FieldLabel label="Explanation">
-            <textarea
-              rows={2}
+            <RichTextEditor
+              key={editingQuestionId ? `exp-${editingQuestionId}-${resetCounter}` : `exp-new-${resetCounter}`}
               value={newQ.explanation}
-              onChange={(e) => onNewQChange({ ...newQ, explanation: e.target.value })}
-              placeholder="Optional — shown on the result page when explanations are revealed."
-              className={`${fieldInput} resize-none`}
+              onChange={(explanation) => onNewQChange({ ...newQ, explanation })}
+              placeholder="Optional explanation shown after submission."
             />
           </FieldLabel>
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -612,8 +703,16 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
               className="inline-flex items-center gap-2 rounded-xl btn-gradient px-4 py-2.5 text-sm font-bold disabled:opacity-50"
             >
               {addingQ ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              {addingQ ? "Adding…" : "Add Question"}
+              {addingQ ? "Saving…" : editingQuestionId ? "Update Question" : "Add Question"}
             </button>
+            {editingQuestionId && (
+              <button
+                onClick={onCancelEdit}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-bold text-white/70 hover:text-white"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -641,10 +740,17 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
               <article key={q._id} className="rounded-2xl glass-card p-5 animate-fade-up min-w-0" style={{ animationDelay: `${idx * 30}ms` }}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white break-words">
-                      <span className="mr-2 text-white/40">{idx + 1}.</span>
-                      {q.questionText}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1 text-sm font-semibold text-white/40 shrink-0">{idx + 1}.</span>
+                      <div className="text-sm font-semibold text-white break-words quill-content flex-1" dangerouslySetInnerHTML={{ __html: q.questionText }} />
+                    </div>
+                    {q.imageUrl && (
+                      <img
+                        src={q.imageUrl}
+                        alt={`Question ${idx + 1}`}
+                        className="mt-3 max-h-48 rounded-xl border border-white/10 object-contain"
+                      />
+                    )}
                     <ul className="mt-3 space-y-1.5">
                       {(q.options || []).map((o, i) => (
                         <li key={i} className={`flex items-start gap-2 text-xs break-words ${o.isCorrect ? "text-emerald-300" : "text-white/60"}`}>
@@ -656,7 +762,17 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
                       ))}
                     </ul>
                     <p className="mt-2 text-[11px] text-white/40">Marks: {q.marks ?? 1}</p>
+                    {q.explanation && (
+                      <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/70 quill-content" dangerouslySetInnerHTML={{ __html: q.explanation }} />
+                    )}
                   </div>
+                  <button
+                    onClick={() => onEdit(q)}
+                    className="rounded-lg bg-white/5 p-2 text-white/70 hover:bg-white/10 hover:text-white shrink-0"
+                    title="Edit question"
+                  >
+                    <FileText size={14} />
+                  </button>
                   <button
                     onClick={() => onDelete(q._id)}
                     className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20 shrink-0"

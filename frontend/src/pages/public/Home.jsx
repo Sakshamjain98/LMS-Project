@@ -743,9 +743,16 @@ const Home = () => {
             {news.map((item, idx) => (
               <article
                 key={item._id}
-                className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col gap-3 animate-fade-up"
+                className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col gap-4 animate-fade-up"
                 style={{ animationDelay: `${idx * 70}ms` }}
               >
+                {item.imageUrl && (
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="h-44 w-full rounded-2xl border border-white/10 object-cover"
+                  />
+                )}
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-brand-primary/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
                     Update
@@ -755,7 +762,15 @@ const Home = () => {
                   </span>
                 </div>
                 <h3 className="text-base font-bold text-white leading-snug">{item.title}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed line-clamp-3">{item.content}</p>
+                {item.summary && (
+                  <p className="text-sm text-gray-400 leading-relaxed font-semibold">{item.summary}</p>
+                )}
+                {item.content && (
+                  <div
+                    className="text-sm text-gray-400 leading-relaxed quill-content"
+                    dangerouslySetInnerHTML={{ __html: stripFirstParagraph(item.content || "") }}
+                  />
+                )}
               </article>
             ))}
           </div>

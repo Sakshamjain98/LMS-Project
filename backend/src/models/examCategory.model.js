@@ -13,12 +13,14 @@ const examCategorySchema = new mongoose.Schema(
       maxlength: 120,
     },
     order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );
 
 examCategorySchema.index({ slug: 1 });
 examCategorySchema.index({ order: 1 });
+examCategorySchema.index({ isVisible: 1, order: 1 });
 
 examCategorySchema.set("toJSON", { virtuals: true });
 examCategorySchema.set("toObject", { virtuals: true });

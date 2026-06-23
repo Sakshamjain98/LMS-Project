@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getAllNews, createNews, updateNews, deleteNews } from "../../services/adminService";
 import { Plus, Pencil, Trash2, X, Search, Filter, Image as ImageIcon, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import RichTextEditor from "../../components/editor/RichTextEditor";
+import { isRichTextEmpty, stripHtml } from "../../utils/richText";
 
 export default function News() {
   const [news, setNews] = useState([]);
@@ -46,6 +48,10 @@ export default function News() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isRichTextEmpty(formData.content)) {
+      toast.error("Body content is required");
+      return;
+    }
     try {
       setSubmitting(true);
       if (editingNews) {
@@ -173,7 +179,7 @@ export default function News() {
                 {news.map((item) => (
                   <tr key={item._id} className="text-white/90 hover:bg-white/5 transition-colors">
                     <td className="px-5 py-4 font-semibold">{item.title}</td>
-                    <td className="px-5 py-4 max-w-sm truncate text-grayCustom-medium">{item.summary || item.content}</td>
+                    <td className="px-5 py-4 max-w-sm truncate text-grayCustom-medium">{item.summary || stripHtml(item.content)}</td>
                     <td className="px-5 py-4">
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${item.published ? "bg-emerald-500/15 text-emerald-300" : "bg-yellow-500/15 text-yellow-300"}`}>
                         {item.published ? "Published" : "Draft"}
@@ -263,12 +269,10 @@ export default function News() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-widest ml-1">Body Content</label>
-                  <textarea
-                    required
-                    rows={6}
+                  <RichTextEditor
                     value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    className="w-full bg-dark-400 border border-dark-100 text-white px-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all resize-none"
+                    onChange={(content) => setFormData({ ...formData, content })}
+                    placeholder="Write the announcement with headings, lists, links, or images…"
                   />
                 </div>
                 <div className="space-y-2">

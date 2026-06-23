@@ -120,6 +120,7 @@ export const generateDetailedResult = (attempt, questions) => {
     return {
       questionId: question._id,
       questionText: question.questionText,
+      imageUrl: question.imageUrl || "",
       questionType: question.questionType,
       options: question.options,
       selectedOptionIndex: answer.selectedOptionIndex,

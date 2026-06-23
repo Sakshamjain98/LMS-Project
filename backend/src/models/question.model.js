@@ -9,6 +9,7 @@ const questionSchema = new mongoose.Schema(
   {
     testId: { type: mongoose.Schema.Types.ObjectId, ref: "Test", required: true, index: true },
     questionText: { type: String, required: true, trim: true },
+    imageUrl: { type: String, trim: true, default: "" },
     questionType: { type: String, enum: ["MCQ", "TRUE_FALSE", "MULTIPLE_SELECT"], default: "MCQ" },
     options: {
       type: [optionSchema],

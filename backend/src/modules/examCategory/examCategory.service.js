@@ -39,6 +39,7 @@ export const createCategory = async (payload) => {
     description: (payload?.description || "").toString().trim().slice(0, 1000),
     slug,
     order: Number(payload?.order) || 0,
+    isVisible: payload?.isVisible !== false,
   });
 };
 
@@ -57,6 +58,7 @@ export const updateCategory = async (categoryId, payload) => {
   if (payload?.description !== undefined)
     updates.description = payload.description.toString().trim().slice(0, 1000);
   if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
 
   const updated = await ExamCategory.findByIdAndUpdate(
     categoryId,

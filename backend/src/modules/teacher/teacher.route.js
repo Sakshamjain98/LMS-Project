@@ -168,4 +168,10 @@ router.post(
   controller.createTestFromCSV
 );
 
+router.post(
+  "/tests/upload-question-image",
+  upload.single("image"),
+  controller.uploadQuestionImage
+);
+
 export default router;

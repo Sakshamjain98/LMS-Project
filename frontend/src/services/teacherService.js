@@ -638,3 +638,14 @@ export const uploadTestCSV = async (formData) => {
     throw err?.response?.data || { message: "Failed to upload CSV" };
   }
 };
+
+export const uploadQuestionImage = async (file) => {
+  try {
+    const fd = new FormData();
+    fd.append("image", file);
+    const res = await api.post("/teacher/tests/upload-question-image", fd);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to upload image" };
+  }
+};

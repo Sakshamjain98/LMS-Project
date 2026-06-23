@@ -3,11 +3,21 @@ import Test from "../../models/test.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 
+const stripHtml = (value = "") =>
+  value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .trim();
+
 /**
  * Validate question data and options
  */
 const validateQuestionData = (questionData) => {
   const { questionType, options, correctOptionIndex } = questionData;
+
+  if (!stripHtml(questionData?.questionText || "")) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Question text is required");
+  }
 
   // Validate options array is not empty
   if (!Array.isArray(options) || options.length === 0) {
@@ -93,6 +103,7 @@ export const createQuestion = async (testId, questionData, teacherId) => {
   // Create question
   const question = await Question.create({
     questionText: questionData.questionText.trim(),
+    imageUrl: questionData.imageUrl?.trim() || "",
     questionType: questionData.questionType || "MCQ",
     options: formattedOptions,
     correctOptionIndex: questionData.correctOptionIndex,
@@ -150,6 +161,7 @@ export const bulkCreateQuestions = async (
   // Format all questions
   const formattedQuestions = questionsArray.map((q) => ({
     questionText: q.questionText.trim(),
+    imageUrl: q.imageUrl?.trim() || "",
     questionType: q.questionType || "MCQ",
     options: formatOptions(q.options, q.correctOptionIndex),
     correctOptionIndex: q.correctOptionIndex,
@@ -208,7 +220,6 @@ export const getQuestionsByTest = async (testId, teacherId) => {
   }
 
   return Question.find({ testId })
-    .select("-explanation -options.isCorrect")
     .sort({ createdAt: 1 })
     .lean();
 };
@@ -245,25 +256,34 @@ export const updateQuestion = async (questionId, updateData, teacherId) => {
   }
 
   // If options or correctOptionIndex changed, validate and reformat
-  if (updateData.options && updateData.correctOptionIndex !== undefined) {
-    validateQuestionData({
+  if (updateData.options !== undefined || updateData.correctOptionIndex !== undefined) {
+    const mergedData = {
       questionType: updateData.questionType || question.questionType,
-      options: updateData.options,
-      correctOptionIndex: updateData.correctOptionIndex,
-    });
+      options: updateData.options !== undefined ? updateData.options : question.options,
+      correctOptionIndex: updateData.correctOptionIndex !== undefined ? updateData.correctOptionIndex : question.correctOptionIndex,
+      questionText: updateData.questionText !== undefined ? updateData.questionText : question.questionText,
+    };
+
+    validateQuestionData(mergedData);
 
     updateData.options = formatOptions(
-      updateData.options,
-      updateData.correctOptionIndex
+      mergedData.options,
+      mergedData.correctOptionIndex
     );
   }
 
   // Trim string fields
   if (updateData.questionText) {
     updateData.questionText = updateData.questionText.trim();
+    if (!stripHtml(updateData.questionText)) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Question text is required");
+    }
   }
   if (updateData.explanation) {
     updateData.explanation = updateData.explanation.trim();
+  }
+  if (updateData.imageUrl !== undefined) {
+    updateData.imageUrl = updateData.imageUrl?.trim?.() || "";
   }
 
   return Question.findByIdAndUpdate(questionId, updateData, { new: true });
