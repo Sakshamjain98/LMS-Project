@@ -148,7 +148,8 @@ export const resetAdminPassword = async (adminId, newPassword) => {
 };
 
 export const getAdminProfile = async (adminId) => {
-  const profile = await User.findOne({ _id: adminId, role: "admin" })
+  // Self-service — reachable by superadmin too, not just role:"admin".
+  const profile = await User.findOne({ _id: adminId, role: { $in: ["admin", "superadmin"] } })
     .select("name email role phone avatar createdAt updatedAt")
     .lean();
 
@@ -184,7 +185,7 @@ export const updateAdminProfile = async (adminId, payload) => {
   }
 
   const profile = await User.findOneAndUpdate(
-    { _id: adminId, role: "admin" },
+    { _id: adminId, role: { $in: ["admin", "superadmin"] } },
     { $set: updates },
     { new: true }
   )
@@ -207,7 +208,8 @@ export const changeAdminPassword = async (adminId, payload) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "New password must be at least 6 characters");
   }
 
-  const admin = await User.findOne({ _id: adminId, role: "admin" }).select("+password");
+  // Self-service — reachable by superadmin too, not just role:"admin".
+  const admin = await User.findOne({ _id: adminId, role: { $in: ["admin", "superadmin"] } }).select("+password");
   if (!admin) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Admin account not found");
   }

@@ -92,12 +92,24 @@ export default function Dashboard() {
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
 
+    // Payments and analytics/users are permission-gated on the backend for
+    // plain admins (payments is superadmin-only, never grantable). Skip the
+    // request entirely rather than firing one guaranteed to 403 — the global
+    // API client toasts every non-401/422 error, which otherwise shows a
+    // confusing "no permission" toast on every dashboard load.
+    let currentUser = {};
+    try { currentUser = JSON.parse(localStorage.getItem("user") || "{}"); } catch { /* ignore */ }
+    const isSuperadmin = currentUser.role === "superadmin";
+    const perms = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
+    const canViewAnalytics = isSuperadmin || perms.includes("analytics.view");
+    const canViewUsers = isSuperadmin || perms.includes("users.view");
+
     try {
       const [dashRes, revRes, paymentsRes, usersRes, seriesRes] = await Promise.allSettled([
         getAdminDashboard(),
-        getRevenueAnalytics(period),
-        getAllPayments(),
-        getAllUsers({ limit: 5, sort: "-createdAt", role: "student" }),
+        canViewAnalytics ? getRevenueAnalytics(period) : Promise.resolve(null),
+        isSuperadmin ? getAllPayments() : Promise.resolve(null),
+        canViewUsers ? getAllUsers({ limit: 5, sort: "-createdAt", role: "student" }) : Promise.resolve(null),
         getTeacherTestSeries(),
       ]);
 
