@@ -152,6 +152,8 @@ export const createOrder = async (userId, planId) => {
     orderId,
     amount: plan.price,
     plan: plan.id,
+    kind: "SUBSCRIPTION",
+    description: `${plan.name} subscription`,
     status: "PENDING",
     adminApproved: false,
   });
@@ -408,6 +410,16 @@ export const createTopicOrder = async (userId, topicId) => {
     }
   }
 
+  await Payment.create({
+    userId,
+    orderId,
+    amount,
+    kind: "TOPIC",
+    refId: topic._id,
+    description: `Test series unlock: ${topic.title}`,
+    status: "PENDING",
+  });
+
   return {
     orderId,
     amount,
@@ -440,6 +452,7 @@ export const fulfillTopicAccess = async (userId, topicId, { orderId = null, paym
   const stillValid =
     existing && !existing.disabled && (!existing.expiresAt || existing.expiresAt > now);
   if (stillValid) {
+    if (orderId) await Payment.findOneAndUpdate({ orderId }, { $set: { status: "SUCCESS", verifiedAt: new Date() } });
     return { alreadyProcessed: true, success: true };
   }
 
@@ -474,6 +487,8 @@ export const fulfillTopicAccess = async (userId, topicId, { orderId = null, paym
       expiresAt,
     });
   }
+
+  if (orderId) await Payment.findOneAndUpdate({ orderId }, { $set: { status: "SUCCESS", paymentId: pid, verifiedAt: new Date() } });
 
   return { success: true, expiresAt };
 };
@@ -580,6 +595,16 @@ export const createCourseOrder = async (userId, courseId) => {
     }
   }
 
+  await Payment.create({
+    userId,
+    orderId,
+    amount,
+    kind: "COURSE",
+    refId: course._id,
+    description: `Course purchase: ${course.title}`,
+    status: "PENDING",
+  });
+
   return {
     orderId,
     amount,
@@ -622,13 +647,14 @@ export const verifyCoursePayment = async ({
   }
 
   const result = await fulfillCourseAccess(userId, courseId, {
+    orderId: razorpay_order_id,
     paymentId: razorpay_payment_id || `DEV_PAY_${Date.now()}`,
   });
   return { success: true, message: "Course unlocked", ...result };
 };
 
 // Idempotently grant a course purchase. Shared by verify, webhook and reconcile.
-export const fulfillCourseAccess = async (userId, courseId, { paymentId = null } = {}) => {
+export const fulfillCourseAccess = async (userId, courseId, { orderId = null, paymentId = null } = {}) => {
   if (!mongoose.Types.ObjectId.isValid(courseId)) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid courseId");
   }
@@ -636,12 +662,15 @@ export const fulfillCourseAccess = async (userId, courseId, { paymentId = null }
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
   if (await userHasCourseAccess(userId, courseId)) {
+    if (orderId) await Payment.findOneAndUpdate({ orderId }, { $set: { status: "SUCCESS", verifiedAt: new Date() } });
     return { alreadyProcessed: true, success: true };
   }
 
   const expiresAt = expiryFromMonths(course.validityMonths);
+  const pid = paymentId || `MANUAL_${Date.now()}`;
   // grantCourseAccess upserts CourseAccess, resets the window, clears revoked state.
-  await grantCourseAccess(userId, courseId, paymentId || `MANUAL_${Date.now()}`, expiresAt);
+  await grantCourseAccess(userId, courseId, pid, expiresAt);
+  if (orderId) await Payment.findOneAndUpdate({ orderId }, { $set: { status: "SUCCESS", paymentId: pid, verifiedAt: new Date() } });
 
   return { success: true, expiresAt };
 };
@@ -679,7 +708,7 @@ const routeOrderFulfillment = async (notes = {}, { orderId = null, paymentId = n
     return fulfillTopicAccess(notes.userId, notes.topicId, { orderId, paymentId });
   }
   if (notes.kind === "COURSE" && notes.courseId && notes.userId) {
-    return fulfillCourseAccess(notes.userId, notes.courseId, { paymentId });
+    return fulfillCourseAccess(notes.userId, notes.courseId, { orderId, paymentId });
   }
   if (notes.planId) {
     return fulfillSubscriptionByOrderId(orderId, paymentId);

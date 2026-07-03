@@ -3,18 +3,25 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
   BookOpen, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, Check, X,
-  FileText, Video, Link2, Loader2, Upload, Eye,
-  GraduationCap, Folder, Layers, Tag, Search, DollarSign, Globe, EyeOff,
+  FileText, Video, Link2, Loader2, Upload, Eye, GripVertical,
+  GraduationCap, Folder, Layers, Tag, Search, IndianRupee, Globe, EyeOff,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   getAdminCourseHierarchy, getAdminCourseTree,
   createCourse, updateCourse, deleteCourse,
   createSubject, updateSubject, deleteSubject,
-  createChapter, updateChapter, deleteChapter,
+  createChapter, updateChapter, deleteChapter, reorderChapters,
   createRichTextNote, createPdfNote, updateNote, deleteNote,
   createVideo, updateVideo, deleteVideo,
   linkTestToChapter, unlinkTestFromChapter,
@@ -98,6 +105,54 @@ function PaginationBar({ page, totalPages, totalCount, pageSize, onChange }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function SortableChapterRow({ row, onSelect, onEdit, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row._id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <tr ref={setNodeRef} style={style} className="transition-colors hover:bg-white/4">
+      <td className="px-6 py-4 text-sm font-semibold text-white">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab touch-none rounded p-1 text-white/30 hover:text-white/70"
+            title="Drag to reorder"
+          >
+            <GripVertical size={14} />
+          </button>
+          <span onClick={onSelect} className="flex cursor-pointer items-center gap-2">
+            <FileText size={14} className="text-brand-primary" />
+            {row.title}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-xs text-white/50 cursor-pointer" onClick={onSelect}>
+        <div className="flex items-center gap-3">
+          {(row.notesCount || 0) > 0 && (
+            <span className="flex items-center gap-1"><FileText size={11} className="text-brand-primary" /> {row.notesCount} notes</span>
+          )}
+          {(row.videosCount || 0) > 0 && (
+            <span className="flex items-center gap-1"><Video size={11} className="text-red-400" /> {row.videosCount} videos</span>
+          )}
+          {(row.notesCount || 0) === 0 && (row.videosCount || 0) === 0 && <span className="text-white/25">No content yet</span>}
+        </div>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onSelect} className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white">Manage</button>
+          <button onClick={onEdit} className="rounded-lg glass-pill p-2 text-white/70 hover:text-white" title="Edit"><Pencil size={14} /></button>
+          <button onClick={onDelete} className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20" title="Delete"><Trash2 size={14} /></button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -784,7 +839,9 @@ function CourseFormModal({ course, exams, defaultExamId, onClose, onSaved }) {
             <FieldLabel label="Status">
               <select value={status} onChange={(e) => setStatus(e.target.value)} className={fi}>
                 <option value="draft">Draft</option>
-                <option value="published">Published</option>
+                <option value="published">Public (Published)</option>
+                <option value="private">Private</option>
+                <option value="hidden">Hidden</option>
               </select>
             </FieldLabel>
             <div className="flex flex-col justify-end">
@@ -1271,6 +1328,28 @@ export default function CourseManager() {
 
   const canGoBack = level !== "categories" || isContentLevel;
 
+  // Drag-and-drop chapter reorder — only when the full chapter list fits on
+  // one unfiltered page, so index positions map 1:1 to `filteredRows`.
+  const canReorderChapters = level === "chapters" && !isContentLevel && !search.trim() && totalPages <= 1;
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleChapterDragEnd = async ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIndex = filteredRows.findIndex((r) => r._id === active.id);
+    const newIndex = filteredRows.findIndex((r) => r._id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(filteredRows, oldIndex, newIndex);
+    setFullCourseTree((prev) =>
+      prev ? { ...prev, subjects: prev.subjects.map((s) => (s._id === selectedSubjectId ? { ...s, chapters: reordered } : s)) } : prev
+    );
+    try {
+      await reorderChapters(selectedSubjectId, reordered.map((r) => r._id));
+    } catch (err) {
+      toast.error(err.message || "Failed to reorder chapters");
+      refreshAll();
+    }
+  };
+
   // ── Header labels ─────────────────────────────────────────────────────────────
 
   const headerTitle = isContentLevel
@@ -1470,6 +1549,20 @@ export default function CourseManager() {
                         }
                       </td>
                     </tr>
+                  ) : canReorderChapters ? (
+                    <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleChapterDragEnd}>
+                      <SortableContext items={paginatedRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                        {paginatedRows.map((row) => (
+                          <SortableChapterRow
+                            key={row._id}
+                            row={row}
+                            onSelect={() => handleRowSelect(row)}
+                            onEdit={() => handleEditRow(row)}
+                            onDelete={() => setConfirmState({ isOpen: true, type: "chapter", id: row._id })}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   ) : (
                     paginatedRows.map((row, idx) => {
                       const LevelIcon = LEVEL_ICON[level] || FileText;
@@ -1512,10 +1605,16 @@ export default function CourseManager() {
                                 <span className={`rounded-full px-2.5 py-1 font-semibold uppercase tracking-wider ${
                                   row.status === "published"
                                     ? "bg-emerald-500/15 text-emerald-300"
+                                    : row.status === "private" || row.status === "hidden"
+                                    ? "bg-amber-500/15 text-amber-300"
                                     : "bg-white/5 text-white/60"
                                 }`}>
                                   {row.status === "published" ? (
                                     <span className="flex items-center gap-1"><Globe size={10} /> Published</span>
+                                  ) : row.status === "private" ? (
+                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Private</span>
+                                  ) : row.status === "hidden" ? (
+                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Hidden</span>
                                   ) : (
                                     <span className="flex items-center gap-1"><EyeOff size={10} /> Draft</span>
                                   )}
@@ -1524,7 +1623,7 @@ export default function CourseManager() {
                               <td className="px-6 py-4 text-sm">
                                 {row.isPaid ? (
                                   <span className="flex items-center gap-1 font-semibold text-amber-400">
-                                    <DollarSign size={12} />
+                                    <IndianRupee size={12} />
                                     {row.discountedPrice > 0 && row.discountedPrice < row.price ? (
                                       <>
                                         <span className="line-through text-white/35 text-xs">₹{row.price}</span>

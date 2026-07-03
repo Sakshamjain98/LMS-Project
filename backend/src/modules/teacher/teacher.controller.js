@@ -541,8 +541,11 @@ export const createTestFromCSV = async (req, res, next) => {
     }
     const csvStream = Readable.fromWeb(response.body);
 
-    // Core required headers, while other fields are optional.
-    const requiredHeaders = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'answer'];
+    // Core required headers, while other fields are optional. Lowercase —
+    // headers are matched case-insensitively (see normalization below), so
+    // 'Question'/'OPTIONA'/'OptionA' from an Excel/Sheets export all resolve.
+    const requiredHeaders = ['question', 'optiona', 'optionb', 'optionc', 'optiond', 'answer'];
+    let rowNum = 0; // counts data rows only (header excluded), 1-indexed
 
     const parseCorrectOptionIndex = (answerValue, options) => {
       const raw = (answerValue || "").toString().trim();
@@ -573,45 +576,50 @@ export const createTestFromCSV = async (req, res, next) => {
       .pipe(csv())
       .on('data', (row) => {
         if (parseError) return; // skip remaining rows once an error is found
+        rowNum++;
 
+        // Lowercase keys (case-insensitive header match) alongside the
+        // existing trim (also strips a leading BOM on the first header).
         const normalized = Object.fromEntries(
-          Object.entries(row).map(([k, v]) => [k.trim(), typeof v === 'string' ? v.trim() : v])
+          Object.entries(row).map(([k, v]) => [k.trim().toLowerCase(), typeof v === 'string' ? v.trim() : v])
         );
 
-        const isValid = requiredHeaders.every(field =>
-          Object.prototype.hasOwnProperty.call(normalized, field) && normalized[field] !== ""
-        );
+        // Skip a fully blank/comma-only row silently — a common trailing-line
+        // artifact from Excel/Sheets exports, not a real error.
+        const isBlankRow = Object.values(normalized).every((v) => v === "" || v === undefined || v === null);
+        if (isBlankRow) return;
 
-        if (!isValid) {
-          parseError = "Invalid CSV format. Please ensure all columns (question, optionA, optionB, optionC, optionD, answer) are present and not empty.";
+        const missing = requiredHeaders.filter((field) => !normalized[field]);
+        if (missing.length > 0) {
+          parseError = `Row ${rowNum}: missing required column${missing.length > 1 ? "s" : ""} '${missing.join("', '")}'.`;
           return;
         }
 
         const options = [
-          { text: normalized.optionA, isCorrect: false },
-          { text: normalized.optionB, isCorrect: false },
-          { text: normalized.optionC, isCorrect: false },
-          { text: normalized.optionD, isCorrect: false },
+          { text: normalized.optiona, isCorrect: false },
+          { text: normalized.optionb, isCorrect: false },
+          { text: normalized.optionc, isCorrect: false },
+          { text: normalized.optiond, isCorrect: false },
         ];
 
         const correctOptionIndex = parseCorrectOptionIndex(normalized.answer, options);
 
         if (correctOptionIndex < 0) {
-          parseError = `Invalid answer value '${normalized.answer}'. Use 1–4, A–D, or the exact option text.`;
+          parseError = `Row ${rowNum}: invalid answer value '${normalized.answer}'. Use 1–4, A–D, or the exact option text.`;
           return;
         }
 
         options[correctOptionIndex].isCorrect = true;
 
         const marks = Number(normalized.marks);
-        const negativeMarks = Number(normalized.negativeMarks);
+        const negativeMarks = Number(normalized.negativemarks);
         const difficulty = ["easy", "medium", "hard"].includes((normalized.difficulty || "").toLowerCase())
           ? normalized.difficulty.toLowerCase()
           : "medium";
 
         parsedQuestions.push({
           questionText: normalized.question,
-          imageUrl: normalized.imageUrl || "",
+          imageUrl: normalized.imageurl || "",
           questionType: "MCQ",
           options,
           correctOptionIndex,

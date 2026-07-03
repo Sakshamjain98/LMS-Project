@@ -17,9 +17,10 @@ import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import { comparePassword, hashPassword } from "../../shared/utils/bcrypt.js";
 import { syncMappedSeriesToCourse } from "../courses/courses.service.js";
+import { sanitizePermissions } from "../../constants/permissions.js";
 
 // -------------------- Admin Creation --------------------
-export const createAdminService = async ({ name, email, password }) => {
+export const createAdminService = async ({ name, email, password, permissions }) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new ApiError(STATUS_CODES.CONFLICT, "Admin with this email already exists");
@@ -32,6 +33,8 @@ export const createAdminService = async ({ name, email, password }) => {
     password: hashedPassword,
     role: "admin",
     isApproved: true,
+    permissions: sanitizePermissions(permissions),
+    isActive: true,
   });
 
   return admin;
@@ -53,7 +56,7 @@ export const getAdmins = async (query = {}) => {
 
   const [admins, total] = await Promise.all([
     User.find(filter)
-      .select("name email role isApproved createdAt")
+      .select("name email role isApproved isActive permissions createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -99,11 +102,19 @@ export const updateAdminInfo = async (adminId, payload) => {
     admin.password = await hashPassword(payload.password);
   }
 
+  if (payload.permissions !== undefined) {
+    admin.permissions = sanitizePermissions(payload.permissions);
+  }
+
+  if (payload.isActive !== undefined) {
+    admin.isActive = Boolean(payload.isActive);
+  }
+
   admin.role = "admin";
   admin.isApproved = true;
   await admin.save();
 
-  return User.findById(adminId).select("name email role isApproved createdAt").lean();
+  return User.findById(adminId).select("name email role isApproved isActive permissions createdAt").lean();
 };
 
 export const deleteAdminById = async (adminId, currentAdminId) => {
@@ -117,6 +128,23 @@ export const deleteAdminById = async (adminId, currentAdminId) => {
   }
 
   return deleted;
+};
+
+// Superadmin-only: set a new password for an admin directly, no current-password
+// check (unlike the self-service changeAdminPassword below). Invalidates the
+// target admin's existing sessions immediately since they didn't initiate this.
+export const resetAdminPassword = async (adminId, newPassword) => {
+  if (!newPassword || newPassword.length < 6) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "New password must be at least 6 characters");
+  }
+  const admin = await User.findOne({ _id: adminId, role: "admin" });
+  if (!admin) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Admin not found");
+  }
+  admin.password = await hashPassword(newPassword);
+  admin.passwordChangedAt = new Date();
+  await admin.save();
+  return true;
 };
 
 export const getAdminProfile = async (adminId) => {

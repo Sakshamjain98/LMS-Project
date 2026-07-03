@@ -149,6 +149,9 @@ const emptyQuestion = {
   imageUrl: "",
   options: [{ text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }, { text: "", isCorrect: false }],
   marks: 1,
+  // null = "not yet touched by teacher" — falls back to the test-level
+  // negativeMarking setting until explicitly overridden for this question.
+  negativeMarks: null,
   explanation: "",
 };
 
@@ -258,6 +261,7 @@ export default function TestEditor() {
         options: filledOptions.map((o) => ({ text: o.text.trim() })),
         correctOptionIndex,
         marks: Number(newQ.marks) || 1,
+        negativeMarks: Number(newQ.negativeMarks ?? form.negativeMarking) || 0,
         ...(newQ.explanation?.trim() ? { explanation: newQ.explanation.trim() } : {}),
       };
 
@@ -294,6 +298,7 @@ export default function TestEditor() {
       imageUrl: question.imageUrl || "",
       options,
       marks: question.marks ?? 1,
+      negativeMarks: question.negativeMarks ?? 0,
       explanation: question.explanation || "",
     });
     setResetCounter((prev) => prev + 1);
@@ -415,6 +420,7 @@ export default function TestEditor() {
             uploadingImage={uploadingImage}
             onUploadImage={handleUploadImage}
             resetCounter={resetCounter}
+            testNegativeMarking={form.negativeMarking}
           />
         )}
       </div>
@@ -599,7 +605,7 @@ function ConfigTab({ form, onChange }) {
   );
 }
 
-function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, onDelete, onEdit, editingQuestionId, onCancelEdit, csvFile, onCsvFileChange, onCsvUpload, csvUploading, uploadingImage, onUploadImage, resetCounter }) {
+function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, onDelete, onEdit, editingQuestionId, onCancelEdit, csvFile, onCsvFileChange, onCsvUpload, csvUploading, uploadingImage, onUploadImage, resetCounter, testNegativeMarking }) {
   return (
     <div className="space-y-6">
       <section className="rounded-2xl glass-card p-5">
@@ -696,6 +702,16 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
           <div className="flex flex-wrap items-end justify-between gap-4">
             <FieldLabel label="Marks">
               <input type="number" min="0" value={newQ.marks} onChange={(e) => onNewQChange({ ...newQ, marks: e.target.value })} className={`${fieldInput} max-w-32`} />
+            </FieldLabel>
+            <FieldLabel label="Negative Marks" hint={`Defaults to test setting (${testNegativeMarking ?? 0})`}>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                value={newQ.negativeMarks ?? testNegativeMarking ?? 0}
+                onChange={(e) => onNewQChange({ ...newQ, negativeMarks: e.target.value })}
+                className={`${fieldInput} max-w-32`}
+              />
             </FieldLabel>
             <button
               onClick={onAdd}

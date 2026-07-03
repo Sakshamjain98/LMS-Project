@@ -10,6 +10,9 @@ export const authorize = (...allowedRoles) => {
         MESSAGES.TOKEN_INVALID || "Unauthorized"
       );
     }
+    // Superadmin bypasses every role gate project-wide — fixing it here once
+    // avoids touching ~30 authorize(...) call sites individually.
+    if (req.user.role === "superadmin") return next();
     if (!allowedRoles.includes(req.user.role)) {
       throw new ApiError(
         STATUS_CODES.FORBIDDEN,

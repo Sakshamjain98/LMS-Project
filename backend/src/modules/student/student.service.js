@@ -82,8 +82,24 @@ export const userHasPaidSubscription = async (userId) => {
   return !!approvedPayment;
 };
 
-export const getUserPayments = async (userId) => {
-  return Payment.find({ userId }).sort({ createdAt: -1 }).lean();
+export const getUserPayments = async (userId, { page = 1, limit = 10 } = {}) => {
+  const p = Math.max(parseInt(page, 10) || 1, 1);
+  const l = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+  const [payments, total] = await Promise.all([
+    Payment.find({ userId }).sort({ createdAt: -1 }).skip((p - 1) * l).limit(l).lean(),
+    Payment.countDocuments({ userId }),
+  ]);
+  return {
+    payments,
+    pagination: {
+      page: p,
+      limit: l,
+      total,
+      totalPages: Math.max(Math.ceil(total / l), 1),
+      hasNextPage: p * l < total,
+      hasPrevPage: p > 1,
+    },
+  };
 };
 
 export const getAllCourses = async () => {

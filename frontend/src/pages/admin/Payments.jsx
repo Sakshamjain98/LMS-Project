@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAllPayments } from "../../services/adminService";
 import { 
-  DollarSign, User, Hash, Calendar, Loader2, 
+  IndianRupee, User, Hash, Calendar, Loader2, 
   CheckCircle2, Clock, AlertCircle, History, Search, Filter 
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -90,7 +90,7 @@ export default function Payments() {
         </div>
         <div className="flex items-center gap-3 bg-dark-200 border border-dark-100 p-4 rounded-2xl shadow-lg">
           <div className="p-2 bg-brand-primary/10 rounded-lg">
-            <DollarSign className="text-brand-primary w-5 h-5" />
+            <IndianRupee className="text-brand-primary w-5 h-5" />
           </div>
           <div>
             <p className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-widest leading-none">Total Logs</p>
@@ -170,6 +170,7 @@ export default function Payments() {
                 <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">
                   <div className="flex items-center gap-2"><Hash size={14} /> ID</div>
                 </th>
+                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Type</th>
                 <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">
                   <div className="flex items-center gap-2"><User size={14} /> Customer</div>
                 </th>
@@ -183,7 +184,7 @@ export default function Payments() {
             <tbody className="divide-y divide-dark-100">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-24 text-center">
+                  <td colSpan="6" className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="animate-spin text-brand-primary" size={32} />
                       <span className="text-grayCustom-medium text-sm font-medium">Filtering records...</span>
@@ -192,7 +193,7 @@ export default function Payments() {
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-20 text-center text-grayCustom-medium font-medium">
+                  <td colSpan="6" className="px-6 py-20 text-center text-grayCustom-medium font-medium">
                     No transactions match your search criteria.
                   </td>
                 </tr>
@@ -205,6 +206,10 @@ export default function Payments() {
                         <span className="font-mono text-[10px] text-brand-primary bg-brand-primary/5 px-2 py-1 rounded border border-brand-primary/10 tracking-wider">
                           {payment.orderId || payment.paymentId || payment._id.slice(-10).toUpperCase()}
                         </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="text-xs font-bold text-white/80">{payment.kind || "SUBSCRIPTION"}</div>
+                        <div className="text-[11px] text-grayCustom-medium mt-0.5">{payment.description || payment.plan}</div>
                       </td>
                       <td className="px-6 py-5">
                         <div className="min-w-37.5">

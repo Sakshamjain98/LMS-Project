@@ -4,8 +4,8 @@ import { STATUS_CODES } from "../../constants/statusCode.js";
 
 // -------------------- Admin Creation --------------------
 export const createAdmin = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
-  const admin = await service.createAdminService({ name, email, password });
+  const { name, email, password, permissions } = req.body;
+  const admin = await service.createAdminService({ name, email, password, permissions });
   res.status(STATUS_CODES.CREATED).json({
     success: true,
     message: "Admin created successfully",
@@ -14,6 +14,8 @@ export const createAdmin = asyncHandler(async (req, res) => {
       name: admin.name,
       email: admin.email,
       role: admin.role,
+      permissions: admin.permissions,
+      isActive: admin.isActive,
     },
   });
 });
@@ -31,6 +33,11 @@ export const updateAdmin = asyncHandler(async (req, res) => {
 export const deleteAdmin = asyncHandler(async (req, res) => {
   await service.deleteAdminById(req.params.id, req.user._id);
   res.json({ success: true, message: "Admin deleted successfully" });
+});
+
+export const resetAdminPassword = asyncHandler(async (req, res) => {
+  await service.resetAdminPassword(req.params.id, req.body?.newPassword);
+  res.json({ success: true, message: "Admin password reset successfully" });
 });
 
 export const getAdminProfile = asyncHandler(async (req, res) => {

@@ -31,14 +31,14 @@ import logo from "../../assets/icons/logo.png";
 // 6. Test Series (collapsible tree), 7. Create Admin, 8. Profile
 const navTop = [
   { path: "/admin/dashboard",    label: "Dashboard", icon: LayoutDashboard },
-  { path: "/admin/users",        label: "Users",     icon: Users },
-  { path: "/admin/payments",     label: "Payments",  icon: CreditCard },
+  { path: "/admin/users",        label: "Users",     icon: Users, perm: "users.view" },
+  { path: "/admin/payments",     label: "Payments",  icon: CreditCard, superadminOnly: true },
   { path: "/admin/news",         label: "News",      icon: Newspaper },
   { path: "/admin/blogs",        label: "Blogs",     icon: PenSquare },
 ];
 const navBottom = [
-  { path: "/admin/site-content", label: "Site Content", icon: LayoutTemplate },
-  { path: "/admin/create-admin", label: "Create Admin", icon: UserPlus },
+  { path: "/admin/site-content", label: "Site Content", icon: LayoutTemplate, perm: "settings.view" },
+  { path: "/admin/create-admin", label: "Create Admin", icon: UserPlus, superadminOnly: true },
   { path: "/admin/profile",      label: "Profile",      icon: UserCircle2 },
 ];
 
@@ -60,6 +60,16 @@ export default function AdminLayout() {
     if (!userStr) return null;
     try { return JSON.parse(userStr); } catch { return null; }
   });
+  const isSuperadmin = user?.role === "superadmin";
+  const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+  const canSee = (item) => {
+    if (isSuperadmin) return true;
+    if (item.superadminOnly) return false;
+    if (item.perm) return permissions.includes(item.perm);
+    return true;
+  };
+  const canViewCourses = isSuperadmin || permissions.includes("courses.view");
+  const canViewTestSeries = isSuperadmin || permissions.includes("testseries.view");
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,12 +145,12 @@ export default function AdminLayout() {
 
         {/* Nav — scrollable when content overflows the fixed sidebar height. */}
         <nav className="flex-1 min-w-0 overflow-y-auto space-y-1 px-3 py-3">
-          {navTop.map((item) => (
+          {navTop.filter(canSee).map((item) => (
             <NavItem key={item.path} item={item} collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           ))}
 
           {/* Test Series hierarchy: Category → Exam → Series */}
-          <div className="mt-1">
+          {canViewTestSeries && <div className="mt-1">
             <button
               onClick={() => setSeriesExpanded((v) => !v)}
               className={`group flex w-full items-center justify-between rounded-xl px-4 py-2.5 transition-colors ${
@@ -309,10 +319,10 @@ export default function AdminLayout() {
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* AITS — dedicated top-level tab */}
-          <div className="mt-1">
+          {canViewTestSeries && <div className="mt-1">
             <NavLink
               to="/admin/aits"
               onClick={() => setMobileOpen(false)}
@@ -330,10 +340,10 @@ export default function AdminLayout() {
                 {!collapsed && <span className="text-sm font-semibold">AITS</span>}
               </span>
             </NavLink>
-          </div>
+          </div>}
 
           {/* Courses section */}
-          <div className="mt-1">
+          {canViewCourses && <div className="mt-1">
             <NavLink
               to="/admin/courses"
               onClick={() => setMobileOpen(false)}
@@ -351,11 +361,11 @@ export default function AdminLayout() {
                 {!collapsed && <span className="text-sm font-semibold">Courses</span>}
               </span>
             </NavLink>
-          </div>
+          </div>}
 
           <div className="my-2 h-px bg-white/5" />
 
-          {navBottom.map((item) => (
+          {navBottom.filter(canSee).map((item) => (
             <NavItem key={item.path} item={item} collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           ))}
         </nav>
@@ -369,7 +379,7 @@ export default function AdminLayout() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-white">{user?.name || "Administrator"}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-primary">Super Admin</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-primary">{isSuperadmin ? "Super Admin" : "Admin"}</p>
               </div>
             </div>
           )}

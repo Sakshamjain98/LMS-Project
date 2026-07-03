@@ -29,8 +29,18 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["student", "teacher", "admin"],
+      enum: ["student", "teacher", "admin", "superadmin"],
       default: "student",
+    },
+    // Only meaningful when role === "admin" — superadmin is always unrestricted.
+    permissions: {
+      type: [String],
+      default: [],
+    },
+    // Disable-admin switch, enforced at login and on every authenticated request.
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     isProfileComplete: {
       type: Boolean,

@@ -39,6 +39,20 @@ const testAttemptSchema = new mongoose.Schema(
       index: true,
     },
     answers: [answerSchema],
+    // Per-attempt display order of questions (shuffled if test.shuffleQuestions,
+    // else the Test's authored order). Populated at attempt creation so
+    // refresh/resume always sees the same order for this attempt.
+    questionOrder: [{ type: mongoose.Schema.Types.ObjectId, ref: "Question" }],
+    // Per-attempt, per-question option display order.
+    // order[displayPosition] = canonical index into question.options.
+    // Identity ([0,1,2,3]) when test.shuffleOptions is false.
+    optionOrders: [
+      {
+        _id: false,
+        questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question", required: true },
+        order: { type: [Number], required: true },
+      },
+    ],
     status: {
       type: String,
       enum: ["in_progress", "submitted", "evaluated", "expired"],

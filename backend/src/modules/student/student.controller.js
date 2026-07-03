@@ -82,11 +82,11 @@ export const schedule = asyncHandler(async (req, res) => {
 
 export const paymentHistory = asyncHandler(async (req, res) => {
   await activityQueue.add("payment_history_view", { userId: req.user._id });
-  const payments = await service.getUserPayments(req.user._id);
+  const result = await service.getUserPayments(req.user._id, req.query);
   res.status(STATUS_CODES.SUCCESS).json({
     success: true,
     message: MESSAGES.SUCCESS,
-    payments,
+    ...result,
   });
 });
 

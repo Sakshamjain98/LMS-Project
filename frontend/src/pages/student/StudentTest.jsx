@@ -815,7 +815,7 @@ function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, on
                       {a.marksObtained || 0}/{a.totalMarks || 0}
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-brand-primary whitespace-nowrap">
-                      {(a.percentage || 0).toFixed(1)}%
+                      {a.attemptedQuestions > 0 ? ((a.correctAnswers / a.attemptedQuestions) * 100).toFixed(1) : "0.0"}%
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button

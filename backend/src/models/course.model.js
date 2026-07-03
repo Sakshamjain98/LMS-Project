@@ -42,7 +42,10 @@ const courseSchema = new mongoose.Schema(
       },
     ],
     thumbnail: { url: String, publicId: String },
-    status: { type: String, enum: ["draft", "published"], default: "published" },
+    // "private" and "hidden" are both simply "not visible to students" —
+    // distinct labels only, no behavioral difference (no invite/share-link
+    // system exists). Only "published" is ever shown/accessible to students.
+    status: { type: String, enum: ["draft", "published", "private", "hidden"], default: "published" },
     order: { type: Number, default: 0 },
     tags: [String],
     isVisible: { type: Boolean, default: true, index: true },

@@ -39,6 +39,9 @@ export const loginUserService = async ({ email, password }) => {
   if (user.role === 'teacher' && !user.isApproved) {
     throw new ApiError(STATUS_CODES.FORBIDDEN, "Your teacher account is pending admin approval.");
   }
+  if (user.isActive === false) {
+    throw new ApiError(STATUS_CODES.FORBIDDEN, "This account has been disabled. Contact a super admin.");
+  }
   const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, MESSAGES.INVALID_CREDENTIALS);

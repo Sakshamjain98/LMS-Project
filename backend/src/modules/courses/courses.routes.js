@@ -2,6 +2,7 @@ import express from "express";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
+import { requirePermission } from "../../middlewares/requirePermission.middleware.js";
 import { upload } from "../../middlewares/upload.middleware.js";
 import * as svc from "./courses.service.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
@@ -26,6 +27,9 @@ router.get(
   "/:courseId/public",
   asyncHandler(async (req, res) => {
     const tree = await svc.getCourseTree(req.params.courseId);
+    if (tree.status !== "published") {
+      return res.status(STATUS_CODES.NOT_FOUND).json({ success: false, message: "Course not found" });
+    }
     // Strip full note content from public view (only titles)
     const stripped = {
       ...tree,
@@ -69,6 +73,7 @@ router.get(
 router.post(
   "/",
   authorize("teacher", "admin"),
+  requirePermission("courses.create"),
   upload.single("thumbnail"),
   asyncHandler(async (req, res) => {
     const thumbnail = req.file
@@ -83,6 +88,7 @@ router.post(
 router.patch(
   "/:courseId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   upload.single("thumbnail"),
   asyncHandler(async (req, res) => {
     const thumbnail = req.file
@@ -90,7 +96,7 @@ router.patch(
       : req.body.thumbnail !== undefined ? req.body.thumbnail : undefined;
     const data = { ...req.body };
     if (thumbnail !== undefined) data.thumbnail = thumbnail;
-    const teacherId = req.user.role === "admin" ? null : req.user._id;
+    const teacherId = ["admin", "superadmin"].includes(req.user.role) ? null : req.user._id;
     const course = await svc.updateCourse(req.params.courseId, data, teacherId);
     res.json({ success: true, course });
   })
@@ -100,8 +106,9 @@ router.patch(
 router.delete(
   "/:courseId",
   authorize("teacher", "admin"),
+  requirePermission("courses.delete"),
   asyncHandler(async (req, res) => {
-    const teacherId = req.user.role === "admin" ? null : req.user._id;
+    const teacherId = ["admin", "superadmin"].includes(req.user.role) ? null : req.user._id;
     await svc.deleteCourse(req.params.courseId, teacherId);
     res.json({ success: true, message: "Course deleted" });
   })
@@ -113,13 +120,19 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { courseId } = req.params;
-    const isAdminOrTeacher = req.user.role === "admin" || req.user.role === "teacher";
+    const isAdminOrTeacher = ["admin", "superadmin", "teacher"].includes(req.user.role);
+
+    const tree = await svc.getCourseTree(courseId);
+    // Students can't view a course that isn't published, even via a direct
+    // link/id — status !== "published" is not just a listing filter.
+    if (!isAdminOrTeacher && tree.status !== "published") {
+      return res.status(STATUS_CODES.NOT_FOUND).json({ success: false, message: "Course not found" });
+    }
+
     const access = isAdminOrTeacher
       ? { hasAccess: true, reason: "admin", expiresAt: null }
       : await svc.checkCourseAccess(userId, courseId);
     const { hasAccess, reason, expiresAt } = access;
-
-    const tree = await svc.getCourseTree(courseId);
 
     if (!hasAccess) {
       // Return tree with note content stripped (preview mode)
@@ -158,6 +171,7 @@ router.get(
 router.post(
   "/:courseId/subjects",
   authorize("teacher", "admin"),
+  requirePermission("courses.create"),
   asyncHandler(async (req, res) => {
     const sub = await svc.createSubject(req.params.courseId, req.body, req.user._id);
     res.status(STATUS_CODES.CREATED).json({ success: true, subject: sub });
@@ -168,6 +182,7 @@ router.post(
 router.patch(
   "/subjects/:subjectId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     const sub = await svc.updateSubject(req.params.subjectId, req.body, req.user._id);
     res.json({ success: true, subject: sub });
@@ -178,6 +193,7 @@ router.patch(
 router.delete(
   "/subjects/:subjectId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     await svc.deleteSubject(req.params.subjectId, req.user._id);
     res.json({ success: true, message: "Subject deleted" });
@@ -190,6 +206,7 @@ router.delete(
 router.post(
   "/subjects/:subjectId/chapters",
   authorize("teacher", "admin"),
+  requirePermission("chapters.edit"),
   asyncHandler(async (req, res) => {
     const ch = await svc.createChapter(req.params.subjectId, req.body, req.user._id);
     res.status(STATUS_CODES.CREATED).json({ success: true, chapter: ch });
@@ -200,9 +217,21 @@ router.post(
 router.patch(
   "/chapters/:chapterId",
   authorize("teacher", "admin"),
+  requirePermission("chapters.edit"),
   asyncHandler(async (req, res) => {
     const ch = await svc.updateChapter(req.params.chapterId, req.body, req.user._id);
     res.json({ success: true, chapter: ch });
+  })
+);
+
+// PATCH /api/courses/subjects/:subjectId/chapters/reorder — bulk reorder (drag-and-drop)
+router.patch(
+  "/subjects/:subjectId/chapters/reorder",
+  authorize("teacher", "admin"),
+  requirePermission("chapters.edit"),
+  asyncHandler(async (req, res) => {
+    const chapters = await svc.reorderChapters(req.params.subjectId, req.body.chapterIds, req.user._id);
+    res.json({ success: true, chapters });
   })
 );
 
@@ -210,6 +239,7 @@ router.patch(
 router.delete(
   "/chapters/:chapterId",
   authorize("teacher", "admin"),
+  requirePermission("chapters.edit"),
   asyncHandler(async (req, res) => {
     await svc.deleteChapter(req.params.chapterId, req.user._id);
     res.json({ success: true, message: "Chapter deleted" });
@@ -223,6 +253,7 @@ router.delete(
 router.post(
   "/chapters/:chapterId/notes",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     const data = { ...req.body };
@@ -241,6 +272,7 @@ router.post(
 router.patch(
   "/notes/:noteId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     const data = { ...req.body };
@@ -258,6 +290,7 @@ router.patch(
 router.delete(
   "/notes/:noteId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     await svc.deleteNote(req.params.noteId, req.user._id);
     res.json({ success: true, message: "Note deleted" });
@@ -271,7 +304,7 @@ router.get(
     const { noteId } = req.params;
     const note = await svc.getNoteById(noteId);
 
-    if (req.user.role !== "admin" && req.user.role !== "teacher") {
+    if (!["admin", "superadmin", "teacher"].includes(req.user.role)) {
       const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
       const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
       const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
@@ -298,7 +331,7 @@ router.get(
       return res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "PDF preview unavailable" });
     }
 
-    if (req.user.role !== "admin" && req.user.role !== "teacher") {
+    if (!["admin", "superadmin", "teacher"].includes(req.user.role)) {
       const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
       const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
       const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
@@ -341,6 +374,7 @@ router.get(
 router.post(
   "/chapters/:chapterId/videos",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     const vid = await svc.createVideo(req.params.chapterId, req.body, req.user._id);
     res.status(STATUS_CODES.CREATED).json({ success: true, video: vid });
@@ -351,6 +385,7 @@ router.post(
 router.patch(
   "/videos/:videoId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     const vid = await svc.updateVideo(req.params.videoId, req.body, req.user._id);
     res.json({ success: true, video: vid });
@@ -361,6 +396,7 @@ router.patch(
 router.delete(
   "/videos/:videoId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     await svc.deleteVideo(req.params.videoId, req.user._id);
     res.json({ success: true, message: "Video deleted" });
@@ -373,6 +409,7 @@ router.delete(
 router.post(
   "/chapters/:chapterId/tests",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     const ch = await svc.linkTest(req.params.chapterId, req.body.testId, req.user._id);
     res.status(STATUS_CODES.CREATED).json({ success: true, chapter: ch });
@@ -383,6 +420,7 @@ router.post(
 router.delete(
   "/chapters/:chapterId/tests/:testId",
   authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
   asyncHandler(async (req, res) => {
     const ch = await svc.unlinkTest(req.params.chapterId, req.params.testId, req.user._id);
     res.json({ success: true, chapter: ch });

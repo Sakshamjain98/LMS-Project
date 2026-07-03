@@ -128,6 +128,15 @@ export const deleteChapter = async (chapterId) => {
   }
 };
 
+export const reorderChapters = async (subjectId, chapterIds) => {
+  try {
+    const res = await api.patch(`/courses/subjects/${subjectId}/chapters/reorder`, { chapterIds });
+    return res.data.chapters;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to reorder chapters" };
+  }
+};
+
 // ─── Notes ───────────────────────────────────────────────────────────────────
 
 export const createRichTextNote = async (chapterId, data) => {

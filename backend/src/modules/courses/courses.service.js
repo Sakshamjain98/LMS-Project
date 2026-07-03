@@ -68,7 +68,7 @@ export async function createCourse(data, teacherId) {
     mappedTestSeries: parseIdArray(mappedTestSeries),
     tags,
     thumbnail,
-    status: "published",
+    status: ["draft", "published", "private", "hidden"].includes(data.status) ? data.status : "published",
   });
 }
 
@@ -286,6 +286,22 @@ export async function deleteChapter(chapterId, teacherId) {
   await CourseNote.deleteMany({ chapterId });
   await CourseVideo.deleteMany({ chapterId });
   await CourseChapter.deleteOne({ _id: chapterId });
+}
+
+// Bulk drag-and-drop reorder: chapterIds is the full new order for this subject.
+export async function reorderChapters(subjectId, chapterIds, teacherId) {
+  if (!Array.isArray(chapterIds) || !chapterIds.length) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "chapterIds array is required");
+  }
+  const chapters = await CourseChapter.find({ subjectId, teacherId }).select("_id").lean();
+  const validIds = new Set(chapters.map((c) => c._id.toString()));
+  if (chapterIds.some((id) => !validIds.has(String(id))) || chapterIds.length !== chapters.length) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "chapterIds must match this subject's existing chapters");
+  }
+  await CourseChapter.bulkWrite(
+    chapterIds.map((id, order) => ({ updateOne: { filter: { _id: id }, update: { $set: { order } } } }))
+  );
+  return CourseChapter.find({ subjectId }).sort({ order: 1 }).lean();
 }
 
 // ─── Notes ──────────────────────────────────────────────────────────────────
@@ -507,7 +523,7 @@ export async function syncMappedSeriesToCourse(userId, courseId, { disabled, exp
 
 // Returns courses grouped by ExamCategory → Exam for the public website.
 export async function getPublicCourseHierarchy(limit = 20, examId = null) {
-  const filter = {};
+  const filter = { status: "published" };
   if (examId) filter.examId = examId;
 
   const rawCourses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).lean();

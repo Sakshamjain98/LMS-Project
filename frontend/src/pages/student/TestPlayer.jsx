@@ -385,7 +385,7 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
             <div className="rounded-2xl border border-dark-100 bg-dark-300 p-5 md:p-7">
               {/* Q header */}
               <div className="mb-5 flex items-start justify-between gap-4 border-b border-dark-100 pb-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
                     Question {currentIndex + 1}
                   </p>

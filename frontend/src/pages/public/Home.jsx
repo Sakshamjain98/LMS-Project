@@ -407,7 +407,7 @@ const Home = () => {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      if (userRole === "admin") navigate("/admin/dashboard");
+      if (["admin","superadmin"].includes(userRole)) navigate("/admin/dashboard");
       else navigate("/student/dashboard");
     } else {
       navigate("/login");

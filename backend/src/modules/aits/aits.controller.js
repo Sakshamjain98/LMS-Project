@@ -3,7 +3,7 @@ import { STATUS_CODES } from "../../constants/statusCode.js";
 import * as service from "./aits.service.js";
 
 export const getByExam = asyncHandler(async (req, res) => {
-  const teacherId = req.user.role === "admin" ? null : req.user._id;
+  const teacherId = ["admin", "superadmin"].includes(req.user.role) ? null : req.user._id;
   const aitsList = await service.getAITSByExam(req.params.examId, teacherId);
   res.status(STATUS_CODES.SUCCESS).json({ success: true, aitsList });
 });

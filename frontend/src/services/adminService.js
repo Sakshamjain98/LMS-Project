@@ -247,6 +247,11 @@ export const deleteAdmin = async (adminId) => {
   return res.data;
 };
 
+export const resetAdminPassword = async (adminId, newPassword) => {
+  const res = await API.patch(`/admin/admins/${adminId}/reset-password`, { newPassword });
+  return res.data;
+};
+
 // ==================== TEACHER FEATURE SETTINGS ====================
 export const getTeacherFeatureSettings = async () => {
   const res = await API.get("/admin/settings/teacher");

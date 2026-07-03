@@ -30,6 +30,7 @@ export const login = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       isApproved: user.isApproved,
+      permissions: user.permissions || [],
     },
   });
 });

@@ -355,40 +355,6 @@ export const publishTest = async (testId, payload) => {
   return Test.findByIdAndUpdate(testId, payload, { new: true });
 };
 
-export const getTestAnalytics = async (testId) => {
-  // In a real system, you'd aggregate from attempts collection.
-  // For now, return detailed dummy data.
-  const questions = await Question.find({ testId }).lean();
-  const questionAnalytics = await QuestionAnalytics.find({ testId }).lean();
-
-  const totalAttempts = 1240; // dummy
-  const avgScore = 58;
-  const accuracy = 62;
-  const completionRate = 91;
-  const avgTimeSpent = 1245; // seconds
-
-  const questionStats = questions.map(q => {
-    const stats = questionAnalytics.find(a => a.questionId.toString() === q._id.toString()) || {};
-    return {
-      questionId: q._id,
-      questionText: q.questionText,
-      totalAttempts: stats.totalAttempts || 0,
-      correctPercentage: stats.correctAttempts ? (stats.correctAttempts / stats.totalAttempts) * 100 : 0,
-      avgTimeSpent: stats.avgTimeSpent || 0,
-    };
-  });
-
-  return {
-    testId,
-    totalAttempts,
-    avgScore,
-    accuracy,
-    completionRate,
-    avgTimeSpent,
-    questionStats,
-  };
-};
-
 export const getQuestionAnalytics = async (questionId) => {
   return QuestionAnalytics.findOne({ questionId }).lean();
 };

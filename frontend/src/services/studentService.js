@@ -19,6 +19,15 @@ export const updateStudentProfile = async (data) => {
   }
 };
 
+export const getPaymentHistory = async (params = {}) => {
+  try {
+    const res = await api.get("/student/payment-history", { params });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to fetch transaction history" };
+  }
+};
+
 // ─── Tests ──────────────────────────────────────────────────────────────────
 export const getAvailableTests = async () => {
   try {

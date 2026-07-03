@@ -2,6 +2,7 @@ import express from "express";
 import * as controller from "./teacher.controller.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
+import { requirePermission } from "../../middlewares/requirePermission.middleware.js";
 import { upload } from "../../middlewares/upload.middleware.js";
 
 import * as analyticsController from "../analytics/analytics.controller.js";
@@ -141,23 +142,23 @@ router.use("/aits", aitsRoutes);
 router.get("/test-series", testSeriesController.getSeriesTree);
 // Full hierarchy (categories → exams → series → subjects → chapters → tests + AITS)
 router.get("/test-series/hierarchy", testSeriesController.getFullHierarchy);
-router.post("/test-series/topics", testSeriesController.createTopic);
-router.put("/test-series/topics/:topicId", testSeriesController.updateTopic);
-router.delete("/test-series/topics/:topicId", testSeriesController.deleteTopic);
+router.post("/test-series/topics", requirePermission("testseries.create"), testSeriesController.createTopic);
+router.put("/test-series/topics/:topicId", requirePermission("testseries.edit"), testSeriesController.updateTopic);
+router.delete("/test-series/topics/:topicId", requirePermission("testseries.edit"), testSeriesController.deleteTopic);
 
-router.post("/test-series/topics/:topicId/subjects", testSeriesController.createSubject);
-router.put("/test-series/subjects/:subjectId", testSeriesController.updateSubject);
-router.delete("/test-series/subjects/:subjectId", testSeriesController.deleteSubject);
+router.post("/test-series/topics/:topicId/subjects", requirePermission("testseries.create"), testSeriesController.createSubject);
+router.put("/test-series/subjects/:subjectId", requirePermission("testseries.edit"), testSeriesController.updateSubject);
+router.delete("/test-series/subjects/:subjectId", requirePermission("testseries.edit"), testSeriesController.deleteSubject);
 
-router.post("/test-series/subjects/:subjectId/chapters", testSeriesController.createChapter);
-router.put("/test-series/chapters/:chapterId", testSeriesController.updateChapter);
-router.delete("/test-series/chapters/:chapterId", testSeriesController.deleteChapter);
+router.post("/test-series/subjects/:subjectId/chapters", requirePermission("chapters.edit"), testSeriesController.createChapter);
+router.put("/test-series/chapters/:chapterId", requirePermission("chapters.edit"), testSeriesController.updateChapter);
+router.delete("/test-series/chapters/:chapterId", requirePermission("chapters.edit"), testSeriesController.deleteChapter);
 
-router.post("/test-series/chapters/:chapterId/tests", testSeriesController.createTestInChapter);
+router.post("/test-series/chapters/:chapterId/tests", requirePermission("chapters.edit"), testSeriesController.createTestInChapter);
 router.get("/test-series/topics/:topicId/analytics", testSeriesController.getTopicAnalytics);
 
 // Assign a test series (topic) to an exam
-router.patch("/test-series/topics/:topicId/assign-exam", testSeriesController.assignTopicToExam);
+router.patch("/test-series/topics/:topicId/assign-exam", requirePermission("testseries.edit"), testSeriesController.assignTopicToExam);
 
 // ========== PERFORMANCE ==========
 router.get("/performance", controller.studentPerformance);

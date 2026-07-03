@@ -38,6 +38,9 @@ if (user.passwordChangedAt) {
         MESSAGES.USER_NOT_FOUND
       );
     }
+    if (user.isActive === false) {
+      throw new ApiError(STATUS_CODES.UNAUTHORIZED, "This account has been disabled.");
+    }
     req.user = user;
     markUserActive(user._id).catch((error) => {
       console.error("Failed to update active user state:", error?.message || error);

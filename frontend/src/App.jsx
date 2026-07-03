@@ -20,6 +20,7 @@ import StudentProfile from "./pages/student/StudentProfile";
 import StudentCourses from "./pages/student/StudentCourses";
 import CourseLearning from "./pages/student/CourseLearning";
 import CourseTestPlayer from "./pages/student/CourseTestPlayer";
+import MyTransactions from "./pages/student/MyTransactions";
 
 /* Layouts */
 import StudentLayout from "./pages/student/StudentLayout";
@@ -45,9 +46,27 @@ import StudentAITS from "./pages/student/StudentAITS";
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   const userRole = localStorage.getItem("userRole");
-  if (!token || userRole !== "admin") return <Navigate to="/login" replace />;
+  if (!token || (userRole !== "admin" && userRole !== "superadmin")) {
+    return <Navigate to="/login" replace />;
+  }
   return children;
 };
+
+const hasPermission = (perm) => {
+  if (localStorage.getItem("userRole") === "superadmin") return true;
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    return Array.isArray(user.permissions) && user.permissions.includes(perm);
+  } catch {
+    return false;
+  }
+};
+
+const RequirePermission = ({ perm, children }) =>
+  hasPermission(perm) ? children : <Navigate to="/admin/dashboard" replace />;
+
+const SuperadminOnly = ({ children }) =>
+  localStorage.getItem("userRole") === "superadmin" ? children : <Navigate to="/admin/dashboard" replace />;
 
 function App() {
   return (
@@ -106,6 +125,7 @@ function App() {
           <Route path="courses/:courseId" element={<CourseLearning />} />
           <Route path="courses/:courseId/tests/:testId" element={<CourseTestPlayer />} />
           <Route path="aits" element={<StudentAITS />} />
+          <Route path="transactions" element={<MyTransactions />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
 
@@ -120,8 +140,8 @@ function App() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="users" element={<Users />} />
-          <Route path="payments" element={<Payments />} />
+          <Route path="users" element={<RequirePermission perm="users.view"><Users /></RequirePermission>} />
+          <Route path="payments" element={<SuperadminOnly><Payments /></SuperadminOnly>} />
           <Route path="news" element={<News />} />
           <Route path="blogs" element={<Blogs />} />
           <Route path="blogs/new" element={<AdminBlogEditor />} />
@@ -132,7 +152,7 @@ function App() {
           <Route path="courses" element={<CourseManager />} />
           <Route path="aits" element={<AITSManager />} />
           <Route path="site-content" element={<AdminSiteContent />} />
-          <Route path="create-admin" element={<CreateAdmin />} />
+          <Route path="create-admin" element={<SuperadminOnly><CreateAdmin /></SuperadminOnly>} />
           <Route path="profile" element={<AdminProfile />} />
         </Route>
 

@@ -36,6 +36,7 @@ const Login = () => {
 
     const routes = {
       admin: "/admin/dashboard",
+      superadmin: "/admin/dashboard",
       student: "/student/dashboard",
     };
     navigate(routes[res.user.role] || "/student/dashboard");

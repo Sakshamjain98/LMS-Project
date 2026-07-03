@@ -28,14 +28,15 @@ router.post("/course/:courseId/order", authMiddleware, authorize("student"), con
 router.post("/course/:courseId/verify", authMiddleware, authorize("student"), controller.verifyCoursePayment);
 router.get("/course/:courseId/access", authMiddleware, authorize("student"), controller.checkCourseAccess);
 
-// Admin routes — payment approval
-router.get("/pending-approval", authMiddleware, authorize("admin"), controller.getPendingApprovalPayments);
-router.put("/:id/approve", authMiddleware, authorize("admin"), controller.approvePayment);
-router.put("/:id/reject", authMiddleware, authorize("admin"), controller.rejectPayment);
+// Admin routes — payment approval. Superadmin-only: payments are never a
+// grantable admin permission (client requirement — admins must not see payments).
+router.get("/pending-approval", authMiddleware, authorize("superadmin"), controller.getPendingApprovalPayments);
+router.put("/:id/approve", authMiddleware, authorize("superadmin"), controller.approvePayment);
+router.put("/:id/reject", authMiddleware, authorize("superadmin"), controller.rejectPayment);
 
 // Admin recovery — rescue a paid-but-not-unlocked order by Razorpay id.
 // Body: { paymentId } or { orderId } (from the Razorpay dashboard / email).
-router.post("/reconcile", authMiddleware, authorize("admin"), controller.reconcilePayment);
+router.post("/reconcile", authMiddleware, authorize("superadmin"), controller.reconcilePayment);
 
 export default router;
 

@@ -11,10 +11,12 @@ import {
   calculateMarksForAnswer,
   isAnswerCorrect,
   calculateTestResult,
-  sanitizeQuestionsForStudent,
   validateTestTiming,
   hasExceededTimeLimit,
   generateDetailedResult,
+  shuffleArray,
+  buildAttemptQuestionsForStudent,
+  toCanonicalOptionIndex,
 } from "../../shared/utils/evaluation.utils.js";
 
 // True when the student holds a valid (non-disabled, non-expired) unlock for
@@ -110,14 +112,15 @@ export const startTest = async (testId, studentId) => {
   }).lean();
 
   if (existingAttempt) {
-    // Return existing attempt for resume
+    // Return existing attempt for resume — same questionOrder/optionOrders
+    // computed when the attempt was created, so the shuffle stays stable.
     const questions = await Question.find({
       _id: { $in: test.questions },
     }).lean();
 
     return {
       attempt: existingAttempt,
-      questions: sanitizeQuestionsForStudent(questions),
+      questions: buildAttemptQuestionsForStudent(questions, existingAttempt.questionOrder, existingAttempt.optionOrders),
       duration: test.duration,
       isProctored: Boolean(test.isProctored),
       testTitle: test.title,
@@ -145,6 +148,17 @@ export const startTest = async (testId, studentId) => {
     _id: { $in: test.questions },
   }).lean();
 
+  // Base the canonical order on test.questions (the teacher's authored order)
+  // rather than the $in query's result, which Mongo never guarantees to match.
+  const validIds = new Set(questions.map((q) => q._id.toString()));
+  const canonicalOrder = (test.questions || []).filter((id) => validIds.has(id.toString()));
+  const questionOrder = test.shuffleQuestions ? shuffleArray(canonicalOrder) : canonicalOrder;
+
+  const optionOrders = questions.map((q) => {
+    const identity = q.options.map((_, i) => i);
+    return { questionId: q._id, order: test.shuffleOptions ? shuffleArray(identity) : identity };
+  });
+
   // Create new attempt
   const attempt = await TestAttempt.create({
     testId: objTestId,
@@ -152,11 +166,13 @@ export const startTest = async (testId, studentId) => {
     totalQuestions: questions.length,
     totalMarks: test.totalMarks || 0,
     status: "in_progress",
+    questionOrder,
+    optionOrders,
   });
 
   return {
     attempt: attempt.toObject(),
-    questions: sanitizeQuestionsForStudent(questions),
+    questions: buildAttemptQuestionsForStudent(questions, questionOrder, optionOrders),
     duration: test.duration,
     isProctored: Boolean(test.isProctored),
     testTitle: test.title,
@@ -249,13 +265,17 @@ export const submitAnswer = async (attemptId, answerData, studentId) => {
     );
   }
 
-  const { questionId, selectedOptionIndex, timeTaken } = answerData;
+  const { questionId, selectedOptionIndex: rawIndex, timeTaken } = answerData;
 
   // Verify question and test ownership
   const question = await Question.findById(questionId).lean();
   if (!question || question.testId.toString() !== attempt.testId.toString()) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid question");
   }
+
+  // rawIndex arrives in display (shuffled) coordinates; convert to canonical
+  // before scoring/persisting so attempt.answers always stores canonical indices.
+  const selectedOptionIndex = toCanonicalOptionIndex(rawIndex, attempt.optionOrders, questionId);
 
   // Check time limit
   const test = await Test.findById(attempt.testId).lean();
@@ -354,10 +374,17 @@ export const submitTest = async (attemptId, answersData, studentId) => {
     const savedAnswer = savedAnswerMap.get(questionId);
     const mergedAnswer = requestAnswer || savedAnswer || {};
 
-    const selectedOptionIndex =
+    const rawIndex =
       mergedAnswer.selectedOptionIndex === undefined
         ? null
         : mergedAnswer.selectedOptionIndex;
+    // requestAnswer is raw client input (display coords) and needs conversion
+    // each time; savedAnswer was already converted+persisted by submitAnswer —
+    // converting it again would silently corrupt it, so only convert values
+    // that came fresh from the request body.
+    const selectedOptionIndex = requestAnswer
+      ? toCanonicalOptionIndex(rawIndex, attempt.optionOrders, question._id)
+      : rawIndex;
 
     const isCorrect = isAnswerCorrect(question, selectedOptionIndex);
     const marksObtained = calculateMarksForAnswer(question, selectedOptionIndex);

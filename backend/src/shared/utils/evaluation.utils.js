@@ -81,6 +81,54 @@ export const sanitizeQuestionsForStudent = (questions) => {
 };
 
 /**
+ * Fisher-Yates shuffle. Not cryptographic — question/option order isn't a
+ * secret, it just needs to differ per attempt.
+ */
+export const shuffleArray = (arr) => {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+/**
+ * Reorders questions per questionOrder and each question's options per its
+ * matching optionOrders entry, then sanitizes. Falls back to identity order
+ * when questionOrder/optionOrders are missing or empty — this makes it safe
+ * for attempts created before shuffle support shipped (no data migration).
+ */
+export const buildAttemptQuestionsForStudent = (questions, questionOrder, optionOrders) => {
+  const qMap = new Map(questions.map((q) => [q._id.toString(), q]));
+  const orderMap = new Map((optionOrders || []).map((o) => [o.questionId.toString(), o.order]));
+
+  const ids = questionOrder && questionOrder.length ? questionOrder : questions.map((q) => q._id);
+  const ordered = ids.map((id) => qMap.get(id.toString())).filter(Boolean);
+
+  const reordered = ordered.map((q) => {
+    const base = q.toObject ? q.toObject() : q;
+    const order = orderMap.get(base._id.toString()) || base.options.map((_, i) => i);
+    return { ...base, options: order.map((canonicalIdx) => base.options[canonicalIdx]) };
+  });
+
+  return sanitizeQuestionsForStudent(reordered);
+};
+
+/**
+ * selectedOptionIndex arrives from the client in display (shuffled)
+ * coordinates. Converts it to the canonical index question.correctOptionIndex
+ * is defined against. Identity fallback covers unshuffled tests and legacy
+ * attempts with no optionOrders.
+ */
+export const toCanonicalOptionIndex = (selectedOptionIndex, optionOrders, questionId) => {
+  if (selectedOptionIndex === null || selectedOptionIndex === undefined) return null;
+  const entry = (optionOrders || []).find((o) => o.questionId.toString() === questionId.toString());
+  const order = entry?.order;
+  return order && order[selectedOptionIndex] !== undefined ? order[selectedOptionIndex] : selectedOptionIndex;
+};
+
+/**
  * Validate test timing constraints
  */
 export const validateTestTiming = (test, currentTime = Date.now()) => {

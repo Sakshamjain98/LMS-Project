@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   BookOpen, ChevronRight, ChevronDown, Loader2, Lock, FileText, Eye,
   Video, Download, ArrowLeft, Play, BookMarked,
@@ -457,8 +457,12 @@ export default function CourseLearning() {
   const [progress, setProgress] = useState({ completedChapterIds: [], totalChapters: 0, completedCount: 0, percentage: 0 });
   const [markingComplete, setMarkingComplete] = useState(false);
 
+  // Chapter selection lives in the URL (not plain state) so each selection is
+  // a real browser-history entry — back then steps lesson → chapter list →
+  // course list instead of exiting the course in one jump.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedChapterId = searchParams.get("chapter");
   const [openSubjectId, setOpenSubjectId] = useState(null);
-  const [selectedChapterId, setSelectedChapterId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [unlocking, setUnlocking] = useState(false);
@@ -473,13 +477,6 @@ export default function CourseLearning() {
       setHasAccess(res.hasAccess);
       setAccessReason(res.accessReason || null);
       setAccessExpiresAt(res.expiresAt || null);
-
-      const firstSubject = res.course?.subjects?.[0];
-      if (firstSubject) {
-        setOpenSubjectId(firstSubject._id);
-        const firstChapter = firstSubject.chapters?.[0];
-        if (firstChapter) setSelectedChapterId(firstChapter._id);
-      }
 
       const prog = await getCourseProgress(courseId);
       setProgress(prog);
@@ -602,9 +599,21 @@ export default function CourseLearning() {
   };
 
   const selectChapter = (chapterId) => {
-    setSelectedChapterId(chapterId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("chapter", chapterId);
+      return next;
+    });
     setSidebarOpen(false); // close mobile drawer on selection
   };
+
+  // Auto-expand the subject containing the selected chapter (deep link, or
+  // stepping across a subject boundary via Prev/Next).
+  useEffect(() => {
+    if (!selectedChapterId || !course) return;
+    const subj = course.subjects?.find((s) => (s.chapters || []).some((ch) => ch._id === selectedChapterId));
+    if (subj) setOpenSubjectId(subj._id);
+  }, [selectedChapterId, course]);
 
   if (loading) {
     return (

@@ -21,7 +21,22 @@ const paymentSchema = new mongoose.Schema(
     plan: {
       type: String,
       enum: ["MONTHLY", "QUARTERLY", "YEARLY"],
-      required: true,
+    },
+    // Distinguishes what was purchased. Historical rows predate this field and
+    // are all subscriptions — "SUBSCRIPTION" is the correct default for them.
+    kind: {
+      type: String,
+      enum: ["SUBSCRIPTION", "COURSE", "TOPIC"],
+      default: "SUBSCRIPTION",
+    },
+    // Course/topic id when kind is COURSE/TOPIC; null for subscriptions.
+    refId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    description: {
+      type: String,
+      default: "",
     },
     amount: {
       type: Number,
@@ -33,7 +48,7 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["PENDING", "PENDING_APPROVAL", "SUCCESS", "FAILED", "REFUNDED", "REJECTED", "pending", "success", "failed"],
+      enum: ["PENDING", "PENDING_APPROVAL", "SUCCESS", "FAILED", "REFUNDED", "REJECTED"],
       default: "PENDING",
     },
     refundedAt: Date,

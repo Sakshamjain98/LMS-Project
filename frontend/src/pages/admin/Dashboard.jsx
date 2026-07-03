@@ -8,7 +8,7 @@ import {
 } from "../../services/adminService";
 import { getTeacherTestSeries } from "../../services/teacherService";
 import {
-  Users, DollarSign, Layers, Newspaper, PenSquare, CreditCard,
+  Users, IndianRupee, Layers, Newspaper, PenSquare, CreditCard,
   ArrowUpRight, RefreshCw, TrendingUp, Sparkles, Activity, Clock, ChevronRight,
 } from "lucide-react";
 import {
@@ -189,7 +189,7 @@ export default function Dashboard() {
         ) : (
           <>
             <KpiCard
-              icon={DollarSign}
+              icon={IndianRupee}
               label="Total Revenue"
               value={`₹${(stats?.totalRevenue || 0).toLocaleString()}`}
               trend={stats?.revenueGrowth}
