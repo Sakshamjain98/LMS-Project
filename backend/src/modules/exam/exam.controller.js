@@ -24,6 +24,11 @@ export const update = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Exam updated", exam });
 });
 
+export const reorder = asyncHandler(async (req, res) => {
+  const exams = await service.reorderExams(req.body.examCategoryId, req.body.examIds);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, exams });
+});
+
 export const remove = asyncHandler(async (req, res) => {
   await service.deleteExam(req.params.examId);
   res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Exam deleted" });

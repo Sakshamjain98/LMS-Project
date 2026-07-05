@@ -279,6 +279,15 @@ export const deleteExamCategory = async (categoryId) => {
   }
 };
 
+export const reorderExamCategories = async (categoryIds) => {
+  try {
+    const res = await api.patch("/teacher/exam-categories/reorder", { categoryIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder exam categories failed" };
+  }
+};
+
 // ================= EXAMS =================
 export const getExams = async (categoryId = null) => {
   try {
@@ -314,6 +323,15 @@ export const deleteExam = async (examId) => {
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Delete exam failed" };
+  }
+};
+
+export const reorderExams = async (examCategoryId, examIds) => {
+  try {
+    const res = await api.patch("/teacher/exams/reorder", { examCategoryId, examIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder exams failed" };
   }
 };
 
@@ -372,6 +390,24 @@ export const createAITSTest = async (aitsId, payload) => {
   }
 };
 
+export const reorderAITS = async (examId, aitsIds) => {
+  try {
+    const res = await api.patch("/teacher/aits/reorder", { examId, aitsIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder AITS failed" };
+  }
+};
+
+export const reorderAITSTests = async (aitsId, testIds) => {
+  try {
+    const res = await api.patch(`/teacher/aits/${aitsId}/tests/reorder`, { testIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder AITS tests failed" };
+  }
+};
+
 export const getTopicAnalytics = async (topicId) => {
   try {
     const res = await api.get(`/teacher/test-series/topics/${topicId}/analytics`);
@@ -408,6 +444,15 @@ export const deleteTestSeriesTopic = async (topicId) => {
   }
 };
 
+export const reorderTestSeriesTopics = async (examId, topicIds) => {
+  try {
+    const res = await api.patch("/teacher/test-series/topics/reorder", { examId, topicIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder test series failed" };
+  }
+};
+
 export const createTestSeriesSubject = async (topicId, payload) => {
   try {
     const res = await api.post(`/teacher/test-series/topics/${topicId}/subjects`, payload);
@@ -432,6 +477,15 @@ export const deleteTestSeriesSubject = async (subjectId) => {
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Delete subject failed" };
+  }
+};
+
+export const reorderTestSeriesSubjects = async (topicId, subjectIds) => {
+  try {
+    const res = await api.patch(`/teacher/test-series/topics/${topicId}/subjects/reorder`, { subjectIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder subjects failed" };
   }
 };
 
@@ -462,12 +516,30 @@ export const deleteTestSeriesChapter = async (chapterId) => {
   }
 };
 
+export const reorderTestSeriesChapters = async (subjectId, chapterIds) => {
+  try {
+    const res = await api.patch(`/teacher/test-series/subjects/${subjectId}/chapters/reorder`, { chapterIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder chapters failed" };
+  }
+};
+
 export const createTestSeriesTest = async (chapterId, payload) => {
   try {
     const res = await api.post(`/teacher/test-series/chapters/${chapterId}/tests`, payload);
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Create test failed" };
+  }
+};
+
+export const reorderTestSeriesTests = async (chapterId, testIds) => {
+  try {
+    const res = await api.patch(`/teacher/test-series/chapters/${chapterId}/tests/reorder`, { testIds });
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Reorder tests failed" };
   }
 };
 

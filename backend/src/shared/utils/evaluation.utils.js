@@ -22,6 +22,14 @@ export const isAnswerCorrect = (question, selectedOptionIndex) => {
 };
 
 /**
+ * Sum of a test's live questions' marks — the correct value for Test.totalMarks.
+ * Pure so it can be unit tested without touching the DB.
+ */
+export const sumQuestionMarks = (questions) => {
+  return questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+};
+
+/**
  * Calculate comprehensive test result from answers
  */
 export const calculateTestResult = (answers, questions, totalMarks) => {

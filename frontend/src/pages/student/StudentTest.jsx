@@ -34,6 +34,7 @@ import {
 } from "../../services/studentService";
 import TestResult from "./TestResult";
 import { formatValidity } from "../../utils/validity";
+import { calculateAccuracy } from "../../utils/scoreUtils";
 
 const PAGE_SIZE = 8;
 
@@ -815,7 +816,7 @@ function ResultsTable({ attempts, totalCount, page, totalPages, onPageChange, on
                       {a.marksObtained || 0}/{a.totalMarks || 0}
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-brand-primary whitespace-nowrap">
-                      {a.attemptedQuestions > 0 ? ((a.correctAnswers / a.attemptedQuestions) * 100).toFixed(1) : "0.0"}%
+                      {calculateAccuracy(a.correctAnswers, a.attemptedQuestions)}%
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button

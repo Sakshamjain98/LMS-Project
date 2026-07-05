@@ -19,6 +19,7 @@ const examSchema = new mongoose.Schema(
       index: true,
     },
     order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );

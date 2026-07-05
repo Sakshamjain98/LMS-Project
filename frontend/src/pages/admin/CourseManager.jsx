@@ -10,17 +10,16 @@ import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
-import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDragReorder } from "../../components/admin/dnd/useDragReorder";
+import { DragHandle } from "../../components/admin/dnd/DragHandle";
+import { SortableRow } from "../../components/admin/dnd/SortableRow";
+import { VisibilityToggle } from "../../components/admin/VisibilityToggle";
 import {
   getAdminCourseHierarchy, getAdminCourseTree,
-  createCourse, updateCourse, deleteCourse,
-  createSubject, updateSubject, deleteSubject,
+  createCourse, updateCourse, deleteCourse, reorderCourses,
+  createSubject, updateSubject, deleteSubject, reorderSubjects,
   createChapter, updateChapter, deleteChapter, reorderChapters,
   createRichTextNote, createPdfNote, updateNote, deleteNote,
   createVideo, updateVideo, deleteVideo,
@@ -105,54 +104,6 @@ function PaginationBar({ page, totalPages, totalCount, pageSize, onChange }) {
         </button>
       </div>
     </div>
-  );
-}
-
-function SortableChapterRow({ row, onSelect, onEdit, onDelete }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row._id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-  return (
-    <tr ref={setNodeRef} style={style} className="transition-colors hover:bg-white/4">
-      <td className="px-6 py-4 text-sm font-semibold text-white">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            className="cursor-grab touch-none rounded p-1 text-white/30 hover:text-white/70"
-            title="Drag to reorder"
-          >
-            <GripVertical size={14} />
-          </button>
-          <span onClick={onSelect} className="flex cursor-pointer items-center gap-2">
-            <FileText size={14} className="text-brand-primary" />
-            {row.title}
-          </span>
-        </div>
-      </td>
-      <td className="px-6 py-4 text-xs text-white/50 cursor-pointer" onClick={onSelect}>
-        <div className="flex items-center gap-3">
-          {(row.notesCount || 0) > 0 && (
-            <span className="flex items-center gap-1"><FileText size={11} className="text-brand-primary" /> {row.notesCount} notes</span>
-          )}
-          {(row.videosCount || 0) > 0 && (
-            <span className="flex items-center gap-1"><Video size={11} className="text-red-400" /> {row.videosCount} videos</span>
-          )}
-          {(row.notesCount || 0) === 0 && (row.videosCount || 0) === 0 && <span className="text-white/25">No content yet</span>}
-        </div>
-      </td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <button onClick={onSelect} className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white">Manage</button>
-          <button onClick={onEdit} className="rounded-lg glass-pill p-2 text-white/70 hover:text-white" title="Edit"><Pencil size={14} /></button>
-          <button onClick={onDelete} className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20" title="Delete"><Trash2 size={14} /></button>
-        </div>
-      </td>
-    </tr>
   );
 }
 
@@ -931,6 +882,14 @@ function ChapterContentPanel({ chapter, examId, onRefresh }) {
     if (!window.confirm("Delete this video?")) return;
     try { await deleteVideo(id); toast.success("Deleted"); onRefresh(); } catch (e) { toast.error(e?.message || "Failed"); }
   };
+  const handleToggleNoteVisible = async (id, next) => {
+    await updateNote(id, { isVisible: next });
+    onRefresh();
+  };
+  const handleToggleVideoVisible = async (id, next) => {
+    await updateVideo(id, { isVisible: next });
+    onRefresh();
+  };
   const handleUnlinkTest = async (testId) => {
     if (!window.confirm("Unlink this test?")) return;
     try { await unlinkTestFromChapter(chapter._id, testId); toast.success("Unlinked"); onRefresh(); } catch (e) { toast.error(e?.message || "Failed"); }
@@ -1027,6 +986,7 @@ function ChapterContentPanel({ chapter, examId, onRefresh }) {
                       <Eye size={14} />
                     </button>
                   )}
+                  <VisibilityToggle isVisible={note.isVisible} onToggle={(next) => handleToggleNoteVisible(note._id, next)} className="shrink-0" />
                   <button onClick={() => setNoteDrawer({ note })} className="shrink-0 rounded-lg p-1.5 text-white/40 opacity-0 group-hover:opacity-100 hover:text-white transition-opacity">
                     <Pencil size={14} />
                   </button>
@@ -1075,6 +1035,7 @@ function ChapterContentPanel({ chapter, examId, onRefresh }) {
                         <p className="text-[11px] text-white/40 truncate">{vid.description || "No description added"}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
+                        <VisibilityToggle isVisible={vid.isVisible} onToggle={(next) => handleToggleVideoVisible(vid._id, next)} />
                         <button onClick={() => setVideoForm({ video: vid })} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
                           <Pencil size={14} />
                         </button>
@@ -1328,25 +1289,84 @@ export default function CourseManager() {
 
   const canGoBack = level !== "categories" || isContentLevel;
 
-  // Drag-and-drop chapter reorder — only when the full chapter list fits on
-  // one unfiltered page, so index positions map 1:1 to `filteredRows`.
-  const canReorderChapters = level === "chapters" && !isContentLevel && !search.trim() && totalPages <= 1;
-  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // Drag-and-drop reorder for courses/subjects/chapters — only when the full
+  // list fits on one unfiltered page, so index positions map 1:1 to
+  // `filteredRows`. Categories/exams are read-only here (managed in
+  // TestSeries.jsx, the shared owner of those two levels).
+  const canReorder =
+    ["courses", "subjects", "chapters"].includes(level) &&
+    !isContentLevel &&
+    !search.trim() &&
+    totalPages <= 1;
 
-  const handleChapterDragEnd = async ({ active, over }) => {
-    if (!over || active.id === over.id) return;
-    const oldIndex = filteredRows.findIndex((r) => r._id === active.id);
-    const newIndex = filteredRows.findIndex((r) => r._id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(filteredRows, oldIndex, newIndex);
-    setFullCourseTree((prev) =>
-      prev ? { ...prev, subjects: prev.subjects.map((s) => (s._id === selectedSubjectId ? { ...s, chapters: reordered } : s)) } : prev
-    );
-    try {
-      await reorderChapters(selectedSubjectId, reordered.map((r) => r._id));
-    } catch (err) {
-      toast.error(err.message || "Failed to reorder chapters");
-      refreshAll();
+  const handleReordered = async (reordered) => {
+    if (level === "courses") {
+      setHierarchy((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          exams: cat.exams.map((ex) => (ex._id === selectedExamId ? { ...ex, courses: reordered } : ex)),
+        }))
+      );
+      try {
+        await reorderCourses(selectedExamId, reordered.map((r) => r._id));
+      } catch (err) {
+        toast.error(err.message || "Failed to reorder courses");
+        refreshAll();
+      }
+    } else if (level === "subjects") {
+      setFullCourseTree((prev) => (prev ? { ...prev, subjects: reordered } : prev));
+      try {
+        await reorderSubjects(selectedCourseId, reordered.map((r) => r._id));
+      } catch (err) {
+        toast.error(err.message || "Failed to reorder subjects");
+        refreshAll();
+      }
+    } else if (level === "chapters") {
+      setFullCourseTree((prev) =>
+        prev ? { ...prev, subjects: prev.subjects.map((s) => (s._id === selectedSubjectId ? { ...s, chapters: reordered } : s)) } : prev
+      );
+      try {
+        await reorderChapters(selectedSubjectId, reordered.map((r) => r._id));
+      } catch (err) {
+        toast.error(err.message || "Failed to reorder chapters");
+        refreshAll();
+      }
+    }
+  };
+
+  const { sensors: dndSensors, handleDragEnd } = useDragReorder({ items: filteredRows, onReorder: handleReordered });
+
+  const handleToggleVisible = async (row, nextVisible) => {
+    if (level === "courses") {
+      setHierarchy((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          exams: cat.exams.map((ex) => ({
+            ...ex,
+            courses: ex.courses.map((c) => (c._id === row._id ? { ...c, isVisible: nextVisible } : c)),
+          })),
+        }))
+      );
+      await updateCourse(row._id, { isVisible: nextVisible });
+    } else if (level === "subjects") {
+      setFullCourseTree((prev) =>
+        prev ? { ...prev, subjects: prev.subjects.map((s) => (s._id === row._id ? { ...s, isVisible: nextVisible } : s)) } : prev
+      );
+      await updateSubject(row._id, { isVisible: nextVisible });
+    } else if (level === "chapters") {
+      setFullCourseTree((prev) =>
+        prev
+          ? {
+              ...prev,
+              subjects: prev.subjects.map((s) =>
+                s._id === selectedSubjectId
+                  ? { ...s, chapters: s.chapters.map((c) => (c._id === row._id ? { ...c, isVisible: nextVisible } : c)) }
+                  : s
+              ),
+            }
+          : prev
+      );
+      await updateChapter(row._id, { isVisible: nextVisible });
     }
   };
 
@@ -1549,167 +1569,186 @@ export default function CourseManager() {
                         }
                       </td>
                     </tr>
-                  ) : canReorderChapters ? (
-                    <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleChapterDragEnd}>
-                      <SortableContext items={paginatedRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
-                        {paginatedRows.map((row) => (
-                          <SortableChapterRow
-                            key={row._id}
-                            row={row}
-                            onSelect={() => handleRowSelect(row)}
-                            onEdit={() => handleEditRow(row)}
-                            onDelete={() => setConfirmState({ isOpen: true, type: "chapter", id: row._id })}
-                          />
-                        ))}
-                      </SortableContext>
-                    </DndContext>
                   ) : (
-                    paginatedRows.map((row, idx) => {
-                      const LevelIcon = LEVEL_ICON[level] || FileText;
-                      const iconColor = ICON_COLOR[level] || "text-brand-primary";
-                      return (
+                    (() => {
+                      const renderCells = (row, dragHandleProps) => {
+                        const LevelIcon = LEVEL_ICON[level] || FileText;
+                        const iconColor = ICON_COLOR[level] || "text-brand-primary";
+                        return (
+                          <>
+                            {/* Name */}
+                            <td
+                              className="px-6 py-4 text-sm font-semibold text-white cursor-pointer"
+                              onClick={() => handleRowSelect(row)}
+                            >
+                              <div className="flex items-center gap-2">
+                                {dragHandleProps && (
+                                  <span onClick={(e) => e.stopPropagation()}>
+                                    <DragHandle {...dragHandleProps} />
+                                  </span>
+                                )}
+                                <LevelIcon size={14} className={iconColor} />
+                                {row.title}
+                              </div>
+                            </td>
+
+                            {/* Category: exam count */}
+                            {level === "categories" && (
+                              <td className="px-6 py-4 text-sm text-white/50">
+                                {(row.exams || []).length} exams
+                              </td>
+                            )}
+
+                            {/* Exam: course count */}
+                            {level === "exams" && (
+                              <td className="px-6 py-4 text-sm text-white/50">
+                                {(row.courses || []).length} courses
+                              </td>
+                            )}
+
+                            {/* Course columns */}
+                            {level === "courses" && (
+                              <>
+                                <td className="px-6 py-4 text-xs">
+                                  <span className={`rounded-full px-2.5 py-1 font-semibold uppercase tracking-wider ${
+                                    row.status === "published"
+                                      ? "bg-emerald-500/15 text-emerald-300"
+                                      : row.status === "private" || row.status === "hidden"
+                                      ? "bg-amber-500/15 text-amber-300"
+                                      : "bg-white/5 text-white/60"
+                                  }`}>
+                                    {row.status === "published" ? (
+                                      <span className="flex items-center gap-1"><Globe size={10} /> Published</span>
+                                    ) : row.status === "private" ? (
+                                      <span className="flex items-center gap-1"><EyeOff size={10} /> Private</span>
+                                    ) : row.status === "hidden" ? (
+                                      <span className="flex items-center gap-1"><EyeOff size={10} /> Hidden</span>
+                                    ) : (
+                                      <span className="flex items-center gap-1"><EyeOff size={10} /> Draft</span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                  {row.isPaid ? (
+                                    <span className="flex items-center gap-1 font-semibold text-amber-400">
+                                      <IndianRupee size={12} />
+                                      {row.discountedPrice > 0 && row.discountedPrice < row.price ? (
+                                        <>
+                                          <span className="line-through text-white/35 text-xs">₹{row.price}</span>
+                                          <span>₹{row.discountedPrice}</span>
+                                        </>
+                                      ) : (
+                                        <span>₹{row.price}</span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="font-semibold text-emerald-400">Free</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-white/50">
+                                  {(row.subjects || []).length} subjects
+                                </td>
+                              </>
+                            )}
+
+                            {/* Subject: chapter count */}
+                            {level === "subjects" && (
+                              <td className="px-6 py-4 text-sm text-white/50">
+                                {(row.chapters || []).length} chapters
+                              </td>
+                            )}
+
+                            {/* Chapter: content summary */}
+                            {level === "chapters" && (
+                              <td className="px-6 py-4 text-xs text-white/50">
+                                <div className="flex items-center gap-3">
+                                  {(row.notesCount || 0) > 0 && (
+                                    <span className="flex items-center gap-1">
+                                      <FileText size={11} className="text-brand-primary" /> {row.notesCount} notes
+                                    </span>
+                                  )}
+                                  {(row.videosCount || 0) > 0 && (
+                                    <span className="flex items-center gap-1">
+                                      <Video size={11} className="text-red-400" /> {row.videosCount} videos
+                                    </span>
+                                  )}
+                                  {(row.notesCount || 0) === 0 && (row.videosCount || 0) === 0 && (
+                                    <span className="text-white/25">No content yet</span>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+
+                            {/* Actions */}
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleRowSelect(row)}
+                                  className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white"
+                                >
+                                  {level === "chapters" ? "Manage" : "View"}
+                                </button>
+                                {!isReadOnly && (
+                                  <>
+                                    {["courses", "subjects", "chapters"].includes(level) && (
+                                      <VisibilityToggle
+                                        isVisible={row.isVisible}
+                                        onToggle={(next) => handleToggleVisible(row, next)}
+                                      />
+                                    )}
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleEditRow(row); }}
+                                      className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
+                                      title="Edit"
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmState({
+                                          isOpen: true,
+                                          type: level === "courses" ? "course" : level === "subjects" ? "subject" : "chapter",
+                                          id: row._id,
+                                        });
+                                      }}
+                                      className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </>
+                        );
+                      };
+
+                      if (canReorder) {
+                        return (
+                          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                            <SortableContext items={paginatedRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                              {paginatedRows.map((row) => (
+                                <SortableRow key={row._id} id={row._id} className="transition-colors hover:bg-white/4">
+                                  {({ attributes, listeners }) => renderCells(row, { attributes, listeners })}
+                                </SortableRow>
+                              ))}
+                            </SortableContext>
+                          </DndContext>
+                        );
+                      }
+
+                      return paginatedRows.map((row, idx) => (
                         <tr
                           key={row._id}
                           className="transition-colors hover:bg-white/4 animate-fade-up"
                           style={{ animationDelay: `${idx * 25}ms` }}
                         >
-                          {/* Name */}
-                          <td
-                            className="px-6 py-4 text-sm font-semibold text-white cursor-pointer"
-                            onClick={() => handleRowSelect(row)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <LevelIcon size={14} className={iconColor} />
-                              {row.title}
-                            </div>
-                          </td>
-
-                          {/* Category: exam count */}
-                          {level === "categories" && (
-                            <td className="px-6 py-4 text-sm text-white/50">
-                              {(row.exams || []).length} exams
-                            </td>
-                          )}
-
-                          {/* Exam: course count */}
-                          {level === "exams" && (
-                            <td className="px-6 py-4 text-sm text-white/50">
-                              {(row.courses || []).length} courses
-                            </td>
-                          )}
-
-                          {/* Course columns */}
-                          {level === "courses" && (
-                            <>
-                              <td className="px-6 py-4 text-xs">
-                                <span className={`rounded-full px-2.5 py-1 font-semibold uppercase tracking-wider ${
-                                  row.status === "published"
-                                    ? "bg-emerald-500/15 text-emerald-300"
-                                    : row.status === "private" || row.status === "hidden"
-                                    ? "bg-amber-500/15 text-amber-300"
-                                    : "bg-white/5 text-white/60"
-                                }`}>
-                                  {row.status === "published" ? (
-                                    <span className="flex items-center gap-1"><Globe size={10} /> Published</span>
-                                  ) : row.status === "private" ? (
-                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Private</span>
-                                  ) : row.status === "hidden" ? (
-                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Hidden</span>
-                                  ) : (
-                                    <span className="flex items-center gap-1"><EyeOff size={10} /> Draft</span>
-                                  )}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-sm">
-                                {row.isPaid ? (
-                                  <span className="flex items-center gap-1 font-semibold text-amber-400">
-                                    <IndianRupee size={12} />
-                                    {row.discountedPrice > 0 && row.discountedPrice < row.price ? (
-                                      <>
-                                        <span className="line-through text-white/35 text-xs">₹{row.price}</span>
-                                        <span>₹{row.discountedPrice}</span>
-                                      </>
-                                    ) : (
-                                      <span>₹{row.price}</span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="font-semibold text-emerald-400">Free</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-white/50">
-                                {(row.subjects || []).length} subjects
-                              </td>
-                            </>
-                          )}
-
-                          {/* Subject: chapter count */}
-                          {level === "subjects" && (
-                            <td className="px-6 py-4 text-sm text-white/50">
-                              {(row.chapters || []).length} chapters
-                            </td>
-                          )}
-
-                          {/* Chapter: content summary */}
-                          {level === "chapters" && (
-                            <td className="px-6 py-4 text-xs text-white/50">
-                              <div className="flex items-center gap-3">
-                                {(row.notesCount || 0) > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <FileText size={11} className="text-brand-primary" /> {row.notesCount} notes
-                                  </span>
-                                )}
-                                {(row.videosCount || 0) > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <Video size={11} className="text-red-400" /> {row.videosCount} videos
-                                  </span>
-                                )}
-                                {(row.notesCount || 0) === 0 && (row.videosCount || 0) === 0 && (
-                                  <span className="text-white/25">No content yet</span>
-                                )}
-                              </div>
-                            </td>
-                          )}
-
-                          {/* Actions */}
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleRowSelect(row)}
-                                className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white"
-                              >
-                                {level === "chapters" ? "Manage" : "View"}
-                              </button>
-                              {!isReadOnly && (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleEditRow(row); }}
-                                    className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
-                                    title="Edit"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setConfirmState({
-                                        isOpen: true,
-                                        type: level === "courses" ? "course" : level === "subjects" ? "subject" : "chapter",
-                                        id: row._id,
-                                      });
-                                    }}
-                                    className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
+                          {renderCells(row, null)}
                         </tr>
-                      );
-                    })
+                      ));
+                    })()
                   )}
                 </tbody>
               </table>

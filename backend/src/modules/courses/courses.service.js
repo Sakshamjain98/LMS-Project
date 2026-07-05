@@ -11,6 +11,7 @@ import ExamCategory from "../../models/examCategory.model.js";
 import Test from "../../models/test.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { reorderItems } from "../../shared/utils/reorder.utils.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,13 +78,18 @@ export async function updateCourse(courseId, data, teacherId) {
   const course = await Course.findOne(query);
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
-  const allowed = ["title", "description", "isPaid", "price", "discountedPrice", "tags", "status", "thumbnail", "order", "examId"];
+  const allowed = ["title", "description", "isPaid", "price", "discountedPrice", "tags", "status", "thumbnail", "order", "examId", "isVisible"];
   allowed.forEach((k) => {
     if (data[k] !== undefined) course[k] = data[k];
   });
   if (data.validityMonths !== undefined) course.validityMonths = Math.max(0, Number(data.validityMonths) || 0);
   if (data.mappedTestSeries !== undefined) course.mappedTestSeries = parseIdArray(data.mappedTestSeries);
   return course.save();
+}
+
+// Bulk drag-and-drop reorder: courseIds is the full new order within an exam.
+export async function reorderCourses(examId, courseIds, teacherId) {
+  return reorderItems(Course, { examId, teacherId }, courseIds);
 }
 
 export async function deleteCourse(courseId, teacherId) {
@@ -109,21 +115,27 @@ export async function deleteCourse(courseId, teacherId) {
   await Course.deleteOne({ _id: courseId });
 }
 
-// Full hierarchy tree for a single course (admin/student).
-export async function getCourseTree(courseId) {
+// Full hierarchy tree for a single course. Pass studentView: true from any
+// public/student-facing route so hidden subjects/chapters/notes/videos
+// (isVisible: false) are excluded — a hidden parent's children simply never
+// get fetched into the tree, no separate cascade write needed. Admin/teacher
+// callers omit it and see everything, including hidden items.
+export async function getCourseTree(courseId, { studentView = false } = {}) {
   const course = await Course.findById(courseId).lean();
   if (!course) throw new ApiError(STATUS_CODES.NOT_FOUND, "Course not found");
 
-  const subjects = await CourseSubject.find({ courseId }).sort({ order: 1, createdAt: 1 }).lean();
+  const visibleFilter = studentView ? { isVisible: { $ne: false } } : {};
+
+  const subjects = await CourseSubject.find({ courseId, ...visibleFilter }).sort({ order: 1, createdAt: 1 }).lean();
   const subjectIds = subjects.map((s) => s._id);
   const chapters = subjectIds.length
-    ? await CourseChapter.find({ subjectId: { $in: subjectIds } }).sort({ order: 1, createdAt: 1 }).lean()
+    ? await CourseChapter.find({ subjectId: { $in: subjectIds }, ...visibleFilter }).sort({ order: 1, createdAt: 1 }).lean()
     : [];
   const chapterIds = chapters.map((c) => c._id);
 
   const [notes, videos] = await Promise.all([
-    chapterIds.length ? CourseNote.find({ chapterId: { $in: chapterIds } }).sort({ order: 1 }).lean() : [],
-    chapterIds.length ? CourseVideo.find({ chapterId: { $in: chapterIds } }).sort({ order: 1 }).lean() : [],
+    chapterIds.length ? CourseNote.find({ chapterId: { $in: chapterIds }, ...visibleFilter }).sort({ order: 1 }).lean() : [],
+    chapterIds.length ? CourseVideo.find({ chapterId: { $in: chapterIds }, ...visibleFilter }).sort({ order: 1 }).lean() : [],
   ]);
 
   // Gather test IDs for population
@@ -246,6 +258,7 @@ export async function updateSubject(subjectId, data, teacherId) {
   if (data.title !== undefined) sub.title = data.title;
   if (data.description !== undefined) sub.description = data.description;
   if (data.order !== undefined) sub.order = data.order;
+  if (data.isVisible !== undefined) sub.isVisible = data.isVisible;
   return sub.save();
 }
 
@@ -277,6 +290,7 @@ export async function updateChapter(chapterId, data, teacherId) {
   if (data.title !== undefined) ch.title = data.title;
   if (data.description !== undefined) ch.description = data.description;
   if (data.order !== undefined) ch.order = data.order;
+  if (data.isVisible !== undefined) ch.isVisible = data.isVisible;
   return ch.save();
 }
 
@@ -290,18 +304,22 @@ export async function deleteChapter(chapterId, teacherId) {
 
 // Bulk drag-and-drop reorder: chapterIds is the full new order for this subject.
 export async function reorderChapters(subjectId, chapterIds, teacherId) {
-  if (!Array.isArray(chapterIds) || !chapterIds.length) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "chapterIds array is required");
-  }
-  const chapters = await CourseChapter.find({ subjectId, teacherId }).select("_id").lean();
-  const validIds = new Set(chapters.map((c) => c._id.toString()));
-  if (chapterIds.some((id) => !validIds.has(String(id))) || chapterIds.length !== chapters.length) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "chapterIds must match this subject's existing chapters");
-  }
-  await CourseChapter.bulkWrite(
-    chapterIds.map((id, order) => ({ updateOne: { filter: { _id: id }, update: { $set: { order } } } }))
-  );
-  return CourseChapter.find({ subjectId }).sort({ order: 1 }).lean();
+  return reorderItems(CourseChapter, { subjectId, teacherId }, chapterIds);
+}
+
+// Bulk drag-and-drop reorder: subjectIds is the full new order for this course.
+export async function reorderSubjects(courseId, subjectIds, teacherId) {
+  return reorderItems(CourseSubject, { courseId, teacherId }, subjectIds);
+}
+
+// Bulk drag-and-drop reorder: noteIds is the full new order for this chapter.
+export async function reorderNotes(chapterId, noteIds, teacherId) {
+  return reorderItems(CourseNote, { chapterId, teacherId }, noteIds);
+}
+
+// Bulk drag-and-drop reorder: videoIds is the full new order for this chapter.
+export async function reorderVideos(chapterId, videoIds, teacherId) {
+  return reorderItems(CourseVideo, { chapterId, teacherId }, videoIds);
 }
 
 // ─── Notes ──────────────────────────────────────────────────────────────────
@@ -327,7 +345,7 @@ export async function createNote(chapterId, data, teacherId) {
 export async function updateNote(noteId, data, teacherId) {
   const note = await CourseNote.findOne({ _id: noteId, teacherId });
   if (!note) throw new ApiError(STATUS_CODES.NOT_FOUND, "Note not found");
-  const allowed = ["title", "content", "fileUrl", "filePublicId", "fileName", "allowDownload", "order"];
+  const allowed = ["title", "content", "fileUrl", "filePublicId", "fileName", "allowDownload", "order", "isVisible"];
   allowed.forEach((k) => { if (data[k] !== undefined) note[k] = data[k]; });
   return note.save();
 }
@@ -357,7 +375,7 @@ export async function createVideo(chapterId, data, teacherId) {
 export async function updateVideo(videoId, data, teacherId) {
   const vid = await CourseVideo.findOne({ _id: videoId, teacherId });
   if (!vid) throw new ApiError(STATUS_CODES.NOT_FOUND, "Video not found");
-  const allowed = ["title", "youtubeUrl", "description", "order"];
+  const allowed = ["title", "youtubeUrl", "description", "order", "isVisible"];
   allowed.forEach((k) => { if (data[k] !== undefined) vid[k] = data[k]; });
   return vid.save();
 }
@@ -523,12 +541,14 @@ export async function syncMappedSeriesToCourse(userId, courseId, { disabled, exp
 
 // Returns courses grouped by ExamCategory → Exam for the public website.
 export async function getPublicCourseHierarchy(limit = 20, examId = null) {
-  const filter = { status: "published" };
+  const filter = { status: "published", isVisible: { $ne: false } };
   if (examId) filter.examId = examId;
 
   const rawCourses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).lean();
 
-  // Exclude orphans whose exam was deleted so they don't surface to students.
+  // Exclude orphans whose exam/category was deleted or hidden so they don't
+  // surface to students — a course only appears if its whole ancestor chain
+  // (category → exam) is visible too.
   const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
   const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
   const visibleCategoryIds = visibleCategories.map((category) => category._id);
@@ -536,6 +556,7 @@ export async function getPublicCourseHierarchy(limit = 20, examId = null) {
     ? await Exam.find({
         _id: { $in: examIds },
         examCategoryId: { $in: visibleCategoryIds },
+        isVisible: { $ne: false },
       }).select("_id").lean()
     : [];
   const liveExamIds = new Set(existingExams.map((e) => String(e._id)));

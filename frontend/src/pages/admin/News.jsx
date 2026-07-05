@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, X, Search, Filter, Image as ImageIcon, Loader2 } 
 import toast from "react-hot-toast";
 import RichTextEditor from "../../components/editor/RichTextEditor";
 import { isRichTextEmpty, stripHtml } from "../../utils/richText";
+import { VisibilityToggle } from "../../components/admin/VisibilityToggle";
 
 export default function News() {
   const [news, setNews] = useState([]);
@@ -81,6 +82,11 @@ export default function News() {
         toast.error("Failed to delete");
       }
     }
+  };
+
+  const handleTogglePublished = async (item, nextPublished) => {
+    await updateNews(item._id, { published: nextPublished });
+    setNews((prev) => prev.map((n) => (n._id === item._id ? { ...n, published: nextPublished } : n)));
   };
 
   const handleEdit = (newsItem) => {
@@ -188,6 +194,7 @@ export default function News() {
                     <td className="px-5 py-4 text-grayCustom-medium">{new Date(item.createdAt).toLocaleDateString()}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
+                        <VisibilityToggle isVisible={item.published} onToggle={(next) => handleTogglePublished(item, next)} />
                         <button onClick={() => handleEdit(item)} className="rounded-lg border border-white/10 p-2 text-grayCustom-medium transition-colors hover:text-white" aria-label="Edit news">
                           <Pencil size={15} />
                         </button>

@@ -40,21 +40,21 @@ router.get(
   "/test-series",
   asyncHandler(async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 6, 50);
-    const filter = {};
+    const filter = { isVisible: { $ne: false } };
     if (req.query.examId) filter.examId = req.query.examId;
     const topics = await TestSeriesTopic.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
     if (topics.length === 0) {
       return res.json({ success: true, topics: [] });
     }
     const topicIds = topics.map((t) => t._id);
-    const subjects = await TestSeriesSubject.find({ topicId: { $in: topicIds } }).lean();
+    const subjects = await TestSeriesSubject.find({ topicId: { $in: topicIds }, isVisible: { $ne: false } }).lean();
     const subjectIds = subjects.map((s) => s._id);
     const chapters = subjectIds.length
-      ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds } }).lean()
+      ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds }, isVisible: { $ne: false } }).lean()
       : [];
     const chapterIds = chapters.map((c) => c._id);
     const tests = chapterIds.length
-      ? await Test.find({ chapterId: { $in: chapterIds }, status: "published" })
+      ? await Test.find({ chapterId: { $in: chapterIds }, status: "published", isVisible: { $ne: false } })
           .select("chapterId duration")
           .lean()
       : [];
@@ -94,7 +94,10 @@ router.get(
     const categories = await ExamCategory.find({ isVisible: { $ne: false } }).sort({ order: 1, createdAt: 1 }).lean();
     if (!categories.length) return res.json({ success: true, categories: [] });
 
-    const exams = await Exam.find({ examCategoryId: { $in: categories.map((c) => c._id) } })
+    const exams = await Exam.find({
+      examCategoryId: { $in: categories.map((c) => c._id) },
+      isVisible: { $ne: false },
+    })
       .sort({ order: 1, createdAt: 1 })
       .lean();
 
@@ -154,13 +157,14 @@ router.get(
   "/courses",
   asyncHandler(async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 8, 50);
-    const filter = { status: "published" };
+    const filter = { status: "published", isVisible: { $ne: false } };
     if (req.query.examId) filter.examId = req.query.examId;
 
     const rawCourses = await Course.find(filter).sort({ order: 1, createdAt: -1 }).lean();
 
     // Drop orphans: a course whose exam was deleted must not linger on the
-    // student dashboard. Keep only courses whose exam still exists.
+    // student dashboard. Keep only courses whose exam still exists and whose
+    // whole ancestor chain (category → exam) is visible.
     const examIds = [...new Set(rawCourses.map((c) => String(c.examId)).filter(Boolean))];
     const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
     const visibleCategoryIds = visibleCategories.map((category) => category._id);
@@ -168,6 +172,7 @@ router.get(
       ? await Exam.find({
           _id: { $in: examIds },
           examCategoryId: { $in: visibleCategoryIds },
+          isVisible: { $ne: false },
         }).select("_id").lean()
       : [];
     const liveExamIds = new Set(existingExams.map((e) => String(e._id)));

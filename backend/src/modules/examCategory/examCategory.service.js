@@ -4,6 +4,7 @@ import Exam from "../../models/exam.model.js";
 import TestSeriesTopic from "../../models/testSeriesTopic.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { reorderItems } from "../../shared/utils/reorder.utils.js";
 
 const slugify = (str) =>
   str
@@ -105,6 +106,11 @@ export const getAllCategories = async () => {
     ...cat,
     exams: examsByCat.get(cat._id.toString()) || [],
   }));
+};
+
+// Bulk drag-and-drop reorder: categoryIds is the full new order for all categories.
+export const reorderCategories = async (categoryIds) => {
+  return reorderItems(ExamCategory, {}, categoryIds);
 };
 
 export const getCategoryById = async (categoryId) => {

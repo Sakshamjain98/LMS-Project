@@ -26,8 +26,8 @@ router.get(
 router.get(
   "/:courseId/public",
   asyncHandler(async (req, res) => {
-    const tree = await svc.getCourseTree(req.params.courseId);
-    if (tree.status !== "published") {
+    const tree = await svc.getCourseTree(req.params.courseId, { studentView: true });
+    if (tree.status !== "published" || tree.isVisible === false) {
       return res.status(STATUS_CODES.NOT_FOUND).json({ success: false, message: "Course not found" });
     }
     // Strip full note content from public view (only titles)
@@ -114,6 +114,17 @@ router.delete(
   })
 );
 
+// PATCH /api/courses/reorder — bulk reorder (drag-and-drop)
+router.patch(
+  "/reorder",
+  authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
+  asyncHandler(async (req, res) => {
+    const courses = await svc.reorderCourses(req.body.examId, req.body.courseIds, req.user._id);
+    res.json({ success: true, courses });
+  })
+);
+
 // GET /api/courses/:courseId/tree — full course tree (auth required)
 router.get(
   "/:courseId/tree",
@@ -122,10 +133,10 @@ router.get(
     const { courseId } = req.params;
     const isAdminOrTeacher = ["admin", "superadmin", "teacher"].includes(req.user.role);
 
-    const tree = await svc.getCourseTree(courseId);
-    // Students can't view a course that isn't published, even via a direct
-    // link/id — status !== "published" is not just a listing filter.
-    if (!isAdminOrTeacher && tree.status !== "published") {
+    const tree = await svc.getCourseTree(courseId, { studentView: !isAdminOrTeacher });
+    // Students can't view a course that isn't published or is hidden, even via
+    // a direct link/id — this is not just a listing filter.
+    if (!isAdminOrTeacher && (tree.status !== "published" || tree.isVisible === false)) {
       return res.status(STATUS_CODES.NOT_FOUND).json({ success: false, message: "Course not found" });
     }
 
@@ -197,6 +208,17 @@ router.delete(
   asyncHandler(async (req, res) => {
     await svc.deleteSubject(req.params.subjectId, req.user._id);
     res.json({ success: true, message: "Subject deleted" });
+  })
+);
+
+// PATCH /api/courses/:courseId/subjects/reorder — bulk reorder (drag-and-drop)
+router.patch(
+  "/:courseId/subjects/reorder",
+  authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
+  asyncHandler(async (req, res) => {
+    const subjects = await svc.reorderSubjects(req.params.courseId, req.body.subjectIds, req.user._id);
+    res.json({ success: true, subjects });
   })
 );
 
@@ -294,6 +316,17 @@ router.delete(
   asyncHandler(async (req, res) => {
     await svc.deleteNote(req.params.noteId, req.user._id);
     res.json({ success: true, message: "Note deleted" });
+  })
+);
+
+// PATCH /api/courses/chapters/:chapterId/notes/reorder — bulk reorder (drag-and-drop)
+router.patch(
+  "/chapters/:chapterId/notes/reorder",
+  authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
+  asyncHandler(async (req, res) => {
+    const notes = await svc.reorderNotes(req.params.chapterId, req.body.noteIds, req.user._id);
+    res.json({ success: true, notes });
   })
 );
 
@@ -400,6 +433,17 @@ router.delete(
   asyncHandler(async (req, res) => {
     await svc.deleteVideo(req.params.videoId, req.user._id);
     res.json({ success: true, message: "Video deleted" });
+  })
+);
+
+// PATCH /api/courses/chapters/:chapterId/videos/reorder — bulk reorder (drag-and-drop)
+router.patch(
+  "/chapters/:chapterId/videos/reorder",
+  authorize("teacher", "admin"),
+  requirePermission("courses.edit"),
+  asyncHandler(async (req, res) => {
+    const videos = await svc.reorderVideos(req.params.chapterId, req.body.videoIds, req.user._id);
+    res.json({ success: true, videos });
   })
 );
 

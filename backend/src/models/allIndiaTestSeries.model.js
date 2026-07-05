@@ -22,6 +22,7 @@ const aitsSchema = new mongoose.Schema(
     price: { type: Number, default: 0, min: 0 },
     discountedPrice: { type: Number, default: 0, min: 0 },
     order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );

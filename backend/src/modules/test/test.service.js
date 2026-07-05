@@ -110,6 +110,8 @@ export const createTest = async (data, teacherId) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Title must be at least 3 characters");
   }
 
+  const maxOrder = await Test.countDocuments({ chapterId: hierarchy.chapter._id });
+
   if (payload.duration && payload.duration <= 0) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Duration must be greater than 0");
   }
@@ -140,6 +142,7 @@ export const createTest = async (data, teacherId) => {
     subjectId: hierarchy.subject._id,
     chapterId: hierarchy.chapter._id,
     status: "published",
+    order: maxOrder,
   });
 };
 /**

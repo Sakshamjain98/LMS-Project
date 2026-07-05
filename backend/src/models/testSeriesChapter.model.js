@@ -11,11 +11,13 @@ const testSeriesChapterSchema = new mongoose.Schema(
       index: true,
     },
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );
 
-testSeriesChapterSchema.index({ subjectId: 1, createdAt: 1 });
+testSeriesChapterSchema.index({ subjectId: 1, order: 1 });
 
 testSeriesChapterSchema.set("toJSON", { virtuals: true });
 testSeriesChapterSchema.set("toObject", { virtuals: true });

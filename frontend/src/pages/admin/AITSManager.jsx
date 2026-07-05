@@ -10,6 +10,8 @@ import {
   deleteTeacherTest,
   uploadTestCSV,
   publishTeacherTest,
+  updateTeacherTest,
+  reorderAITSTests,
 } from "../../services/teacherService";
 import {
   Trophy,
@@ -35,6 +37,12 @@ import {
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import toast from "react-hot-toast";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDragReorder } from "../../components/admin/dnd/useDragReorder";
+import { DragHandle } from "../../components/admin/dnd/DragHandle";
+import { SortableRow } from "../../components/admin/dnd/SortableRow";
+import { VisibilityToggle } from "../../components/admin/VisibilityToggle";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const emptyAitsForm   = { title: "", description: "", isPaid: false, price: 0, examId: "" };
@@ -436,6 +444,31 @@ export default function AITSManager() {
     } finally { setActionLoading(false); }
   };
 
+  const handleToggleAitsVisible = async (aits, nextVisible) => {
+    await updateAITS(aits._id, { isVisible: nextVisible });
+    await loadHierarchy();
+  };
+
+  const handleToggleTestVisible = async (test, nextVisible) => {
+    await updateTeacherTest(test._id, { isVisible: nextVisible });
+    await refreshTests();
+  };
+
+  const handleTestsReordered = async (reordered) => {
+    setAitsTests(reordered);
+    try {
+      await reorderAITSTests(selectedAits._id, reordered.map((t) => t._id));
+    } catch (err) {
+      toast.error(err.message || "Failed to reorder tests");
+      await refreshTests();
+    }
+  };
+
+  const { sensors: testDndSensors, handleDragEnd: handleTestDragEnd } = useDragReorder({
+    items: aitsTests,
+    onReorder: handleTestsReordered,
+  });
+
   // ── Confirm delete ───────────────────────────────────────────────────────
   const handleConfirmDelete = async () => {
     setActionLoading(true);
@@ -548,48 +581,66 @@ export default function AITSManager() {
                       </button>
                     </td>
                   </tr>
-                ) : (
-                  aitsTests.map((test, idx) => (
-                    <tr key={test._id} className="hover:bg-white/4 transition-colors animate-fade-up" style={{ animationDelay: `${idx * 20}ms` }}>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-white">{test.title}</p>
-                        {test.description && <p className="mt-0.5 text-xs text-white/40 line-clamp-1">{test.description}</p>}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-white/60">{test.duration ?? "—"} min</td>
-                      <td className="px-6 py-4"><StatusBadge status={test.status} /></td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleTogglePublish(test)}
-                            disabled={actionLoading}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                              test.status === "published"
-                                ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                                : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                            }`}
-                            title={test.status === "published" ? "Unpublish — hide from students" : "Publish — show to students"}
-                          >
-                            {test.status === "published"
-                              ? <><EyeOff size={12} /> Unpublish</>
-                              : <><Send size={12} /> Publish</>}
-                          </button>
-                          <button
-                            onClick={() => navigate(`/admin/test-series/test/${test._id}`)}
-                            className="inline-flex items-center gap-1.5 rounded-lg glass-pill px-3 py-1.5 text-xs text-white/70 hover:text-white"
-                          >
-                            <ExternalLink size={12} /> Edit Questions
-                          </button>
-                          <button
-                            onClick={() => setConfirm({ open: true, type: "test", id: test._id })}
-                            className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ) : (() => {
+                    const renderCells = (test, dragHandleProps) => (
+                      <>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {dragHandleProps && <DragHandle {...dragHandleProps} />}
+                            <div>
+                              <p className="text-sm font-semibold text-white">{test.title}</p>
+                              {test.description && <p className="mt-0.5 text-xs text-white/40 line-clamp-1">{test.description}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-white/60">{test.duration ?? "—"} min</td>
+                        <td className="px-6 py-4"><StatusBadge status={test.status} /></td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <VisibilityToggle isVisible={test.isVisible} onToggle={(next) => handleToggleTestVisible(test, next)} />
+                            <button
+                              onClick={() => handleTogglePublish(test)}
+                              disabled={actionLoading}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                                test.status === "published"
+                                  ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                                  : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                              }`}
+                              title={test.status === "published" ? "Unpublish — hide from students" : "Publish — show to students"}
+                            >
+                              {test.status === "published"
+                                ? <><EyeOff size={12} /> Unpublish</>
+                                : <><Send size={12} /> Publish</>}
+                            </button>
+                            <button
+                              onClick={() => navigate(`/admin/test-series/test/${test._id}`)}
+                              className="inline-flex items-center gap-1.5 rounded-lg glass-pill px-3 py-1.5 text-xs text-white/70 hover:text-white"
+                            >
+                              <ExternalLink size={12} /> Edit Questions
+                            </button>
+                            <button
+                              onClick={() => setConfirm({ open: true, type: "test", id: test._id })}
+                              className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    );
+
+                    return (
+                      <DndContext sensors={testDndSensors} collisionDetection={closestCenter} onDragEnd={handleTestDragEnd}>
+                        <SortableContext items={aitsTests.map((t) => t._id)} strategy={verticalListSortingStrategy}>
+                          {aitsTests.map((test) => (
+                            <SortableRow key={test._id} id={test._id} className="hover:bg-white/4 transition-colors">
+                              {({ attributes, listeners }) => renderCells(test, { attributes, listeners })}
+                            </SortableRow>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                    );
+                  })()}
               </tbody>
             </table>
           </div>
@@ -791,6 +842,7 @@ export default function AITSManager() {
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
+                        <VisibilityToggle isVisible={aits.isVisible} onToggle={(next) => handleToggleAitsVisible(aits, next)} />
                         <button
                           onClick={() => openEditAits(aits)}
                           className="rounded-lg glass-pill p-2 text-white/60 hover:text-white transition-colors"

@@ -12,6 +12,7 @@ import TestConfig from "../../models/testConfig.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { reorderItems } from "../../shared/utils/reorder.utils.js";
 
 const validateObjectId = (value, label) => {
   if (!value) {
@@ -82,6 +83,7 @@ export const createTopic = async (payload, teacherId) => {
     examId = validateObjectId(payload.examId, "examId");
   }
 
+  const maxOrder = await TestSeriesTopic.countDocuments({ examId });
   return TestSeriesTopic.create({
     title,
     description,
@@ -91,6 +93,7 @@ export const createTopic = async (payload, teacherId) => {
     validityMonths: isPaid ? validityMonths : 0,
     teacherId: validateObjectId(teacherId, "teacherId"),
     examId,
+    order: maxOrder,
   });
 };
 
@@ -114,6 +117,8 @@ export const updateTopic = async (topicId, payload, teacherId) => {
   if (payload?.validityMonths !== undefined) {
     updates.validityMonths = Math.max(0, Number(payload.validityMonths) || 0);
   }
+  if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
   // If admin marks topic free, force price/validity to 0 to keep state consistent.
   if (updates.isPaid === false) {
     updates.price = 0;
@@ -177,11 +182,13 @@ export const createSubject = async (topicId, payload, teacherId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Topic not found");
   }
 
+  const maxOrder = await TestSeriesSubject.countDocuments({ topicId: objTopicId });
   return TestSeriesSubject.create({
     title: normalizeTitle(payload?.title, "Subject title"),
     description: normalizeDescription(payload?.description),
     topicId: objTopicId,
     teacherId: objTeacherId,
+    order: maxOrder,
   });
 };
 
@@ -193,6 +200,8 @@ export const updateSubject = async (subjectId, payload, teacherId) => {
   if (payload?.description !== undefined) {
     updates.description = normalizeDescription(payload.description);
   }
+  if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
 
   const updated = await TestSeriesSubject.findOneAndUpdate(
     { _id: validateObjectId(subjectId, "subjectId"), teacherId: validateObjectId(teacherId, "teacherId") },
@@ -242,11 +251,13 @@ export const createChapter = async (subjectId, payload, teacherId) => {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Subject not found");
   }
 
+  const maxOrder = await TestSeriesChapter.countDocuments({ subjectId: objSubjectId });
   return TestSeriesChapter.create({
     title: normalizeTitle(payload?.title, "Chapter title"),
     description: normalizeDescription(payload?.description),
     subjectId: objSubjectId,
     teacherId: objTeacherId,
+    order: maxOrder,
   });
 };
 
@@ -258,6 +269,8 @@ export const updateChapter = async (chapterId, payload, teacherId) => {
   if (payload?.description !== undefined) {
     updates.description = normalizeDescription(payload.description);
   }
+  if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
 
   const updated = await TestSeriesChapter.findOneAndUpdate(
     { _id: validateObjectId(chapterId, "chapterId"), teacherId: validateObjectId(teacherId, "teacherId") },
@@ -289,31 +302,50 @@ export const deleteChapter = async (chapterId, teacherId) => {
   return deleted;
 };
 
+// Bulk drag-and-drop reorder: topicIds is the full new order within an exam
+// (or among orphan/uncategorised topics when examId is null).
+export const reorderTopics = async (examId, topicIds, teacherId) => {
+  return reorderItems(TestSeriesTopic, { examId: examId || null, teacherId }, topicIds);
+};
+
+export const reorderSubjects = async (topicId, subjectIds, teacherId) => {
+  return reorderItems(TestSeriesSubject, { topicId, teacherId }, subjectIds);
+};
+
+export const reorderChapters = async (subjectId, chapterIds, teacherId) => {
+  return reorderItems(TestSeriesChapter, { subjectId, teacherId }, chapterIds);
+};
+
+// Bulk drag-and-drop reorder for tests within a chapter.
+export const reorderTests = async (chapterId, testIds, teacherId) => {
+  return reorderItems(Test, { chapterId, teacherId }, testIds);
+};
+
 export const getTeacherSeriesTree = async (teacherId) => {
   const objTeacherId = validateObjectId(teacherId, "teacherId");
 
-  const topics = await TestSeriesTopic.find({ teacherId: objTeacherId }).sort({ createdAt: -1 }).lean();
+  const topics = await TestSeriesTopic.find({ teacherId: objTeacherId }).sort({ order: 1, createdAt: -1 }).lean();
   if (!topics.length) {
     return [];
   }
 
   const topicIds = topics.map((t) => t._id);
   const subjects = await TestSeriesSubject.find({ teacherId: objTeacherId, topicId: { $in: topicIds } })
-    .sort({ createdAt: 1 })
+    .sort({ order: 1, createdAt: 1 })
     .lean();
   const subjectIds = subjects.map((s) => s._id);
 
   const chapters = subjectIds.length
     ? await TestSeriesChapter.find({ teacherId: objTeacherId, subjectId: { $in: subjectIds } })
-        .sort({ createdAt: 1 })
+        .sort({ order: 1, createdAt: 1 })
         .lean()
     : [];
   const chapterIds = chapters.map((c) => c._id);
 
   const tests = chapterIds.length
     ? await Test.find({ teacherId: objTeacherId, chapterId: { $in: chapterIds } })
-        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId createdAt questions isPaid isProctored attemptLimit")
-        .sort({ createdAt: -1 })
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId createdAt questions isPaid isProctored attemptLimit order isVisible")
+        .sort({ order: 1, createdAt: -1 })
         .lean()
     : [];
 
@@ -550,11 +582,11 @@ export const getStudentSeriesTree = async () => {
   const visibleCategories = await ExamCategory.find({ isVisible: { $ne: false } }).select("_id").lean();
   const visibleCatIds = visibleCategories.map((c) => c._id);
   const visibleExams = visibleCatIds.length
-    ? await Exam.find({ examCategoryId: { $in: visibleCatIds } }).select("_id").lean()
+    ? await Exam.find({ examCategoryId: { $in: visibleCatIds }, isVisible: { $ne: false } }).select("_id").lean()
     : [];
   const visibleExamIds = new Set(visibleExams.map((e) => String(e._id)));
 
-  const allTopics = await TestSeriesTopic.find({}).sort({ createdAt: -1 }).lean();
+  const allTopics = await TestSeriesTopic.find({ isVisible: { $ne: false } }).sort({ order: 1, createdAt: -1 }).lean();
   // Keep topic if it is uncategorised (no examId) OR its exam is in a visible category
   const topics = allTopics.filter(
     (t) => !t.examId || visibleExamIds.has(String(t.examId))
@@ -564,22 +596,22 @@ export const getStudentSeriesTree = async () => {
   }
 
   const topicIds = topics.map((t) => t._id);
-  const subjects = await TestSeriesSubject.find({ topicId: { $in: topicIds } })
-    .sort({ createdAt: 1 })
+  const subjects = await TestSeriesSubject.find({ topicId: { $in: topicIds }, isVisible: { $ne: false } })
+    .sort({ order: 1, createdAt: 1 })
     .lean();
   const subjectIds = subjects.map((s) => s._id);
 
   const chapters = subjectIds.length
-    ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds } })
-        .sort({ createdAt: 1 })
+    ? await TestSeriesChapter.find({ subjectId: { $in: subjectIds }, isVisible: { $ne: false } })
+        .sort({ order: 1, createdAt: 1 })
         .lean()
     : [];
   const chapterIds = chapters.map((c) => c._id);
 
   const tests = chapterIds.length
-    ? await Test.find({ chapterId: { $in: chapterIds }, status: "published" })
+    ? await Test.find({ chapterId: { $in: chapterIds }, status: "published", isVisible: { $ne: false } })
         .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit type")
-        .sort({ createdAt: -1 })
+        .sort({ order: 1, createdAt: -1 })
         .lean()
     : [];
 
@@ -631,49 +663,54 @@ export const getFullHierarchyTree = async ({ publishedOnly = false, teacherId = 
 
   const exams = await Exam.find({
     ...(categories.length ? { examCategoryId: { $in: categories.map((c) => c._id) } } : {}),
+    ...(publishedOnly ? { isVisible: { $ne: false } } : {}),
   }).sort({ order: 1, createdAt: 1 }).lean();
 
   const topicQuery = {};
   if (teacherId) topicQuery.teacherId = validateObjectId(teacherId, "teacherId");
-  const topics = await TestSeriesTopic.find(topicQuery).sort({ createdAt: -1 }).lean();
+  if (publishedOnly) topicQuery.isVisible = { $ne: false };
+  const topics = await TestSeriesTopic.find(topicQuery).sort({ order: 1, createdAt: -1 }).lean();
 
   const topicIds = topics.map((t) => t._id);
   const subjectQuery = { topicId: { $in: topicIds } };
   if (teacherId) subjectQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  if (publishedOnly) subjectQuery.isVisible = { $ne: false };
   const subjects = topicIds.length
-    ? await TestSeriesSubject.find(subjectQuery).sort({ createdAt: 1 }).lean()
+    ? await TestSeriesSubject.find(subjectQuery).sort({ order: 1, createdAt: 1 }).lean()
     : [];
 
   const subjectIds = subjects.map((s) => s._id);
   const chapterQuery = { subjectId: { $in: subjectIds } };
   if (teacherId) chapterQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  if (publishedOnly) chapterQuery.isVisible = { $ne: false };
   const chapters = subjectIds.length
-    ? await TestSeriesChapter.find(chapterQuery).sort({ createdAt: 1 }).lean()
+    ? await TestSeriesChapter.find(chapterQuery).sort({ order: 1, createdAt: 1 }).lean()
     : [];
 
   const chapterIds = chapters.map((c) => c._id);
   const testQuery = { chapterId: { $in: chapterIds } };
-  if (publishedOnly) testQuery.status = "published";
+  if (publishedOnly) { testQuery.status = "published"; testQuery.isVisible = { $ne: false }; }
   if (teacherId) testQuery.teacherId = validateObjectId(teacherId, "teacherId");
   const tests = chapterIds.length
     ? await Test.find(testQuery)
-        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit type createdAt")
-        .sort({ createdAt: -1 })
+        .select("title description status totalMarks duration startTime endTime chapterId subjectId topicId questions isPaid isProctored attemptLimit type createdAt order isVisible")
+        .sort({ order: 1, createdAt: -1 })
         .lean()
     : [];
 
   // AITS
   const aitsQuery = {};
   if (teacherId) aitsQuery.teacherId = validateObjectId(teacherId, "teacherId");
+  if (publishedOnly) aitsQuery.isVisible = { $ne: false };
   const aitsList = await AllIndiaTestSeries.find(aitsQuery).sort({ order: 1, createdAt: 1 }).lean();
   const aitsIds = aitsList.map((a) => a._id);
   const aitsTestQuery = { aitsId: { $in: aitsIds }, type: "aits" };
-  if (publishedOnly) aitsTestQuery.status = "published";
+  if (publishedOnly) { aitsTestQuery.status = "published"; aitsTestQuery.isVisible = { $ne: false }; }
   if (teacherId) aitsTestQuery.teacherId = validateObjectId(teacherId, "teacherId");
   const aitsTests = aitsIds.length
     ? await Test.find(aitsTestQuery)
-        .select("title description status totalMarks duration startTime endTime aitsId questions isPaid isProctored attemptLimit type createdAt")
-        .sort({ createdAt: -1 })
+        .select("title description status totalMarks duration startTime endTime aitsId questions isPaid isProctored attemptLimit type createdAt order isVisible")
+        .sort({ order: 1, createdAt: -1 })
         .lean()
     : [];
 

@@ -9,6 +9,7 @@ import PlatformSettings, { DEFAULT_TEACHER_SETTINGS } from "../../models/platfor
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
 import Question from "../../models/question.model.js";
+import { recalculateTestTotalMarks } from "../question/question.service.js";
 
 export const getTeacherUiSettings = async () => {
   const settings = await PlatformSettings.findOne({ key: "singleton" }).lean();
@@ -321,8 +322,8 @@ export const linkQuestionToTest = async (testId, questionId) => {
 
   await Test.findByIdAndUpdate(testId, {
     $addToSet: { questions: question._id },
-    $inc: { totalMarks: question.marks || 0 },
   });
+  await recalculateTestTotalMarks(testId);
 };
 export const bulkCreateQuestions = async (questionsArray, testId, teacherId) => {
   const questionsToInsert = questionsArray.map((q) => ({
@@ -335,15 +336,10 @@ export const bulkCreateQuestions = async (questionsArray, testId, teacherId) => 
 
   const questionIds = created.map((q) => q._id);
 
-  const totalMarks = created.reduce(
-    (sum, q) => sum + (q.marks || 0),
-    0
-  );
-
   await Test.findByIdAndUpdate(testId, {
     $addToSet: { questions: { $each: questionIds } },
-    $inc: { totalMarks: totalMarks },
   });
+  await recalculateTestTotalMarks(testId);
 
   return created;
 };

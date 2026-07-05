@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { deleteBlog, getBlogs } from "../../services/adminService";
+import { deleteBlog, getBlogs, updateBlog } from "../../services/adminService";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { VisibilityToggle } from "../../components/admin/VisibilityToggle";
 
 export default function Blogs() {
   const navigate = useNavigate();
@@ -43,6 +44,11 @@ export default function Blogs() {
     } catch {
       toast.error("Failed to delete article");
     }
+  };
+
+  const handleTogglePublished = async (blog, nextPublished) => {
+    await updateBlog(blog._id, { published: nextPublished });
+    setBlogs((prev) => prev.map((b) => (b._id === blog._id ? { ...b, published: nextPublished } : b)));
   };
 
   const summaryText = useMemo(() => {
@@ -143,6 +149,7 @@ export default function Blogs() {
                     <td className="px-5 py-4 text-grayCustom-medium">{new Date(blog.createdAt).toLocaleDateString()}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
+                        <VisibilityToggle isVisible={blog.published} onToggle={(next) => handleTogglePublished(blog, next)} />
                         <Link
                           to={`/admin/blogs/${blog._id}/edit`}
                           className="rounded-lg border border-white/10 p-2 text-grayCustom-medium transition-colors hover:text-white"

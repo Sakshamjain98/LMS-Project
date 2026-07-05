@@ -15,11 +15,14 @@ const testSeriesTopicSchema = new mongoose.Schema(
     // Months of access a purchase grants. 0 = no expiry (lifetime). Drives
     // TopicAccess.expiresAt; after it lapses the student must pay again.
     validityMonths: { type: Number, default: 0, min: 0 },
+    order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );
 
 testSeriesTopicSchema.index({ teacherId: 1, createdAt: -1 });
+testSeriesTopicSchema.index({ examId: 1, order: 1 });
 
 testSeriesTopicSchema.set("toJSON", { virtuals: true });
 testSeriesTopicSchema.set("toObject", { virtuals: true });

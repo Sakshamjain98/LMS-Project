@@ -145,16 +145,20 @@ router.get("/test-series/hierarchy", testSeriesController.getFullHierarchy);
 router.post("/test-series/topics", requirePermission("testseries.create"), testSeriesController.createTopic);
 router.put("/test-series/topics/:topicId", requirePermission("testseries.edit"), testSeriesController.updateTopic);
 router.delete("/test-series/topics/:topicId", requirePermission("testseries.edit"), testSeriesController.deleteTopic);
+router.patch("/test-series/topics/reorder", requirePermission("testseries.edit"), testSeriesController.reorderTopics);
 
 router.post("/test-series/topics/:topicId/subjects", requirePermission("testseries.create"), testSeriesController.createSubject);
 router.put("/test-series/subjects/:subjectId", requirePermission("testseries.edit"), testSeriesController.updateSubject);
 router.delete("/test-series/subjects/:subjectId", requirePermission("testseries.edit"), testSeriesController.deleteSubject);
+router.patch("/test-series/topics/:topicId/subjects/reorder", requirePermission("testseries.edit"), testSeriesController.reorderSubjects);
 
 router.post("/test-series/subjects/:subjectId/chapters", requirePermission("chapters.edit"), testSeriesController.createChapter);
 router.put("/test-series/chapters/:chapterId", requirePermission("chapters.edit"), testSeriesController.updateChapter);
 router.delete("/test-series/chapters/:chapterId", requirePermission("chapters.edit"), testSeriesController.deleteChapter);
+router.patch("/test-series/subjects/:subjectId/chapters/reorder", requirePermission("chapters.edit"), testSeriesController.reorderChapters);
 
 router.post("/test-series/chapters/:chapterId/tests", requirePermission("chapters.edit"), testSeriesController.createTestInChapter);
+router.patch("/test-series/chapters/:chapterId/tests/reorder", requirePermission("chapters.edit"), testSeriesController.reorderTests);
 router.get("/test-series/topics/:topicId/analytics", testSeriesController.getTopicAnalytics);
 
 // Assign a test series (topic) to an exam

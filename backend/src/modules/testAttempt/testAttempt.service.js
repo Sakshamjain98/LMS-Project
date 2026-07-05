@@ -80,7 +80,7 @@ export const startTest = async (testId, studentId) => {
   }
 
   // Check if test is published
-  if (test.status !== "published") {
+  if (test.status !== "published" || test.isVisible === false) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test is not available");
   }
 
@@ -197,7 +197,7 @@ export const getTestPreview = async (testId, studentId) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, timingCheck.reason);
   }
 
-  if (test.status !== "published") {
+  if (test.status !== "published" || test.isVisible === false) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Test is not available");
   }
 

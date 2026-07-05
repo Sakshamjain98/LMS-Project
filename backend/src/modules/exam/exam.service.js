@@ -6,6 +6,7 @@ import AllIndiaTestSeries from "../../models/allIndiaTestSeries.model.js";
 import Course from "../../models/course.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { reorderItems } from "../../shared/utils/reorder.utils.js";
 
 const slugify = (str) =>
   str
@@ -71,10 +72,16 @@ export const updateExam = async (examId, payload) => {
   if (payload?.examCategoryId !== undefined)
     updates.examCategoryId = validateObjectId(payload.examCategoryId, "examCategoryId");
   if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
 
   const updated = await Exam.findByIdAndUpdate(id, { $set: updates }, { new: true }).lean();
   if (!updated) throw new ApiError(STATUS_CODES.NOT_FOUND, "Exam not found");
   return updated;
+};
+
+// Bulk drag-and-drop reorder: examIds is the full new order within a category.
+export const reorderExams = async (examCategoryId, examIds) => {
+  return reorderItems(Exam, { examCategoryId }, examIds);
 };
 
 export const deleteExam = async (examId) => {

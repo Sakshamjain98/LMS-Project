@@ -17,6 +17,7 @@ import {
   Minus,
 } from "lucide-react";
 import { formatDuration } from "../../utils/formatDuration";
+import { calculateAccuracy } from "../../utils/scoreUtils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,9 +85,7 @@ export default function TestResult({ attemptId, onBack }) {
 
   // Derived analytics
   const unattempted = (result.totalQuestions || 0) - (result.attemptedQuestions || 0);
-  const accuracy = result.attemptedQuestions > 0
-    ? ((result.correctAnswers / result.attemptedQuestions) * 100).toFixed(1)
-    : "0.0";
+  const accuracy = calculateAccuracy(result.correctAnswers, result.attemptedQuestions);
 
   const pieData = [
     { name: "Correct", value: result.correctAnswers || 0, color: "#10B981" },

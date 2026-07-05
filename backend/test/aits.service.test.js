@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findOne, create } = vi.hoisted(() => ({
+const { findOne, create, countDocuments } = vi.hoisted(() => ({
   findOne: vi.fn(),
   create: vi.fn(),
+  countDocuments: vi.fn(),
 }));
 
 vi.mock("../src/models/allIndiaTestSeries.model.js", () => ({
@@ -11,7 +12,7 @@ vi.mock("../src/models/allIndiaTestSeries.model.js", () => ({
 }));
 
 vi.mock("../src/models/test.model.js", () => ({
-  default: { create },
+  default: { create, countDocuments },
 }));
 
 import { createAITSTest } from "../src/modules/aits/aits.service.js";
@@ -20,6 +21,7 @@ describe("AITS service", () => {
   beforeEach(() => {
     findOne.mockReset();
     create.mockReset();
+    countDocuments.mockReset();
   });
 
   it("stores a test against the AITS without chapter references", async () => {
@@ -29,6 +31,7 @@ describe("AITS service", () => {
     findOne.mockReturnValue({
       lean: () => Promise.resolve({ _id: aitsId, teacherId }),
     });
+    countDocuments.mockResolvedValue(0);
     create.mockResolvedValue({ _id: "test-1" });
 
     await createAITSTest(
@@ -60,6 +63,7 @@ describe("AITS service", () => {
       chapterId: null,
       subjectId: null,
       topicId: null,
+      order: 0,
     });
     expect(create.mock.calls[0][0].aitsId.toString()).toBe(aitsId);
     expect(create.mock.calls[0][0].teacherId.toString()).toBe(teacherId);

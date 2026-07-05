@@ -70,6 +70,15 @@ export const deleteCourse = async (courseId) => {
   }
 };
 
+export const reorderCourses = async (examId, courseIds) => {
+  try {
+    const res = await api.patch("/courses/reorder", { examId, courseIds });
+    return res.data.courses;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to reorder courses" };
+  }
+};
+
 // ─── Subjects ────────────────────────────────────────────────────────────────
 
 export const createSubject = async (courseId, data) => {
@@ -96,6 +105,15 @@ export const deleteSubject = async (subjectId) => {
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Failed to delete subject" };
+  }
+};
+
+export const reorderSubjects = async (courseId, subjectIds) => {
+  try {
+    const res = await api.patch(`/courses/${courseId}/subjects/reorder`, { subjectIds });
+    return res.data.subjects;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to reorder subjects" };
   }
 };
 
@@ -179,6 +197,15 @@ export const deleteNote = async (noteId) => {
   }
 };
 
+export const reorderNotes = async (chapterId, noteIds) => {
+  try {
+    const res = await api.patch(`/courses/chapters/${chapterId}/notes/reorder`, { noteIds });
+    return res.data.notes;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to reorder notes" };
+  }
+};
+
 export const getNoteById = async (noteId) => {
   try {
     const res = await api.get(`/courses/notes/${noteId}`);
@@ -214,6 +241,15 @@ export const deleteVideo = async (videoId) => {
     return res.data;
   } catch (err) {
     throw err?.response?.data || { message: "Failed to delete video" };
+  }
+};
+
+export const reorderVideos = async (chapterId, videoIds) => {
+  try {
+    const res = await api.patch(`/courses/chapters/${chapterId}/videos/reorder`, { videoIds });
+    return res.data.videos;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to reorder videos" };
   }
 };
 

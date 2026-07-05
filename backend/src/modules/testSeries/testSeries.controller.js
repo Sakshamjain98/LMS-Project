@@ -97,6 +97,26 @@ export const deleteChapter = asyncHandler(async (req, res) => {
   });
 });
 
+export const reorderTopics = asyncHandler(async (req, res) => {
+  const topics = await seriesService.reorderTopics(req.body.examId || null, req.body.topicIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, topics });
+});
+
+export const reorderSubjects = asyncHandler(async (req, res) => {
+  const subjects = await seriesService.reorderSubjects(req.params.topicId, req.body.subjectIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, subjects });
+});
+
+export const reorderChapters = asyncHandler(async (req, res) => {
+  const chapters = await seriesService.reorderChapters(req.params.subjectId, req.body.chapterIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, chapters });
+});
+
+export const reorderTests = asyncHandler(async (req, res) => {
+  const tests = await seriesService.reorderTests(req.params.chapterId, req.body.testIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, tests });
+});
+
 export const createTestInChapter = asyncHandler(async (req, res) => {
   const test = await testService.createTest(
     { ...req.body, chapterId: req.params.chapterId },

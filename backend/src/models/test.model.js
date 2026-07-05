@@ -42,6 +42,8 @@ const testSchema = new mongoose.Schema(
     showSolution:     { type: Boolean, default: true },  // show explanations after submit
     allowReview:      { type: Boolean, default: true },  // student can review answers post-submit
     negativeMarking:  { type: Number,  default: 0 },     // marks deducted per wrong answer (0 = none)
+    order: { type: Number, default: 0 },
+    isVisible: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );

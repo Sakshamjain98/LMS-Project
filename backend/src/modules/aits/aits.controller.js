@@ -27,3 +27,13 @@ export const createTest = asyncHandler(async (req, res) => {
   const test = await service.createAITSTest(req.params.aitsId, req.body, req.user._id);
   res.status(STATUS_CODES.CREATED).json({ success: true, message: "AITS test created", test });
 });
+
+export const reorder = asyncHandler(async (req, res) => {
+  const aitsList = await service.reorderAITS(req.body.examId, req.body.aitsIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, aitsList });
+});
+
+export const reorderTests = asyncHandler(async (req, res) => {
+  const tests = await service.reorderAITSTests(req.params.aitsId, req.body.testIds, req.user._id);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, tests });
+});

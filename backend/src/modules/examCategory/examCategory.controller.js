@@ -22,6 +22,11 @@ export const update = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Category updated", category });
 });
 
+export const reorder = asyncHandler(async (req, res) => {
+  const categories = await service.reorderCategories(req.body.categoryIds);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, categories });
+});
+
 export const remove = asyncHandler(async (req, res) => {
   await service.deleteCategory(req.params.categoryId);
   res.status(STATUS_CODES.SUCCESS).json({ success: true, message: "Category deleted" });

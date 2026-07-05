@@ -2,6 +2,20 @@ import Question from "../../models/question.model.js";
 import Test from "../../models/test.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { sumQuestionMarks } from "../../shared/utils/evaluation.utils.js";
+
+/**
+ * Recompute Test.totalMarks from its live questions. Call this after any
+ * question create/update/delete so totalMarks never drifts from the
+ * questions that actually make up the test (it used to only be
+ * incremented on create, never adjusted on edit/delete).
+ */
+export const recalculateTestTotalMarks = async (testId) => {
+  const questions = await Question.find({ testId }).select("marks").lean();
+  const totalMarks = sumQuestionMarks(questions);
+  await Test.findByIdAndUpdate(testId, { totalMarks });
+  return totalMarks;
+};
 
 const stripHtml = (value = "") =>
   value
@@ -118,6 +132,7 @@ export const createQuestion = async (testId, questionData, teacherId) => {
 
   // Link question to test
   await linkQuestionsToTest(testId, [question._id]);
+  await recalculateTestTotalMarks(testId);
 
   return question;
 };
@@ -182,6 +197,7 @@ export const bulkCreateQuestions = async (
     testId,
     createdQuestions.map((q) => q._id)
   );
+  await recalculateTestTotalMarks(testId);
 
   return createdQuestions;
 };
@@ -286,7 +302,11 @@ export const updateQuestion = async (questionId, updateData, teacherId) => {
     updateData.imageUrl = updateData.imageUrl?.trim?.() || "";
   }
 
-  return Question.findByIdAndUpdate(questionId, updateData, { new: true });
+  const updated = await Question.findByIdAndUpdate(questionId, updateData, { new: true });
+  if (updateData.marks !== undefined) {
+    await recalculateTestTotalMarks(question.testId);
+  }
+  return updated;
 };
 
 /**
@@ -310,6 +330,7 @@ export const deleteQuestion = async (questionId, teacherId) => {
 
   // Delete question
   await Question.findByIdAndDelete(questionId);
+  await recalculateTestTotalMarks(question.testId);
 
   return { deleted: true };
 };
@@ -349,6 +370,7 @@ export const importQuestionsFromBank = async (
     testId,
     created.map((q) => q._id)
   );
+  await recalculateTestTotalMarks(testId);
 
   return created;
 };

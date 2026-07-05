@@ -7,6 +7,7 @@ import TestAttempt from "../../models/testAttempt.model.js";
 import TestConfig from "../../models/testConfig.model.js";
 import { ApiError } from "../../shared/error/ApiError.js";
 import { STATUS_CODES } from "../../constants/statusCode.js";
+import { reorderItems } from "../../shared/utils/reorder.utils.js";
 
 const validateObjectId = (value, label) => {
   if (!value || !mongoose.Types.ObjectId.isValid(value))
@@ -70,6 +71,7 @@ export const updateAITS = async (aitsId, payload, teacherId) => {
   if (payload?.isPaid !== undefined) updates.isPaid = Boolean(payload.isPaid);
   if (payload?.price !== undefined) updates.price = Math.max(0, Number(payload.price) || 0);
   if (payload?.order !== undefined) updates.order = Number(payload.order) || 0;
+  if (payload?.isVisible !== undefined) updates.isVisible = payload.isVisible !== false;
   if (updates.isPaid === false) updates.price = 0;
 
   const updated = await AllIndiaTestSeries.findOneAndUpdate(
@@ -79,6 +81,16 @@ export const updateAITS = async (aitsId, payload, teacherId) => {
   ).lean();
   if (!updated) throw new ApiError(STATUS_CODES.NOT_FOUND, "AITS not found");
   return updated;
+};
+
+// Bulk drag-and-drop reorder: aitsIds is the full new order within an exam.
+export const reorderAITS = async (examId, aitsIds, teacherId) => {
+  return reorderItems(AllIndiaTestSeries, { examId, teacherId }, aitsIds);
+};
+
+// Bulk drag-and-drop reorder: testIds is the full new order within an AITS section.
+export const reorderAITSTests = async (aitsId, testIds, teacherId) => {
+  return reorderItems(Test, { aitsId, teacherId }, testIds);
 };
 
 export const deleteAITS = async (aitsId, teacherId) => {
@@ -109,8 +121,8 @@ export const getAITSByExam = async (examId, teacherId = null) => {
   if (teacherId) testQuery.teacherId = validateObjectId(teacherId, "teacherId");
 
   const tests = await Test.find(testQuery)
-    .select("title description status totalMarks duration startTime endTime aitsId questions isPaid isProctored attemptLimit type createdAt")
-    .sort({ createdAt: -1 })
+    .select("title description status totalMarks duration startTime endTime aitsId questions isPaid isProctored attemptLimit type createdAt order isVisible")
+    .sort({ order: 1, createdAt: -1 })
     .lean();
 
   const testsByAits = new Map();
@@ -146,6 +158,8 @@ export const createAITSTest = async (aitsId, payload, teacherId) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Duration must be greater than 0");
   }
 
+  const maxOrder = await Test.countDocuments({ aitsId: objAitsId });
+
   return Test.create({
     title: payload.title.toString().trim().slice(0, 100),
     description: (payload.description || "").toString().trim().slice(0, 500),
@@ -169,5 +183,6 @@ export const createAITSTest = async (aitsId, payload, teacherId) => {
     chapterId: null,
     subjectId: null,
     topicId: null,
+    order: maxOrder,
   });
 };

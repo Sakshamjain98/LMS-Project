@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   createTestSeriesChapter,
   createTestSeriesSubject,
@@ -14,21 +15,29 @@ import {
   updateTestSeriesChapter,
   updateTestSeriesSubject,
   updateTestSeriesTopic,
+  reorderTestSeriesTopics,
+  reorderTestSeriesSubjects,
+  reorderTestSeriesChapters,
+  reorderTestSeriesTests,
   uploadTestCSV,
   // New hierarchy
   getExamCategories,
   createExamCategory,
   updateExamCategory,
   deleteExamCategory,
+  reorderExamCategories,
   getExams,
   createExam,
   updateExam,
   deleteExam,
+  reorderExams,
   getAITSByExam,
   createAITS,
   updateAITS,
   deleteAITS,
   createAITSTest,
+  reorderAITS,
+  reorderAITSTests,
 } from "../../services/teacherService";
 import {
   ChevronLeft,
@@ -46,11 +55,15 @@ import {
   GraduationCap,
   Trophy,
   Tag,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import ValidityDurationField from "../../components/ui/ValidityDurationField";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useDragReorder } from "../../components/admin/dnd/useDragReorder";
+import { DragHandle } from "../../components/admin/dnd/DragHandle";
+import { SortableRow } from "../../components/admin/dnd/SortableRow";
+import { VisibilityToggle } from "../../components/admin/VisibilityToggle";
 
 // ─── Level definitions ──────────────────────────────────────────────────────
 const LEVELS = ["categories", "exams", "series", "subjects", "chapters", "tests"];
@@ -488,6 +501,163 @@ export default function AdminTestSeries() {
 
   const canGoBack = level !== "categories" || aitsView;
 
+  // ─── Drag-and-drop reorder ────────────────────────────────────────────────
+  // Only when the full list fits on one unfiltered page, so index positions
+  // map 1:1 to `filteredRows` (same gating rule the Course Chapters table uses).
+  const canReorder =
+    !filters.search.trim() &&
+    totalPages <= 1 &&
+    (aitsView
+      ? true
+      : level === "series"
+      ? Boolean(selectedExamId)
+      : ["categories", "exams", "subjects", "chapters", "tests"].includes(level));
+
+  const handleReordered = async (reordered) => {
+    try {
+      if (aitsView) {
+        if (!selectedAitsId) {
+          setAitsList(reordered);
+          await reorderAITS(selectedExamId, reordered.map((r) => r._id));
+        } else {
+          setAitsList((prev) => prev.map((a) => (a._id === selectedAitsId ? { ...a, tests: reordered } : a)));
+          await reorderAITSTests(selectedAitsId, reordered.map((r) => r._id));
+        }
+        return;
+      }
+      if (level === "categories") {
+        setCategories(reordered);
+        await reorderExamCategories(reordered.map((r) => r._id));
+      } else if (level === "exams") {
+        setExams(reordered);
+        await reorderExams(selectedCategoryId, reordered.map((r) => r._id));
+      } else if (level === "series") {
+        setTopics((prev) => {
+          const reorderedIds = new Set(reordered.map((r) => r._id));
+          const rest = prev.filter((t) => !reorderedIds.has(t._id));
+          return [...reordered, ...rest];
+        });
+        await reorderTestSeriesTopics(selectedExamId, reordered.map((r) => r._id));
+      } else if (level === "subjects") {
+        setTopics((prev) => prev.map((t) => (t._id === selectedTopicId ? { ...t, subjects: reordered } : t)));
+        await reorderTestSeriesSubjects(selectedTopicId, reordered.map((r) => r._id));
+      } else if (level === "chapters") {
+        setTopics((prev) =>
+          prev.map((t) =>
+            t._id === selectedTopicId
+              ? { ...t, subjects: t.subjects.map((s) => (s._id === selectedSubjectId ? { ...s, chapters: reordered } : s)) }
+              : t
+          )
+        );
+        await reorderTestSeriesChapters(selectedSubjectId, reordered.map((r) => r._id));
+      } else if (level === "tests") {
+        setTopics((prev) =>
+          prev.map((t) =>
+            t._id === selectedTopicId
+              ? {
+                  ...t,
+                  subjects: t.subjects.map((s) =>
+                    s._id === selectedSubjectId
+                      ? { ...s, chapters: s.chapters.map((c) => (c._id === selectedChapterId ? { ...c, tests: reordered } : c)) }
+                      : s
+                  ),
+                }
+              : t
+          )
+        );
+        await reorderTestSeriesTests(selectedChapterId, reordered.map((r) => r._id));
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to reorder");
+      await fetchData();
+      if (selectedCategoryId) await fetchExams(selectedCategoryId);
+      if (selectedExamId) await fetchAITS(selectedExamId);
+    }
+  };
+
+  const { sensors: dndSensors, handleDragEnd } = useDragReorder({ items: filteredRows, onReorder: handleReordered });
+
+  const handleToggleVisible = async (row, nextVisible) => {
+    try {
+      if (aitsView) {
+        if (!selectedAitsId) {
+          setAitsList((prev) => prev.map((a) => (a._id === row._id ? { ...a, isVisible: nextVisible } : a)));
+          await updateAITS(row._id, { isVisible: nextVisible });
+        } else {
+          setAitsList((prev) =>
+            prev.map((a) =>
+              a._id === selectedAitsId
+                ? { ...a, tests: a.tests.map((t) => (t._id === row._id ? { ...t, isVisible: nextVisible } : t)) }
+                : a
+            )
+          );
+          await updateTeacherTest(row._id, { isVisible: nextVisible });
+        }
+        return;
+      }
+      if (level === "categories") {
+        setCategories((prev) => prev.map((c) => (c._id === row._id ? { ...c, isVisible: nextVisible } : c)));
+        await updateExamCategory(row._id, { isVisible: nextVisible });
+      } else if (level === "exams") {
+        setExams((prev) => prev.map((e) => (e._id === row._id ? { ...e, isVisible: nextVisible } : e)));
+        await updateExam(row._id, { isVisible: nextVisible });
+      } else if (level === "series") {
+        setTopics((prev) => prev.map((t) => (t._id === row._id ? { ...t, isVisible: nextVisible } : t)));
+        await updateTestSeriesTopic(row._id, { isVisible: nextVisible });
+      } else if (level === "subjects") {
+        setTopics((prev) =>
+          prev.map((t) =>
+            t._id === selectedTopicId
+              ? { ...t, subjects: t.subjects.map((s) => (s._id === row._id ? { ...s, isVisible: nextVisible } : s)) }
+              : t
+          )
+        );
+        await updateTestSeriesSubject(row._id, { isVisible: nextVisible });
+      } else if (level === "chapters") {
+        setTopics((prev) =>
+          prev.map((t) =>
+            t._id === selectedTopicId
+              ? {
+                  ...t,
+                  subjects: t.subjects.map((s) =>
+                    s._id === selectedSubjectId
+                      ? { ...s, chapters: s.chapters.map((c) => (c._id === row._id ? { ...c, isVisible: nextVisible } : c)) }
+                      : s
+                  ),
+                }
+              : t
+          )
+        );
+        await updateTestSeriesChapter(row._id, { isVisible: nextVisible });
+      } else if (level === "tests") {
+        setTopics((prev) =>
+          prev.map((t) =>
+            t._id === selectedTopicId
+              ? {
+                  ...t,
+                  subjects: t.subjects.map((s) =>
+                    s._id === selectedSubjectId
+                      ? {
+                          ...s,
+                          chapters: s.chapters.map((c) =>
+                            c._id === selectedChapterId
+                              ? { ...c, tests: c.tests.map((test) => (test._id === row._id ? { ...test, isVisible: nextVisible } : test)) }
+                              : c
+                          ),
+                        }
+                      : s
+                  ),
+                }
+              : t
+          )
+        );
+        await updateTeacherTest(row._id, { isVisible: nextVisible });
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to update visibility");
+    }
+  };
+
   // ─── Determine modal entity type for edit ────────────────────────────────
   const handleEditRow = (row) => {
     if (aitsView && !selectedAitsId) {
@@ -593,92 +763,105 @@ export default function AdminTestSeries() {
                 <tr><td colSpan={6} className="px-6 py-16 text-center text-sm text-white/40">Loading...</td></tr>
               ) : filteredRows.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-16 text-center text-sm text-white/40">No records found.</td></tr>
-              ) : (
-                paginatedRows.map((row, idx) => {
+              ) : (() => {
                   const isTestLevel = level === "tests" || (aitsView && selectedAitsId);
-                  const LevelIcon = aitsView && !selectedAitsId
-                    ? Trophy
-                    : LEVEL_ICON[level] || FileText;
-                  const iconColor = aitsView ? "text-amber-400" : (ICON_COLOR[level] || "text-brand-primary");
-                  return (
-                    <tr key={row._id} className="transition-colors hover:bg-white/4 animate-fade-up" style={{ animationDelay: `${idx * 25}ms` }}>
-                      <td className="px-6 py-4 text-sm font-semibold text-white cursor-pointer" onClick={() => handleRowSelect(row)}>
-                        <div className="flex items-center gap-2">
-                          <LevelIcon size={14} className={iconColor} />
-                          {row.title}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-white/50">{row.description || "—"}</td>
-                      {isTestLevel && (
-                        <>
-                          <td className="px-6 py-4 text-xs">
-                            <TypeBadge type={row.type} />
-                          </td>
-                          <td className="px-6 py-4 text-xs">
-                            <span className={`rounded-full px-2 py-1 font-semibold uppercase tracking-wider ${
-                              row.status === "published" ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-white/60"
-                            }`}>
-                              {row.status || "draft"}
-                            </span>
-                          </td>
-                        </>
-                      )}
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {level === "categories" && (
+                  const renderCells = (row, dragHandleProps) => {
+                    const LevelIcon = aitsView && !selectedAitsId
+                      ? Trophy
+                      : LEVEL_ICON[level] || FileText;
+                    const iconColor = aitsView ? "text-amber-400" : (ICON_COLOR[level] || "text-brand-primary");
+                    return (
+                      <>
+                        <td className="px-6 py-4 text-sm font-semibold text-white cursor-pointer" onClick={() => handleRowSelect(row)}>
+                          <div className="flex items-center gap-2">
+                            {dragHandleProps && (
+                              <span onClick={(e) => e.stopPropagation()}>
+                                <DragHandle {...dragHandleProps} />
+                              </span>
+                            )}
+                            <LevelIcon size={14} className={iconColor} />
+                            {row.title}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-white/50">{row.description || "—"}</td>
+                        {isTestLevel && (
+                          <>
+                            <td className="px-6 py-4 text-xs">
+                              <TypeBadge type={row.type} />
+                            </td>
+                            <td className="px-6 py-4 text-xs">
+                              <span className={`rounded-full px-2 py-1 font-semibold uppercase tracking-wider ${
+                                row.status === "published" ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-white/60"
+                              }`}>
+                                {row.status || "draft"}
+                              </span>
+                            </td>
+                          </>
+                        )}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <VisibilityToggle isVisible={row.isVisible} onToggle={(next) => handleToggleVisible(row, next)} />
+                            {!isTestLevel && (
+                              <button onClick={() => handleRowSelect(row)} className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white">
+                                View
+                              </button>
+                            )}
+                            {level === "series" && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate(`/admin/test-series/${row._id}/analytics`); }}
+                                className="inline-flex items-center gap-1 rounded-lg bg-brand-primary/15 px-3 py-1.5 text-xs font-bold text-brand-primary hover:bg-brand-primary/25"
+                              >
+                                <BarChart2 size={12} /> Analytics
+                              </button>
+                            )}
                             <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await updateExamCategory(row._id, { isVisible: row.isVisible === false });
-                                await fetchData();
-                              }}
+                              onClick={() => handleEditRow(row)}
                               className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
-                              title={row.isVisible === false ? "Show category" : "Hide category"}
                             >
-                              {row.isVisible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+                              <Pencil size={14} />
                             </button>
-                          )}
-                          {!isTestLevel && (
-                            <button onClick={() => handleRowSelect(row)} className="rounded-lg glass-pill px-3 py-1.5 text-xs text-white/80 hover:text-white">
-                              View
-                            </button>
-                          )}
-                          {level === "series" && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); navigate(`/admin/test-series/${row._id}/analytics`); }}
-                              className="inline-flex items-center gap-1 rounded-lg bg-brand-primary/15 px-3 py-1.5 text-xs font-bold text-brand-primary hover:bg-brand-primary/25"
+                              onClick={() => setConfirmState({
+                                isOpen: true,
+                                type: aitsView && !selectedAitsId ? "aits"
+                                  : level === "categories" ? "category"
+                                  : level === "exams" ? "exam"
+                                  : level === "series" ? "topic"
+                                  : level === "subjects" ? "subject"
+                                  : level === "chapters" ? "chapter"
+                                  : "test",
+                                id: row._id,
+                              })}
+                              className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
                             >
-                              <BarChart2 size={12} /> Analytics
+                              <Trash2 size={14} />
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleEditRow(row)}
-                            className="rounded-lg glass-pill p-2 text-white/70 hover:text-white"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmState({
-                              isOpen: true,
-                              type: aitsView && !selectedAitsId ? "aits"
-                                : level === "categories" ? "category"
-                                : level === "exams" ? "exam"
-                                : level === "series" ? "topic"
-                                : level === "subjects" ? "subject"
-                                : level === "chapters" ? "chapter"
-                                : "test",
-                              id: row._id,
-                            })}
-                            className="rounded-lg bg-red-500/10 p-2 text-red-400 hover:bg-red-500/20"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
+                          </div>
+                        </td>
+                      </>
+                    );
+                  };
+
+                  if (canReorder) {
+                    return (
+                      <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={paginatedRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                          {paginatedRows.map((row) => (
+                            <SortableRow key={row._id} id={row._id} className="transition-colors hover:bg-white/4">
+                              {({ attributes, listeners }) => renderCells(row, { attributes, listeners })}
+                            </SortableRow>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                    );
+                  }
+
+                  return paginatedRows.map((row, idx) => (
+                    <tr key={row._id} className="transition-colors hover:bg-white/4 animate-fade-up" style={{ animationDelay: `${idx * 25}ms` }}>
+                      {renderCells(row, null)}
                     </tr>
-                  );
-                })
-              )}
+                  ));
+                })()}
             </tbody>
           </table>
         </div>

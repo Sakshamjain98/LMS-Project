@@ -7,6 +7,7 @@ router.get("/", controller.getAll);
 router.get("/:categoryId", controller.getById);
 router.post("/", controller.create);
 router.put("/:categoryId", controller.update);
+router.patch("/reorder", controller.reorder);
 router.delete("/:categoryId", controller.remove);
 
 export default router;
