@@ -17,7 +17,6 @@ import {
   BookOpen,
   GraduationCap,
   Trophy,
-  Receipt,
 } from "lucide-react";
 import logo from "../../assets/icons/logo.png";
 import { getAvailableTests } from "../../services/studentService";
@@ -296,7 +295,6 @@ export default function StudentSidebar() {
             {!collapsed && <span>AITS</span>}
           </NavLink>
           <div className="my-2 h-px bg-white/5" />
-          <SidebarLink to="/student/transactions" icon={Receipt} label="Transactions" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           <SidebarLink to="/student/profile" icon={User} label="Profile" collapsed={collapsed} onClick={() => setMobileOpen(false)} />
         </nav>
 

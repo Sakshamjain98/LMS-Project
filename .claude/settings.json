@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(node scripts/backfillTestTotalMarks.js)",
+      "Bash(node scripts/backfillTestTotalMarks.js --apply)",
+      "Bash(node scripts/backfillAttemptTotalMarks.js)",
+      "Bash(node scripts/backfillAttemptTotalMarks.js --apply)",
+      "Bash(node -e ' *)"
     ]
   }
 }
