@@ -123,10 +123,12 @@ const buildQuestionsFromCsv = (text) => {
     const c = row[cIdx]?.trim();
     const d = row[dIdx]?.trim();
     if (!text || !a || !b) continue;
-    const correctRaw = (row[correctIdx] || "0").toString().trim().toUpperCase();
+    const correctRaw = (row[correctIdx] || "1").toString().trim().toUpperCase();
     let correctOption = parseInt(correctRaw, 10);
     if (Number.isNaN(correctOption)) {
       correctOption = { A: 0, B: 1, C: 2, D: 3 }[correctRaw] ?? 0;
+    } else {
+      correctOption -= 1; // ponytail: CSV correctIndex is 1-4 (matches optionA-D order), stored 0-indexed
     }
     const filledOptions = [a, b, c, d].filter(Boolean);
     if (filledOptions.length < 2) continue;
@@ -613,7 +615,7 @@ function QuestionsTab({ questions, loading, newQ, onNewQChange, onAdd, addingQ, 
           <UploadCloud size={16} className="text-brand-primary" /> Bulk import via CSV
         </h3>
         <p className="mt-1 text-xs text-white/50">
-          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (0–3 or A/B/C/D), marks, explanation, imageUrl</code>
+          Columns: <code className="rounded bg-white/5 px-1 py-0.5">questionText, optionA, optionB, optionC, optionD, correctIndex (1–4 or A/B/C/D), marks, explanation, imageUrl</code>
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
