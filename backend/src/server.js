@@ -2,6 +2,7 @@ import "./config/env.js";
 import app from "./app.js";
 import connectDB from "./config/db.js";
 import { startExpirySweepJob } from "./infrastucture/jobs/expirySweep.job.js";
+import { startPaymentReconcileSweepJob } from "./infrastucture/jobs/paymentReconcileSweep.job.js";
 
 const PORT = process.env.PORT || 4040;
 
@@ -18,6 +19,10 @@ const startServer = async () => {
 
     // Daily subscription/access expiry sweep (keeps stored status accurate).
     startExpirySweepJob();
+
+    // Safety net: catches payments captured at Razorpay whose client callback
+    // or webhook never fulfilled them (closed tab, in-app-browser app-switch).
+    startPaymentReconcileSweepJob();
 
     const shutdown = (signal) => {
       console.log(`${signal} received. Closing server gracefully...`);

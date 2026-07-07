@@ -16,6 +16,8 @@ import TestResult from "./TestResult";
 import PdfPreviewFrame from "../../components/course/PdfPreviewFrame";
 import AccessExpired from "../../components/student/AccessExpired";
 import { formatValidity } from "../../utils/validity";
+import { savePendingOrder, clearPendingOrder } from "../../utils/pendingPayment";
+import { useResumePendingPayment } from "../../hooks/useResumePendingPayment";
 
 const ensureRazorpayLoaded = () =>
   new Promise((resolve, reject) => {
@@ -488,6 +490,7 @@ export default function CourseLearning() {
   }, [courseId, navigate]);
 
   useEffect(() => { load(); }, [load]);
+  useResumePendingPayment("COURSE", courseId, load);
 
   useEffect(() => {
     let active = true;
@@ -536,6 +539,7 @@ export default function CourseLearning() {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
+          clearPendingOrder();
           toast.success("Payment successful! Unlocking your course...");
           await load();
         } catch (err) {
@@ -552,6 +556,11 @@ export default function CourseLearning() {
           razorpay_signature: "mock_signature",
         });
       }
+
+      // Persisted before opening checkout so a lost `handler` callback (closed
+      // tab, UPI app-switch inside an in-app browser) can still be resumed —
+      // see useResumePendingPayment.
+      savePendingOrder({ orderId: order.orderId, kind: "COURSE", refId: courseId });
 
       const rzp = new window.Razorpay({
         key: order.razorpayKeyId,

@@ -35,6 +35,8 @@ import {
 import TestResult from "./TestResult";
 import { formatValidity } from "../../utils/validity";
 import { calculateAccuracy } from "../../utils/scoreUtils";
+import { savePendingOrder, clearPendingOrder } from "../../utils/pendingPayment";
+import { useResumePendingPayment } from "../../hooks/useResumePendingPayment";
 
 const PAGE_SIZE = 8;
 
@@ -150,6 +152,8 @@ export default function StudentTests() {
   };
 
   useEffect(() => { loadData(); }, []);
+  // No specific refId — this page lists many topics, so resume whichever one's pending.
+  useResumePendingPayment("TOPIC", null, loadData);
 
   // Access is purely per-test-series — the platform subscription no longer
   // unlocks individual series, matching the server-side per-topic gating.
@@ -238,6 +242,7 @@ export default function StudentTests() {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
+          clearPendingOrder();
           await loadData();
         } catch (err) {
           setError(err.message || "Payment verification failed.");
@@ -252,6 +257,10 @@ export default function StudentTests() {
           razorpay_signature: "mock_signature",
         });
       }
+      // Persisted before opening checkout so a lost `handler` callback (closed
+      // tab, UPI app-switch inside an in-app browser) can still be resumed —
+      // see useResumePendingPayment.
+      savePendingOrder({ orderId: order.orderId, kind: "TOPIC", refId: topic._id });
       const rzp = new window.Razorpay({
         key: order.razorpayKeyId,
         amount: order.amountInPaise,

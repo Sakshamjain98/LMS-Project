@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAllPayments } from "../../services/adminService";
-import { 
-  IndianRupee, User, Hash, Calendar, Loader2, 
-  CheckCircle2, Clock, AlertCircle, History, Search, Filter 
+import { getAllPayments, forceGrantPayment, deletePendingPayment } from "../../services/adminService";
+import {
+  IndianRupee, User, Hash, Calendar, Loader2,
+  CheckCircle2, Clock, AlertCircle, History, Search, Filter, ShieldAlert, Trash2
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -55,6 +55,53 @@ export default function Payments() {
       toast.error("Failed to load payments");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [grantingId, setGrantingId] = useState(null);
+
+  // Bypass for a stuck PENDING order: skips the Razorpay re-check entirely.
+  // Only use once the payment's been confirmed some other way (bank
+  // statement, Razorpay dashboard, support conversation).
+  const handleForceGrant = async (payment) => {
+    const reason = window.prompt(
+      `Grant access to ${payment.userId?.email || "this user"} WITHOUT checking Razorpay?\n\n` +
+      `This should only be done if you've already confirmed the payment some other way.\n` +
+      `Reason (saved to the audit log):`
+    );
+    if (reason === null) return;
+    setGrantingId(payment._id);
+    try {
+      await forceGrantPayment(payment._id, reason);
+      toast.success("Access granted");
+      fetchPayments();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to grant access");
+    } finally {
+      setGrantingId(null);
+    }
+  };
+
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Only ever offered for PENDING rows (backend enforces this too) — cleans
+  // up an abandoned checkout: deletes the payment, and the user account with
+  // it unless they have some other completed payment.
+  const handleDeletePending = async (payment) => {
+    const ok = window.confirm(
+      `Delete this pending payment for ${payment.userId?.email || "this user"}?\n\n` +
+      `Their account will also be deleted, unless they have another completed payment. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeletingId(payment._id);
+    try {
+      const res = await deletePendingPayment(payment._id);
+      toast.success(res.userDeleted ? "Payment and user deleted" : "Payment deleted (user kept — other completed payments exist)");
+      fetchPayments();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -179,12 +226,13 @@ export default function Payments() {
                 <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">
                   <div className="flex items-center gap-2"><Calendar size={14} /> Date</div>
                 </th>
+                <th className="px-6 py-5 text-xs font-bold text-grayCustom-medium uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-100">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-24 text-center">
+                  <td colSpan="7" className="px-6 py-24 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="animate-spin text-brand-primary" size={32} />
                       <span className="text-grayCustom-medium text-sm font-medium">Filtering records...</span>
@@ -193,7 +241,7 @@ export default function Payments() {
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-20 text-center text-grayCustom-medium font-medium">
+                  <td colSpan="7" className="px-6 py-20 text-center text-grayCustom-medium font-medium">
                     No transactions match your search criteria.
                   </td>
                 </tr>
@@ -231,6 +279,40 @@ export default function Payments() {
                         <span className="block text-[10px] opacity-50 mt-1 uppercase font-bold">
                           {new Date(payment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        {payment.status === "PENDING" && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleForceGrant(payment)}
+                              disabled={grantingId === payment._id || deletingId === payment._id}
+                              title="Grant access without waiting for Razorpay confirmation"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 disabled:opacity-40 transition-colors"
+                            >
+                              {grantingId === payment._id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <ShieldAlert size={12} />
+                              )}
+                              Force Grant
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePending(payment)}
+                              disabled={grantingId === payment._id || deletingId === payment._id}
+                              title="Delete this pending payment and the user's account"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-40 transition-colors"
+                            >
+                              {deletingId === payment._id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={12} />
+                              )}
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

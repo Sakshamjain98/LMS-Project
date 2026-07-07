@@ -37,6 +37,8 @@ router.put("/content/course/:id/approve", requirePermission("courses.publish"), 
 router.delete("/content/course/:id/reject", requirePermission("courses.publish"), controller.rejectCourse); // now soft reject
 router.get("/payments", authorize("superadmin"), controller.payments);
 router.put("/payments/:id/refund", authorize("superadmin"), controller.refund);
+router.put("/payments/:id/force-grant", authorize("superadmin"), controller.forceGrantPayment);
+router.delete("/payments/:id", authorize("superadmin"), controller.deletePendingPayment);
 router.post("/cms/blog", controller.createBlog);
 router.put("/cms/blog/:id", controller.updateBlog);
 router.delete("/cms/blog/:id", controller.deleteBlog);

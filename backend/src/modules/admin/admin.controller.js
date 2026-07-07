@@ -194,6 +194,22 @@ export const refund = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Payment refunded", payment });
 });
 
+export const forceGrantPayment = asyncHandler(async (req, res) => {
+  const result = await service.forceGrantPayment(req.params.id, req.user._id, req.body?.reason);
+  res.json({ success: true, message: "Access granted", ...result });
+});
+
+export const deletePendingPayment = asyncHandler(async (req, res) => {
+  const result = await service.deletePendingPaymentAndUser(req.params.id);
+  res.json({
+    success: true,
+    message: result.userDeleted
+      ? "Payment and user deleted"
+      : "Payment deleted (user kept — they have other completed payments)",
+    ...result,
+  });
+});
+
 // -------------------- Blog Management --------------------
 export const createBlog = asyncHandler(async (req, res) => {
   const blog = await service.createBlog(req.body, req.user._id);

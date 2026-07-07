@@ -764,6 +764,28 @@ export const handleRazorpayWebhook = async (rawBody, signature) => {
   return { handled: false, event: type };
 };
 
+// Client-side resume path: if the checkout `handler` never fired (closed tab,
+// UPI app-switch inside an in-app browser losing its JS context), the
+// frontend calls this on next load/focus with the orderId it stashed before
+// opening checkout. Scoped to the owning user — unlike admin reconcile, this
+// never accepts an arbitrary id from an unrelated caller.
+export const checkAndResumeOrder = async (userId, orderId) => {
+  const payment = await Payment.findOne({ orderId });
+  if (!payment || payment.userId.toString() !== userId.toString()) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "Order not found");
+  }
+  if (payment.status !== "PENDING") {
+    return { fulfilled: true };
+  }
+  try {
+    await reconcilePayment({ orderId });
+    return { fulfilled: true };
+  } catch (err) {
+    if (/not paid yet/.test(err.message)) return { fulfilled: false };
+    throw err;
+  }
+};
+
 // Admin recovery: given a Razorpay paymentId or orderId, confirm it's actually
 // paid at Razorpay, then grant the access it should have. Use this to rescue any
 // payment that was taken but never unlocked (e.g. before the webhook existed).

@@ -27,5 +27,16 @@ export const verifyPayment = async (payload) => {
   }
 };
 
+// Resume path for a checkout whose Razorpay `handler` never fired — asks the
+// backend to re-check this order against Razorpay and fulfill it if paid.
+export const checkPendingOrder = async (orderId) => {
+  try {
+    const res = await api.get(`/payment/status/${orderId}`);
+    return res.data;
+  } catch (err) {
+    throw err?.response?.data || { message: "Failed to check payment status" };
+  }
+};
+
 
 

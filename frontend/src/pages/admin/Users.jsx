@@ -6,6 +6,7 @@ import {
   setTopicAccessDisabled,
   extendCourseAccess,
   extendTopicAccess,
+  deleteUser,
 } from "../../services/adminService";
 import {
   Search,
@@ -17,6 +18,7 @@ import {
   ListChecks,
   CalendarPlus,
   Settings2,
+  Trash2,
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -64,6 +66,11 @@ export default function Users() {
 
   // Active modal: { type: 'content', user }
   const [modal, setModal] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const isSuperadmin = (() => {
+    try { return JSON.parse(localStorage.getItem("user"))?.role === "superadmin"; } catch { return false; }
+  })();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -100,6 +107,26 @@ export default function Users() {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Deleting invalidates their session immediately — the very next request
+  // they make with their existing token gets a 401 and is bounced to /login.
+  const handleDeleteUser = async (user) => {
+    const ok = window.confirm(
+      `Delete ${user.name} (${user.email})?\n\n` +
+      `This removes their account and purchase records permanently and logs them out immediately. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeletingId(user._id);
+    try {
+      await deleteUser(user._id);
+      toast.success("User deleted");
+      fetchUsers();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -235,6 +262,16 @@ export default function Users() {
                         >
                           <Settings2 size={14} /> Manage Access
                         </button>
+                        {isSuperadmin && (
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={deletingId === user._id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all border border-white/10 disabled:opacity-40"
+                            title="Delete this user's account permanently"
+                          >
+                            <Trash2 size={14} /> {deletingId === user._id ? "Deleting…" : "Delete"}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

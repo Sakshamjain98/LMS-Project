@@ -18,6 +18,11 @@ import { STATUS_CODES } from "../../constants/statusCode.js";
 import { comparePassword, hashPassword } from "../../shared/utils/bcrypt.js";
 import { syncMappedSeriesToCourse } from "../courses/courses.service.js";
 import { sanitizePermissions } from "../../constants/permissions.js";
+import {
+  fulfillTopicAccess,
+  fulfillCourseAccess,
+  fulfillSubscriptionByOrderId,
+} from "../payment/payment.service.js";
 
 // -------------------- Admin Creation --------------------
 export const createAdminService = async ({ name, email, password, permissions }) => {
@@ -885,12 +890,73 @@ export const getAllPayments = async (query = {}) => {
   };
 };
 
+// Cleanup for a stuck/abandoned checkout: removes the payment record and,
+// only if this user has no other completed payment, the user account too.
+// Restricted to PENDING so a genuine paying customer's record/account can
+// never be deleted through this path.
+export const deletePendingPaymentAndUser = async (paymentId) => {
+  const payment = await Payment.findById(paymentId);
+  if (!payment) throw new ApiError(STATUS_CODES.NOT_FOUND, "Payment not found");
+  if (payment.status !== "PENDING") {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Only payments with status PENDING can be deleted");
+  }
+
+  const hasOtherCompletedPayments = await Payment.exists({
+    userId: payment.userId,
+    _id: { $ne: payment._id },
+    status: { $in: ["SUCCESS", "PENDING_APPROVAL", "APPROVED"] },
+  });
+
+  await Payment.findByIdAndDelete(paymentId);
+
+  if (hasOtherCompletedPayments) {
+    return { paymentDeleted: true, userDeleted: false };
+  }
+
+  await User.findByIdAndDelete(payment.userId);
+  return { paymentDeleted: true, userDeleted: true };
+};
+
 export const refundPayment = async (paymentId) => {
   const payment = await Payment.findById(paymentId);
   if (!payment) throw new ApiError(STATUS_CODES.NOT_FOUND, "Payment not found");
   payment.status = "REFUNDED";
   await payment.save();
   return payment;
+};
+
+// Last-resort admin override: grants access for a stuck order WITHOUT asking
+// Razorpay to confirm it first (unlike /payment/reconcile). Use only when an
+// admin has independently confirmed the payment (bank statement, Razorpay
+// dashboard, support conversation) and the automated paths couldn't catch it.
+export const forceGrantPayment = async (paymentId, adminId, reason = "") => {
+  const payment = await Payment.findById(paymentId);
+  if (!payment) throw new ApiError(STATUS_CODES.NOT_FOUND, "Payment not found");
+
+  if (payment.status === "SUCCESS") {
+    return { alreadyProcessed: true, payment };
+  }
+
+  const pid = payment.paymentId || `FORCED_${Date.now()}`;
+  if (payment.kind === "TOPIC") {
+    await fulfillTopicAccess(payment.userId, payment.refId, { orderId: payment.orderId, paymentId: pid });
+  } else if (payment.kind === "COURSE") {
+    await fulfillCourseAccess(payment.userId, payment.refId, { orderId: payment.orderId, paymentId: pid });
+  } else {
+    await fulfillSubscriptionByOrderId(payment.orderId, pid);
+  }
+
+  payment.status = "SUCCESS";
+  payment.adminApproved = true;
+  payment.paymentId = pid;
+  payment.verifiedAt = payment.verifiedAt || new Date();
+  payment.approvedAt = new Date();
+  payment.forcedBy = adminId;
+  payment.forcedAt = new Date();
+  payment.forceGrantReason = reason;
+  await payment.save();
+
+  return { success: true, payment };
 };
 
 // -------------------- Blog Management --------------------

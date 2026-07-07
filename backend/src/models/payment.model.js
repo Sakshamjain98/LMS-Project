@@ -61,6 +61,15 @@ const paymentSchema = new mongoose.Schema(
     approvedAt: Date,
     rejectedAt: Date,
     rejectionReason: String,
+    // Set when a superadmin force-grants access without Razorpay confirmation
+    // (e.g. a stuck PENDING order with proof of payment outside the gateway).
+    forcedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    forcedAt: Date,
+    forceGrantReason: String,
   },
   { timestamps: true }
 );

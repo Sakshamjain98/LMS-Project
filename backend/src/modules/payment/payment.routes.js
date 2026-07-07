@@ -28,6 +28,9 @@ router.post("/course/:courseId/order", authMiddleware, authorize("student"), con
 router.post("/course/:courseId/verify", authMiddleware, authorize("student"), controller.verifyCoursePayment);
 router.get("/course/:courseId/access", authMiddleware, authorize("student"), controller.checkCourseAccess);
 
+// Resume path — client re-checks its own pending order after a lost checkout callback.
+router.get("/status/:orderId", authMiddleware, authorize("student"), controller.checkAndResumeOrder);
+
 // Admin routes — payment approval. Superadmin-only: payments are never a
 // grantable admin permission (client requirement — admins must not see payments).
 router.get("/pending-approval", authMiddleware, authorize("superadmin"), controller.getPendingApprovalPayments);

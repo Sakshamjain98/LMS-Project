@@ -21,7 +21,7 @@
     "@react-oauth/google": "^0.13.4",
     "framer-motion": "^12.37.0",
     "lucide-react": "^0.577.0",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "4.7.76",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",

@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "migrate:test-types:pyq": "node scripts/migrateTestTypesToPyq.js"
+    "migrate:test-types:pyq": "node scripts/migrateTestTypesToPyq.js",
+    "reconcile:payments": "node scripts/reconcileStuckPayments.js"
   },
   "author": "",
   "license": "ISC",

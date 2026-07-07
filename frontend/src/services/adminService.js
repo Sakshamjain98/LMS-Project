@@ -105,6 +105,21 @@ export const refundPayment = async (paymentId) => {
   return res.data;
 };
 
+// Bypass: grants access for a stuck order without asking Razorpay to confirm
+// it first. Use only once the payment's been confirmed some other way.
+export const forceGrantPayment = async (paymentId, reason) => {
+  const res = await API.put(`/admin/payments/${paymentId}/force-grant`, { reason });
+  return res.data;
+};
+
+// Cleanup for an abandoned checkout — backend only allows this when the
+// payment's status is PENDING; it keeps the user account if they have any
+// other completed payment.
+export const deletePendingPayment = async (paymentId) => {
+  const res = await API.delete(`/admin/payments/${paymentId}`);
+  return res.data;
+};
+
 // ==================== BLOG MANAGEMENT ====================
 export const createBlog = async (data) => {
   const res = await API.post("/admin/cms/blog", data);

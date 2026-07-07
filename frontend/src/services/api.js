@@ -58,6 +58,15 @@ const request = async (method, url, data, config = {}) => {
     if (!response.ok) {
       const error = new Error(payload?.message || `Request failed with status ${response.status}`);
       error.response = { status: response.status, data: payload };
+      // A 401 on a request that DID carry a token means the session itself is
+      // no longer valid (deleted/disabled account, expired-after-password-
+      // change, bad token) — not just "wrong password" on a login attempt.
+      if (response.status === 401 && token) {
+        localStorage.clear();
+        if (!window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
+      }
       maybeNotify(error, config);
       throw error;
     }

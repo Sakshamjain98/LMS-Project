@@ -28,6 +28,8 @@ import {
 } from "../../services/studentService";
 import TestPlayer from "./TestPlayer";
 import TestResult from "./TestResult";
+import { savePendingOrder, clearPendingOrder } from "../../utils/pendingPayment";
+import { useResumePendingPayment } from "../../hooks/useResumePendingPayment";
 import AccessExpired from "../../components/student/AccessExpired";
 import { formatValidity } from "../../utils/validity";
 
@@ -114,6 +116,7 @@ export default function SeriesDetail() {
     if (view !== "series") return;
     loadData();
   }, [loadData, view]);
+  useResumePendingPayment("TOPIC", topicId, loadData);
 
   // Access is purely per-test-series. The platform subscription no longer
   // unlocks series, so UI matches the server-side per-topic gating.
@@ -262,6 +265,7 @@ export default function SeriesDetail() {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
           });
+          clearPendingOrder();
           await loadData();
         } catch (err) {
           setError(err.message || "Payment verification failed.");
@@ -277,6 +281,11 @@ export default function SeriesDetail() {
           razorpay_signature: "mock_signature",
         });
       }
+
+      // Persisted before opening checkout so a lost `handler` callback (closed
+      // tab, UPI app-switch inside an in-app browser) can still be resumed —
+      // see useResumePendingPayment.
+      savePendingOrder({ orderId: order.orderId, kind: "TOPIC", refId: topic._id });
 
       const rzp = new window.Razorpay({
         key: order.razorpayKeyId,

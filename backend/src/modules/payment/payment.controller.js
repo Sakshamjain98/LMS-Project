@@ -149,6 +149,13 @@ export const checkCourseAccess = asyncHandler(async (req, res) => {
   res.status(STATUS_CODES.SUCCESS).json({ success: true, unlocked });
 });
 
+// Client resume path — re-checks one of the current user's own pending orders
+// against Razorpay in case the checkout `handler` callback never fired.
+export const checkAndResumeOrder = asyncHandler(async (req, res) => {
+  const result = await service.checkAndResumeOrder(req.user._id, req.params.orderId);
+  res.status(STATUS_CODES.SUCCESS).json({ success: true, ...result });
+});
+
 // Razorpay webhook — server-to-server confirmation that unlocks a paid order even
 // when the browser never calls /verify. Mounted with express.raw() in app.js so
 // `req.body` is the raw Buffer needed for HMAC verification. Not wrapped in
