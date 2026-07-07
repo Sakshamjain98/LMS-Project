@@ -195,16 +195,19 @@ export default function AdminTestSeries() {
   }, [params]);
 
   const updateUrl = (next) => {
+    // "in" check, not "??" — callers pass `xId: null` to explicitly clear a
+    // child selection, and `null ?? current` would silently keep `current`.
+    const pick = (key, current) => (key in next ? next[key] : current);
     const sp = new URLSearchParams();
     const merged = {
-      level: next.level ?? level,
-      categoryId: next.categoryId ?? selectedCategoryId,
-      examId: next.examId ?? selectedExamId,
-      topicId: next.topicId ?? selectedTopicId,
-      subjectId: next.subjectId ?? selectedSubjectId,
-      chapterId: next.chapterId ?? selectedChapterId,
-      aitsView: next.aitsView ?? (aitsView ? "1" : undefined),
-      aitsId: next.aitsId ?? selectedAitsId,
+      level: pick("level", level),
+      categoryId: pick("categoryId", selectedCategoryId),
+      examId: pick("examId", selectedExamId),
+      topicId: pick("topicId", selectedTopicId),
+      subjectId: pick("subjectId", selectedSubjectId),
+      chapterId: pick("chapterId", selectedChapterId),
+      aitsView: pick("aitsView", aitsView ? "1" : undefined),
+      aitsId: pick("aitsId", selectedAitsId),
     };
     Object.entries(merged).forEach(([k, v]) => v && sp.set(k, v));
     setParams(sp, { replace: true });
@@ -492,11 +495,11 @@ export default function AdminTestSeries() {
       else updateUrl({ aitsView: undefined, level: "exams" });
       return;
     }
-    if (level === "exams") updateUrl({ level: "categories" });
-    else if (level === "series") updateUrl({ level: "exams" });
-    else if (level === "subjects") updateUrl({ level: "series" });
-    else if (level === "chapters") updateUrl({ level: "subjects" });
-    else if (level === "tests") updateUrl({ level: "chapters" });
+    if (level === "exams") updateUrl({ level: "categories", categoryId: null });
+    else if (level === "series") updateUrl({ level: "exams", examId: null });
+    else if (level === "subjects") updateUrl({ level: "series", topicId: null });
+    else if (level === "chapters") updateUrl({ level: "subjects", subjectId: null });
+    else if (level === "tests") updateUrl({ level: "chapters", chapterId: null });
   };
 
   const canGoBack = level !== "categories" || aitsView;
