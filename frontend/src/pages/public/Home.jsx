@@ -481,7 +481,7 @@ const Home = () => {
                 <FaArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
               <a
-                href="#test-series"
+                href="#courses"
                 className="px-7 py-3.5 bg-dark-200 text-white rounded-lg font-bold text-sm border border-dark-100 hover:border-brand-primary/40 transition inline-flex items-center justify-center gap-2"
               >
                 <FaPlay size={12} />
