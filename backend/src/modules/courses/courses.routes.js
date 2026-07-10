@@ -336,22 +336,26 @@ router.get(
   asyncHandler(async (req, res) => {
     const { noteId } = req.params;
     const note = await svc.getNoteById(noteId);
-
-    if (!["admin", "superadmin", "teacher"].includes(req.user.role)) {
-      const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
-      const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
-      const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
-      const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
-      if (subject) {
-        const { hasAccess } = await svc.checkCourseAccess(req.user._id, subject.courseId);
-        if (!hasAccess) {
-          return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Course access required" });
-        }
-      }
-    }
+    await svc.assertNoteAccess(req.user, note);
     res.json({ success: true, note });
   })
 );
+
+// Shared PDF fetch for preview/download — pulls the raw Cloudinary file
+// server-side so access control is enforced before bytes leave the server.
+async function fetchNotePdf(note) {
+  const response = await fetch(note.fileUrl);
+  if (!response.ok) throw new ApiError(STATUS_CODES.BAD_GATEWAY, "Unable to fetch PDF from storage");
+  return Buffer.from(await response.arrayBuffer());
+}
+
+function safePdfName(note, fallback) {
+  return (
+    String(note.fileName || note.title || fallback)
+      .replace(/["\r\n]/g, "")
+      .replace(/\.pdf$/i, "") + ".pdf"
+  );
+}
 
 // GET /api/courses/notes/:noteId/preview — authenticated in-app PDF preview
 router.get(
@@ -363,40 +367,39 @@ router.get(
     if (note.type !== "pdf" || !note.fileUrl) {
       return res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "PDF preview unavailable" });
     }
+    await svc.assertNoteAccess(req.user, note);
 
-    if (!["admin", "superadmin", "teacher"].includes(req.user.role)) {
-      const CourseChapter = (await import("../../models/courseChapter.model.js")).default;
-      const CourseSubject = (await import("../../models/courseSubject.model.js")).default;
-      const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
-      const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
-      if (subject) {
-        const { hasAccess } = await svc.checkCourseAccess(req.user._id, subject.courseId);
-        if (!hasAccess) {
-          return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Course access required" });
-        }
-      }
-    }
-
-    let pdfBuffer;
-    try {
-      const response = await fetch(note.fileUrl);
-      if (!response.ok) {
-        return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Unable to fetch PDF from storage" });
-      }
-      pdfBuffer = Buffer.from(await response.arrayBuffer());
-    } catch (fetchErr) {
-      return res.status(STATUS_CODES.BAD_GATEWAY).json({ success: false, message: "Failed to retrieve PDF from storage" });
-    }
-
-    const safeName = String(note.fileName || note.title || "preview.pdf")
-      .replace(/["\r\n]/g, "")
-      .replace(/\.pdf$/i, "") + ".pdf";
+    const pdfBuffer = await fetchNotePdf(note);
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${safePdfName(note, "preview.pdf")}"`);
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
+  })
+);
 
+// GET /api/courses/notes/:noteId/download — authenticated PDF download
+router.get(
+  "/notes/:noteId/download",
+  asyncHandler(async (req, res) => {
+    const { noteId } = req.params;
+    const note = await svc.getNoteById(noteId);
+
+    if (note.type !== "pdf" || !note.fileUrl) {
+      return res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "PDF download unavailable" });
+    }
+    if (!note.allowDownload && !["admin", "superadmin", "teacher"].includes(req.user.role)) {
+      return res.status(STATUS_CODES.FORBIDDEN).json({ success: false, message: "Download disabled for this note" });
+    }
+    await svc.assertNoteAccess(req.user, note);
+
+    const pdfBuffer = await fetchNotePdf(note);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safePdfName(note, "download.pdf")}"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
   })
 );

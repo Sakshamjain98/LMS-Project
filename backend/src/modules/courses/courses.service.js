@@ -430,6 +430,17 @@ export async function checkCourseAccess(userId, courseId) {
   return { hasAccess: false, reason: "locked", expiresAt: null };
 }
 
+// Shared gate for note read/preview/download routes: staff bypass, everyone
+// else must have access to the note's parent course (free or purchased).
+export async function assertNoteAccess(user, note) {
+  if (["admin", "superadmin", "teacher"].includes(user.role)) return;
+  const chapter = await CourseChapter.findById(note.chapterId).select("subjectId").lean();
+  const subject = await CourseSubject.findById(chapter?.subjectId).select("courseId").lean();
+  if (!subject) return;
+  const { hasAccess } = await checkCourseAccess(user._id, subject.courseId);
+  if (!hasAccess) throw new ApiError(STATUS_CODES.FORBIDDEN, "Course access required");
+}
+
 // True when `testId` is linked into a course the student currently has access
 // to. This unlocks ONLY that linked test (not the rest of its test series) — the
 // test still requires its own series purchase when reached outside the course.

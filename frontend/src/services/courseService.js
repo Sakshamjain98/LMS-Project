@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { buildApiUrl } from "./api";
 
 // ─── Public (no auth) ────────────────────────────────────────────────────────
 
@@ -213,6 +213,33 @@ export const getNoteById = async (noteId) => {
   } catch (err) {
     throw err?.response?.data || { message: "Failed to fetch note" };
   }
+};
+
+// Binary PDF response — bypasses the JSON-only `api` wrapper, same pattern as
+// PdfPreviewFrame's in-app viewer fetch.
+export const downloadNote = async (noteId, fileName = "note.pdf") => {
+  const token = localStorage.getItem("token");
+  const response = await fetch(buildApiUrl(`/courses/notes/${noteId}/download`), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    let message = "Failed to download note";
+    try {
+      message = (await response.json())?.message || message;
+    } catch {
+      // ignore non-JSON error bodies
+    }
+    throw new Error(message);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 };
 
 // ─── Videos ──────────────────────────────────────────────────────────────────

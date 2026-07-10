@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
-  getCourseFull, getNoteById,
+  getCourseFull, getNoteById, downloadNote,
   markChapterComplete, unmarkChapterComplete, getCourseProgress,
   createCourseOrder, verifyCoursePayment,
 } from "../../services/courseService";
@@ -72,6 +72,40 @@ function YouTubePlayer({ youtubeId }) {
   );
 }
 
+// ─── Download Note Button ─────────────────────────────────────────────────────
+// NotesSection only renders once course access is already granted (free or
+// purchased) — see the access gate around ContentArea — so the only gate left
+// here is the note's own `allowDownload` flag.
+
+function DownloadNoteButton({ note, className, iconOnly = false }) {
+  const [downloading, setDownloading] = useState(false);
+  if (!note?.allowDownload) return null;
+
+  const handleDownload = async (e) => {
+    e.stopPropagation();
+    setDownloading(true);
+    try {
+      await downloadNote(note._id, `${note.title || "note"}.pdf`);
+    } catch (err) {
+      toast.error(err?.message || "Failed to download note");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={downloading}
+      aria-label={`Download ${note.title}`}
+      className={className}
+    >
+      {downloading ? <Loader2 size={iconOnly ? 12 : 14} className="animate-spin" /> : <Download size={iconOnly ? 12 : 14} />}
+      {!iconOnly && (downloading ? "Downloading..." : "Download")}
+    </button>
+  );
+}
+
 // ─── Rich Text Note Viewer ────────────────────────────────────────────────────
 
 function RichTextNote({ noteId }) {
@@ -104,8 +138,14 @@ function RichTextNote({ noteId }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-base text-white">{note.title}</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-bold text-base text-white truncate">{note.title}</h3>
+        {note.type === "pdf" && (
+          <DownloadNoteButton
+            note={note}
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50"
+          />
+        )}
       </div>
       {note.type === "rich_text" && note.content ? (
         <div className="quill-content rounded-2xl border border-white/5 bg-white/2 p-6"
@@ -132,9 +172,15 @@ function PdfPreviewModal({ note, onClose }) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/35">PDF Preview</p>
             <h3 className="truncate text-base font-bold text-white">{note.title}</h3>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <DownloadNoteButton
+              note={note}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50"
+            />
+            <button onClick={onClose} className="rounded-lg p-1.5 text-white/45 hover:bg-white/5 hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
         </div>
         <PdfPreviewFrame noteId={note._id} title={note.title} className="bg-white" />
       </div>
@@ -229,13 +275,20 @@ function NotesSection({ chapter }) {
                   <span className="flex-1 truncate">{note.title}</span>
                 </button>
                 {note.type === "pdf" && (
-                  <button
-                    onClick={() => setPreviewNote(note)}
-                    className="shrink-0 rounded-lg p-1 text-white/45 hover:bg-white/5 hover:text-white"
-                    aria-label={`Preview ${note.title}`}
-                  >
-                    <Eye size={12} />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setPreviewNote(note)}
+                      className="shrink-0 rounded-lg p-1 text-white/45 hover:bg-white/5 hover:text-white"
+                      aria-label={`Preview ${note.title}`}
+                    >
+                      <Eye size={12} />
+                    </button>
+                    <DownloadNoteButton
+                      note={note}
+                      iconOnly
+                      className="shrink-0 rounded-lg p-1 text-white/45 hover:bg-white/5 hover:text-white disabled:opacity-50"
+                    />
+                  </>
                 )}
               </div>
             ))}
