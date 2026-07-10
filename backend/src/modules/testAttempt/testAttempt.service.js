@@ -348,22 +348,22 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   }
 
   const test = await Test.findById(attempt.testId).lean();
-  const questions = await Question.find({ testId: attempt.testId }).lean();
+  // Fetch by test.questions (same source startTest used to decide what the
+  // student was shown), not by Question.testId — those two can drift apart
+  // (edits/reorders/question-bank clones), and scoring against a different
+  // question set than the one the student answered makes every answer fail
+  // to match, so the whole attempt reads as skipped with a zero score.
+  const questions = await Question.find({ _id: { $in: test.questions } }).lean();
 
-  // Auto-evaluate
-  const questionMap = new Map(questions.map((q) => [q._id.toString(), q]));
-
-  // The client always sends its full current answers state (TestPlayer keeps
-  // every selected/cleared answer in local state and submits that whole array,
-  // on manual submit and both auto-submit paths alike) — so a question absent
-  // from it means the student cleared or never answered it, not "unchanged".
-  // Only fall back to the previously-synced answer when the request has no
-  // `answers` field at all (legacy/malformed payload); a real empty/partial
-  // array must never be topped up from savedAnswerMap, or a cleared answer
-  // would be rescored from its stale pre-clear value (incl. negative marking
-  // on a question the student meant to leave skipped).
-  const hasRequestAnswers = Array.isArray(answersData?.answers);
-  const requestAnswers = hasRequestAnswers ? answersData.answers : [];
+  // `answersData.answers` can be partial/empty (auto-submit scenarios, or the
+  // client's final payload just not round-tripping fully) — attempt.answers,
+  // kept current by each in-flight submitAnswer call, is the reliable ground
+  // truth, so a question missing from the request falls back to it. Clearing
+  // a response calls submitAnswer with selectedOptionIndex: null (TestPlayer's
+  // handleClearResponse), which keeps that fallback accurate for a cleared
+  // question too — it lands here as an explicit null (skipped), never a stale
+  // pre-clear value.
+  const requestAnswers = Array.isArray(answersData?.answers) ? answersData.answers : [];
   const requestAnswerMap = new Map(
     requestAnswers
       .filter((answer) => answer?.questionId)
@@ -379,7 +379,7 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   attempt.answers = questions.map((question) => {
     const questionId = question._id.toString();
     const requestAnswer = requestAnswerMap.get(questionId);
-    const savedAnswer = hasRequestAnswers ? undefined : savedAnswerMap.get(questionId);
+    const savedAnswer = savedAnswerMap.get(questionId);
     const mergedAnswer = requestAnswer || savedAnswer || {};
 
     const rawIndex =
