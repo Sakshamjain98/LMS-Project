@@ -1,5 +1,16 @@
 import API from "./api";
 
+// Triggers a browser download for CSV text returned by an export endpoint.
+const downloadCsv = (csvText, filename) => {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 // ==================== DASHBOARD ====================
 export const getAdminDashboard = async () => {
   const res = await API.get("/admin/dashboard");
@@ -20,6 +31,12 @@ export const updateUserRole = async (userId, role) => {
 export const deleteUser = async (userId) => {
   const res = await API.delete(`/admin/users/${userId}`);
   return res.data;
+};
+
+// Downloads a CSV of every user matching the given filters (same params as getAllUsers).
+export const exportUsers = async (params = {}) => {
+  const res = await API.get("/admin/users/export", { params, timeout: 30000 });
+  downloadCsv(res.data, `users-export-${Date.now()}.csv`);
 };
 
 // ==================== USER SUBSCRIPTION / ACCESS ====================
@@ -103,6 +120,13 @@ export const getAllPayments = async (params = {}) => {
 export const refundPayment = async (paymentId) => {
   const res = await API.put(`/admin/payments/${paymentId}/refund`);
   return res.data;
+};
+
+// Downloads a CSV of every payment matching the given filters (same params as
+// getAllPayments) — pass { forced: "true" } to export only force-granted payments.
+export const exportPayments = async (params = {}) => {
+  const res = await API.get("/admin/payments/export", { params, timeout: 30000 });
+  downloadCsv(res.data, `payments-export-${Date.now()}.csv`);
 };
 
 // Bypass: grants access for a stuck order without asking Razorpay to confirm

@@ -18,6 +18,7 @@ import { STATUS_CODES } from "../../constants/statusCode.js";
 import { comparePassword, hashPassword } from "../../shared/utils/bcrypt.js";
 import { syncMappedSeriesToCourse } from "../courses/courses.service.js";
 import { sanitizePermissions } from "../../constants/permissions.js";
+import { toCsv } from "../../shared/utils/csv.util.js";
 import {
   fulfillTopicAccess,
   fulfillCourseAccess,
@@ -243,6 +244,7 @@ export const getAdminDashboard = async () => {
     pendingTeachers,
     pendingComments,
     totalNews,
+    forcedAccessCount,
   ] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ role: "student" }),
@@ -257,6 +259,8 @@ export const getAdminDashboard = async () => {
     User.countDocuments({ role: "teacher", isApproved: false }),
     Comment.countDocuments({ approved: false }),
     News.countDocuments(),
+    // Payments a superadmin granted directly, bypassing Razorpay confirmation.
+    Payment.countDocuments({ forcedBy: { $ne: null } }),
   ]);
 
   return {
@@ -270,6 +274,7 @@ export const getAdminDashboard = async () => {
     pendingTeachers,
     pendingComments,
     totalNews,
+    forcedAccessCount,
   };
 };
 
@@ -366,11 +371,10 @@ const aggregateAccessCounts = async (model, ids, dateField, now) => {
   return new Map(rows.map((r) => [String(r._id), r]));
 };
 
-export const getAllUsers = async (query) => {
+// Builds the Mongo filter shared by getAllUsers (paginated) and exportUsersCsv
+// (unpaginated) so the two never drift out of sync.
+const buildUserFilter = async (query = {}) => {
   const { role, search, subStatus, expiringInDays, purchasedWithinMonths } = query;
-  const page = Math.max(parseInt(query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
-  const skip = (page - 1) * limit;
   const now = new Date();
 
   const userFilter = {};
@@ -429,24 +433,18 @@ export const getAllUsers = async (query) => {
     userFilter._id = { $in: [...result] };
   }
 
-  const [users, total] = await Promise.all([
-    User.find(userFilter)
-      .select("name email role isApproved createdAt")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-    User.countDocuments(userFilter),
-  ]);
+  return userFilter;
+};
 
-  // Enrich the page with per-item purchase counts + last purchase date.
+// Per-item purchase counts + last purchase date for a set of users.
+const enrichUsersWithAccessCounts = async (users, now) => {
   const ids = users.map((u) => u._id);
   const [courseCounts, topicCounts] = await Promise.all([
     aggregateAccessCounts(CourseAccess, ids, "purchasedAt", now),
     aggregateAccessCounts(TopicAccess, ids, "createdAt", now),
   ]);
 
-  const enriched = users.map((u) => {
+  return users.map((u) => {
     const c = courseCounts.get(String(u._id)) || { total: 0, active: 0, expired: 0, last: null };
     const t = topicCounts.get(String(u._id)) || { total: 0, active: 0, expired: 0, last: null };
     const lastDates = [c.last, t.last].filter(Boolean).map((d) => new Date(d).getTime());
@@ -459,6 +457,26 @@ export const getAllUsers = async (query) => {
       lastPurchaseDate: lastDates.length ? new Date(Math.max(...lastDates)) : null,
     };
   });
+};
+
+export const getAllUsers = async (query) => {
+  const page = Math.max(parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
+  const skip = (page - 1) * limit;
+  const now = new Date();
+  const userFilter = await buildUserFilter(query);
+
+  const [users, total] = await Promise.all([
+    User.find(userFilter)
+      .select("name email role isApproved createdAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    User.countDocuments(userFilter),
+  ]);
+
+  const enriched = await enrichUsersWithAccessCounts(users, now);
 
   return {
     users: enriched,
@@ -471,6 +489,35 @@ export const getAllUsers = async (query) => {
       hasPrevPage: page > 1,
     },
   };
+};
+
+// CSV export of every user matching the same filters as getAllUsers, unpaginated.
+export const exportUsersCsv = async (query = {}) => {
+  const userFilter = await buildUserFilter(query);
+  const now = new Date();
+
+  const users = await User.find(userFilter)
+    .select("name email role isApproved createdAt")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const enriched = await enrichUsersWithAccessCounts(users, now);
+
+  return toCsv(enriched, [
+    { header: "Name", key: "name" },
+    { header: "Email", key: "email" },
+    { header: "Role", key: "role" },
+    { header: "Approved", value: (u) => (u.isApproved ? "YES" : "NO") },
+    { header: "Purchased Courses", key: "purchasedCoursesCount" },
+    { header: "Purchased Test Series", key: "purchasedTestSeriesCount" },
+    { header: "Active Subscriptions", key: "activeSubscriptions" },
+    { header: "Expired Subscriptions", key: "expiredSubscriptions" },
+    {
+      header: "Last Purchase Date",
+      value: (u) => (u.lastPurchaseDate ? new Date(u.lastPurchaseDate).toISOString() : ""),
+    },
+    { header: "Joined", value: (u) => new Date(u.createdAt).toISOString() },
+  ]);
 };
 
 export const getUserSubscriptionDetail = async (userId) => {
@@ -836,16 +883,20 @@ export const restoreCourse = async (courseId) => {
 };
 
 // -------------------- Payment Management --------------------
-export const getAllPayments = async (query = {}) => {
-  const page = Math.max(parseInt(query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
-  const skip = (page - 1) * limit;
+// Builds the Mongo filter shared by getAllPayments (paginated) and
+// exportPaymentsCsv (unpaginated) so the two never drift out of sync.
+const buildPaymentFilter = async (query = {}) => {
   const status = query.status?.trim();
   const search = query.search?.trim();
+  const forcedOnly = query.forced === "true" || query.forced === true;
 
   const filter = {};
   if (status) {
     filter.status = status;
+  }
+  // Payments a superadmin granted directly, bypassing Razorpay confirmation.
+  if (forcedOnly) {
+    filter.forcedBy = { $ne: null };
   }
 
   if (search) {
@@ -866,6 +917,15 @@ export const getAllPayments = async (query = {}) => {
       { paymentId: { $regex: search, $options: "i" } },
     ];
   }
+
+  return filter;
+};
+
+export const getAllPayments = async (query = {}) => {
+  const page = Math.max(parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
+  const skip = (page - 1) * limit;
+  const filter = await buildPaymentFilter(query);
 
   const [payments, total] = await Promise.all([
     Payment.find(filter)
@@ -888,6 +948,40 @@ export const getAllPayments = async (query = {}) => {
       hasPrevPage: page > 1,
     },
   };
+};
+
+// CSV export of every payment matching the same filters as getAllPayments,
+// unpaginated — includes the financial + force-grant audit fields the admin
+// table doesn't show (pass { forced: "true" } to export forced-access only).
+export const exportPaymentsCsv = async (query = {}) => {
+  const filter = await buildPaymentFilter(query);
+  const payments = await Payment.find(filter)
+    .populate("userId", "name email")
+    .populate("forcedBy", "name email")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return toCsv(payments, [
+    { header: "Order ID", key: "orderId" },
+    { header: "Payment ID", key: "paymentId" },
+    { header: "Customer Name", value: (p) => p.userId?.name || "" },
+    { header: "Customer Email", value: (p) => p.userId?.email || "" },
+    { header: "Kind", key: "kind" },
+    { header: "Plan", value: (p) => p.plan || "" },
+    { header: "Description", key: "description" },
+    { header: "Amount", key: "amount" },
+    { header: "Currency", key: "currency" },
+    { header: "Status", key: "status" },
+    { header: "Forced Access", value: (p) => (p.forcedBy ? "YES" : "NO") },
+    { header: "Forced By", value: (p) => p.forcedBy?.name || p.forcedBy?.email || "" },
+    { header: "Force Grant Reason", value: (p) => p.forceGrantReason || "" },
+    {
+      header: "Refunded At",
+      value: (p) => (p.refundedAt ? new Date(p.refundedAt).toISOString() : ""),
+    },
+    { header: "Refund Reason", value: (p) => p.refundReason || "" },
+    { header: "Created At", value: (p) => new Date(p.createdAt).toISOString() },
+  ]);
 };
 
 // Cleanup for a stuck/abandoned checkout: removes the payment record and,

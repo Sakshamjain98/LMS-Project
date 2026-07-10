@@ -225,9 +225,19 @@ export default function TestPlayer({ attemptData, onFinish, onExit }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [isPausedForFullscreen, showSubmitConfirm, currentIndex, currentQuestion, goToQuestion, handleOptionSelect]);
 
-  const handleClearResponse = () => {
+  const handleClearResponse = async () => {
     if (isPausedForFullscreen) return;
     setAnswers((prev) => prev.filter((a) => a.questionId !== currentQuestion._id));
+    // Sync the clear to the server too — otherwise the previously selected
+    // option stays in attempt.answers and comes back (scored as wrong) if
+    // the attempt is resumed after a refresh, e.g. before the final submit.
+    try {
+      await submitAnswer(attempt._id, {
+        questionId: currentQuestion._id,
+        selectedOptionIndex: null,
+        timeTaken: 0,
+      });
+    } catch (err) { console.error("Failed to sync cleared answer:", err); }
   };
 
   const toggleMarkForReview = () => {

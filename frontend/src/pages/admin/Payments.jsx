@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAllPayments, forceGrantPayment, deletePendingPayment } from "../../services/adminService";
+import { getAllPayments, forceGrantPayment, deletePendingPayment, exportPayments } from "../../services/adminService";
 import {
   IndianRupee, User, Hash, Calendar, Loader2,
-  CheckCircle2, Clock, AlertCircle, History, Search, Filter, ShieldAlert, Trash2
+  CheckCircle2, Clock, AlertCircle, History, Search, Filter, ShieldAlert, Trash2, Download
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function Payments() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: "", search: "" });
+  const [exporting, setExporting] = useState(false);
+  const [filters, setFilters] = useState({ status: "", search: "", forced: false });
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -33,12 +34,12 @@ export default function Payments() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.status, limit]);
+  }, [filters.status, filters.forced, limit]);
 
   useEffect(() => {
     fetchPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.status, debouncedSearch, page, limit]);
+  }, [filters.status, filters.forced, debouncedSearch, page, limit]);
 
   const fetchPayments = async () => {
     try {
@@ -46,6 +47,7 @@ export default function Payments() {
       const res = await getAllPayments({
         status: filters.status,
         search: debouncedSearch,
+        forced: filters.forced || undefined,
         page,
         limit,
       });
@@ -55,6 +57,24 @@ export default function Payments() {
       toast.error("Failed to load payments");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Exports whatever is currently filtered — e.g. check "Forced access only"
+  // first to download just the force-granted payments.
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportPayments({
+        status: filters.status,
+        search: debouncedSearch,
+        forced: filters.forced || undefined,
+      });
+      toast.success("Payments exported");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to export payments");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -135,14 +155,26 @@ export default function Payments() {
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Transaction History</h1>
           <p className="text-grayCustom-medium mt-1 text-sm font-medium">Detailed log of all platform financial activities.</p>
         </div>
-        <div className="flex items-center gap-3 bg-dark-200 border border-dark-100 p-4 rounded-2xl shadow-lg">
-          <div className="p-2 bg-brand-primary/10 rounded-lg">
-            <IndianRupee className="text-brand-primary w-5 h-5" />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 bg-dark-200 border border-dark-100 p-4 rounded-2xl shadow-lg">
+            <div className="p-2 bg-brand-primary/10 rounded-lg">
+              <IndianRupee className="text-brand-primary w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-widest leading-none">Total Logs</p>
+              <p className="text-xl font-bold text-white">{pagination.total || 0}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-grayCustom-medium uppercase tracking-widest leading-none">Total Logs</p>
-            <p className="text-xl font-bold text-white">{pagination.total || 0}</p>
-          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            title="Download the currently filtered payments as CSV, with financial details"
+            className="inline-flex items-center gap-2 h-full px-4 py-2.5 rounded-xl bg-brand-primary/10 text-brand-primary text-xs font-bold uppercase tracking-wide hover:bg-brand-primary/20 disabled:opacity-40 transition-colors"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {exporting ? "Exporting" : "Download Excel"}
+          </button>
         </div>
       </div>
 
@@ -173,6 +205,18 @@ export default function Payments() {
             <option value="REFUNDED">Refunded</option>
           </select>
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer bg-dark-300 border border-dark-100 px-4 py-2.5 rounded-xl text-sm">
+          <input
+            type="checkbox"
+            checked={filters.forced}
+            onChange={(e) => setFilters({ ...filters, forced: e.target.checked })}
+            className="accent-brand-primary w-4 h-4"
+          />
+          <span className="flex items-center gap-1.5 text-white/80 font-semibold">
+            <ShieldAlert size={14} className="text-yellow-500" /> Forced access only
+          </span>
+        </label>
       </div>
 
       <div className="border-t border-white/10 px-4 py-3 flex flex-col gap-3 bg-dark-300/30 sm:flex-row sm:items-center sm:justify-between rounded-xl">

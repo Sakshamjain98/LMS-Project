@@ -5,11 +5,13 @@ import {
   getRevenueAnalytics,
   getAllPayments,
   getAllUsers,
+  exportPayments,
 } from "../../services/adminService";
 import { getTeacherTestSeries } from "../../services/teacherService";
 import {
   Users, IndianRupee, Layers, Newspaper, PenSquare, CreditCard,
   ArrowUpRight, RefreshCw, TrendingUp, Sparkles, Activity, Clock, ChevronRight,
+  ShieldAlert, Download,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -87,6 +89,7 @@ export default function Dashboard() {
   const [period, setPeriod] = useState("30d");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchAll = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -154,6 +157,23 @@ export default function Dashboard() {
     try { return JSON.parse(localStorage.getItem("user") || "{}")?.name || "Admin"; } catch { return "Admin"; }
   }, []);
 
+  // Payment export is superadmin-only on the backend (same as the payments list).
+  const isSuperadmin = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}")?.role === "superadmin"; } catch { return false; }
+  }, []);
+
+  const onExportPayments = async () => {
+    setExporting(true);
+    try {
+      await exportPayments();
+      toast.success("Payments report downloaded");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to export payments");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Hero */}
@@ -182,6 +202,17 @@ export default function Dashboard() {
               <option value="30d">Last 30 days</option>
               <option value="90d">Last 90 days</option>
             </select>
+            {isSuperadmin && (
+              <button
+                onClick={onExportPayments}
+                disabled={exporting}
+                title="Download all payments with financial details as CSV"
+                className="inline-flex items-center gap-2 rounded-xl glass-pill px-4 py-2 text-xs font-bold text-white/80 disabled:opacity-50"
+              >
+                <Download size={14} className={exporting ? "animate-pulse" : ""} />
+                {exporting ? "Exporting" : "Download Report"}
+              </button>
+            )}
             <button
               onClick={onRefresh}
               disabled={refreshing}
@@ -195,9 +226,9 @@ export default function Dashboard() {
       </motion.div>
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {loading ? (
-          [...Array(4)].map((_, i) => <SkeletonCard key={i} />)
+          [...Array(5)].map((_, i) => <SkeletonCard key={i} />)
         ) : (
           <>
             <KpiCard
@@ -224,6 +255,13 @@ export default function Dashboard() {
               icon={CreditCard}
               label="Pending Payments"
               value={(recentPayments.filter((p) => p.status === "PENDING").length).toLocaleString()}
+              to="/admin/payments"
+            />
+            <KpiCard
+              icon={ShieldAlert}
+              label="Forced Access"
+              value={(stats?.forcedAccessCount || 0).toLocaleString()}
+              accent="accent"
               to="/admin/payments"
             />
           </>

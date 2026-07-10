@@ -20,6 +20,7 @@ router.put("/profile", controller.updateAdminProfile);
 router.put("/change-password", controller.changeAdminPassword);
 router.get("/dashboard", controller.dashboard);
 router.get("/users", requirePermission("users.view"), controller.users);
+router.get("/users/export", requirePermission("users.view"), controller.exportUsers);
 router.put("/users/:id/role", authorize("superadmin"), controller.updateRole);
 router.get("/users/:id/subscription", requirePermission("users.view"), controller.userSubscription);
 router.post("/users/:id/subscription/disable", requirePermission("users.suspend"), controller.disableUserAccess);
@@ -36,6 +37,7 @@ router.get("/content/pending", requirePermission("courses.publish"), controller.
 router.put("/content/course/:id/approve", requirePermission("courses.publish"), controller.approveCourse);
 router.delete("/content/course/:id/reject", requirePermission("courses.publish"), controller.rejectCourse); // now soft reject
 router.get("/payments", authorize("superadmin"), controller.payments);
+router.get("/payments/export", authorize("superadmin"), controller.exportPayments);
 router.put("/payments/:id/refund", authorize("superadmin"), controller.refund);
 router.put("/payments/:id/force-grant", authorize("superadmin"), controller.forceGrantPayment);
 router.delete("/payments/:id", authorize("superadmin"), controller.deletePendingPayment);

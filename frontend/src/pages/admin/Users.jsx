@@ -7,6 +7,7 @@ import {
   extendCourseAccess,
   extendTopicAccess,
   deleteUser,
+  exportUsers,
 } from "../../services/adminService";
 import {
   Search,
@@ -20,6 +21,8 @@ import {
   Settings2,
   Trash2,
   X,
+  Download,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -67,6 +70,7 @@ export default function Users() {
   // Active modal: { type: 'content', user }
   const [modal, setModal] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const isSuperadmin = (() => {
     try { return JSON.parse(localStorage.getItem("user"))?.role === "superadmin"; } catch { return false; }
@@ -130,6 +134,25 @@ export default function Users() {
     }
   };
 
+  // Exports whatever is currently filtered/searched.
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportUsers({
+        role: "student",
+        search: debouncedSearch,
+        subStatus: filters.subStatus || undefined,
+        expiringInDays: filters.expiringInDays || undefined,
+        purchasedWithinMonths: filters.purchasedWithinMonths || undefined,
+      });
+      toast.success("Users exported");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to export users");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -143,8 +166,20 @@ export default function Users() {
             Per-course and per-test-series access. Extend, reactivate, or revoke purchases without deleting accounts.
           </p>
         </div>
-        <div className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md text-sm text-gray-300">
-          Total Students: <span className="text-white font-bold">{pagination.total || 0}</span>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md text-sm text-gray-300">
+            Total Students: <span className="text-white font-bold">{pagination.total || 0}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            title="Download the currently filtered students as CSV"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-primary/10 text-brand-primary text-xs font-bold uppercase tracking-wide hover:bg-brand-primary/20 disabled:opacity-40 transition-colors"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {exporting ? "Exporting" : "Download Excel"}
+          </button>
         </div>
       </div>
 

@@ -68,6 +68,13 @@ export const users = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result });
 });
 
+export const exportUsers = asyncHandler(async (req, res) => {
+  const csv = await service.exportUsersCsv(req.query);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="users-export.csv"`);
+  res.send(csv);
+});
+
 export const updateRole = asyncHandler(async (req, res) => {
   const user = await service.updateUserRole(req.params.id, req.body.role);
   res.json({ success: true, message: "User role updated", user });
@@ -187,6 +194,13 @@ export const rejectCourse = asyncHandler(async (req, res) => {
 export const payments = asyncHandler(async (req, res) => {
   const result = await service.getAllPayments(req.query);
   res.json({ success: true, ...result });
+});
+
+export const exportPayments = asyncHandler(async (req, res) => {
+  const csv = await service.exportPaymentsCsv(req.query);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="payments-export.csv"`);
+  res.send(csv);
 });
 
 export const refund = asyncHandler(async (req, res) => {

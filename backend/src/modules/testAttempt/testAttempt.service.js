@@ -353,9 +353,17 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   // Auto-evaluate
   const questionMap = new Map(questions.map((q) => [q._id.toString(), q]));
 
-  // `answersData.answers` can be partial/empty in auto-submit scenarios.
-  // Merge request answers with already saved attempt answers to avoid losing analytics.
-  const requestAnswers = Array.isArray(answersData?.answers) ? answersData.answers : [];
+  // The client always sends its full current answers state (TestPlayer keeps
+  // every selected/cleared answer in local state and submits that whole array,
+  // on manual submit and both auto-submit paths alike) — so a question absent
+  // from it means the student cleared or never answered it, not "unchanged".
+  // Only fall back to the previously-synced answer when the request has no
+  // `answers` field at all (legacy/malformed payload); a real empty/partial
+  // array must never be topped up from savedAnswerMap, or a cleared answer
+  // would be rescored from its stale pre-clear value (incl. negative marking
+  // on a question the student meant to leave skipped).
+  const hasRequestAnswers = Array.isArray(answersData?.answers);
+  const requestAnswers = hasRequestAnswers ? answersData.answers : [];
   const requestAnswerMap = new Map(
     requestAnswers
       .filter((answer) => answer?.questionId)
@@ -371,7 +379,7 @@ export const submitTest = async (attemptId, answersData, studentId) => {
   attempt.answers = questions.map((question) => {
     const questionId = question._id.toString();
     const requestAnswer = requestAnswerMap.get(questionId);
-    const savedAnswer = savedAnswerMap.get(questionId);
+    const savedAnswer = hasRequestAnswers ? undefined : savedAnswerMap.get(questionId);
     const mergedAnswer = requestAnswer || savedAnswer || {};
 
     const rawIndex =
