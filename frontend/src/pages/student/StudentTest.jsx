@@ -578,7 +578,12 @@ function SeriesAndAITSTable({ items, totalCount, isUnlocked, unlockingId, onUnlo
                         )}
                         {item.isPaid && !isAits && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-primary/90">
-                            <Clock size={9} /> {formatValidity(item.validityMonths)}
+                            <Clock size={9} />{" "}
+                            {unlocked
+                              ? item.accessExpiresAt
+                                ? `Valid until ${new Date(item.accessExpiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`
+                                : "Lifetime access"
+                              : formatValidity(item.validityMonths)}
                           </span>
                         )}
                       </div>

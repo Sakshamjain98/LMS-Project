@@ -381,7 +381,12 @@ export default function SeriesDetail() {
                       )}
                       {topic.isPaid && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-3 py-1 text-[11px] font-bold text-brand-primary">
-                          <Clock size={11} /> {formatValidity(topic.validityMonths)}
+                          <Clock size={11} />{" "}
+                          {isUnlocked
+                            ? topic.accessExpiresAt
+                              ? `Valid until ${new Date(topic.accessExpiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`
+                              : "Lifetime access"
+                            : formatValidity(topic.validityMonths)}
                         </span>
                       )}
                       {!isUnlocked && (
