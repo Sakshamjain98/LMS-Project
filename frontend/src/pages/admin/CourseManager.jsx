@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
-  BookOpen, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, Check, X,
+  BookOpen, Plus, ChevronRight, Trash2, Pencil, Check, X,
   FileText, Video, Link2, Loader2, Upload, Eye, GripVertical,
   GraduationCap, Folder, Layers, Tag, Search, IndianRupee, Globe, EyeOff,
 } from "lucide-react";
@@ -56,8 +56,6 @@ const ICON_COLOR = {
   chapters: "text-amber-400",
 };
 
-const PAGE_SIZE = 10;
-
 // ─── Shared field styles ──────────────────────────────────────────────────────
 
 const fi = "w-full rounded-xl border border-white/10 bg-dark-300 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-brand-primary focus:outline-none transition-colors";
@@ -72,37 +70,6 @@ function FieldLabel({ label, hint, required, children }) {
       </label>
       {children}
       {hint && <p className="text-[11px] text-white/40">{hint}</p>}
-    </div>
-  );
-}
-
-function PaginationBar({ page, totalPages, totalCount, pageSize, onChange }) {
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalCount);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/60">
-      <span>
-        Showing <span className="font-bold text-white">{start}</span>–
-        <span className="font-bold text-white">{end}</span> of{" "}
-        <span className="font-bold text-white">{totalCount}</span>
-      </span>
-      <div className="flex items-center gap-2">
-        <button
-          disabled={page <= 1}
-          onClick={() => onChange(page - 1)}
-          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
-        >
-          <ChevronLeft size={12} /> Prev
-        </button>
-        <span className="px-2 font-semibold text-white">{page} / {totalPages}</span>
-        <button
-          disabled={page >= totalPages}
-          onClick={() => onChange(page + 1)}
-          className="inline-flex items-center gap-1 rounded-lg glass-pill px-3 py-1.5 font-semibold disabled:opacity-30"
-        >
-          Next <ChevronRight size={12} />
-        </button>
-      </div>
     </div>
   );
 }
@@ -1124,7 +1091,6 @@ export default function CourseManager() {
   const [selectedChapterId, setSelectedChapterId] = useState(params.get("chapterId") || null);
 
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
 
   const [courseModal, setCourseModal] = useState(null);
   const [entityModal, setEntityModal] = useState({ isOpen: false, mode: "create", editData: null });
@@ -1252,14 +1218,6 @@ export default function CourseManager() {
     return q ? rows.filter((r) => (r.title || "").toLowerCase().includes(q)) : rows;
   }, [search, level, hierarchy, selectedCategory, selectedExam, fullCourseTree, selectedSubject, selectedChapterId]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const paginatedRows = useMemo(
-    () => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredRows, page]
-  );
-
-  useEffect(() => { setPage(1); }, [search, level, selectedCategoryId, selectedExamId, selectedCourseId, selectedSubjectId, selectedChapterId]);
-
   // ── Navigation ────────────────────────────────────────────────────────────────
 
   const handleRowSelect = (row) => {
@@ -1289,15 +1247,16 @@ export default function CourseManager() {
 
   const canGoBack = level !== "categories" || isContentLevel;
 
-  // Drag-and-drop reorder for courses/subjects/chapters — only when the full
-  // list fits on one unfiltered page, so index positions map 1:1 to
-  // `filteredRows`. Categories/exams are read-only here (managed in
+  // Drag-and-drop reorder for courses/subjects/chapters. Disabled while a
+  // search filter is active, since filtering hides rows and `onReorder`
+  // always submits the complete list back to the backend (which requires an
+  // exact-match id set for the scope) — a filtered submit would drop the
+  // hidden rows. Categories/exams are read-only here (managed in
   // TestSeries.jsx, the shared owner of those two levels).
   const canReorder =
     ["courses", "subjects", "chapters"].includes(level) &&
     !isContentLevel &&
-    !search.trim() &&
-    totalPages <= 1;
+    !search.trim();
 
   const handleReordered = async (reordered) => {
     if (level === "courses") {
@@ -1728,8 +1687,8 @@ export default function CourseManager() {
                       if (canReorder) {
                         return (
                           <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                            <SortableContext items={paginatedRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
-                              {paginatedRows.map((row) => (
+                            <SortableContext items={filteredRows.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                              {filteredRows.map((row) => (
                                 <SortableRow key={row._id} id={row._id} className="transition-colors hover:bg-white/4">
                                   {({ attributes, listeners }) => renderCells(row, { attributes, listeners })}
                                 </SortableRow>
@@ -1739,7 +1698,7 @@ export default function CourseManager() {
                         );
                       }
 
-                      return paginatedRows.map((row, idx) => (
+                      return filteredRows.map((row, idx) => (
                         <tr
                           key={row._id}
                           className="transition-colors hover:bg-white/4 animate-fade-up"
@@ -1754,16 +1713,6 @@ export default function CourseManager() {
               </table>
             </div>
           </div>
-
-          {filteredRows.length > PAGE_SIZE && (
-            <PaginationBar
-              page={page}
-              totalPages={totalPages}
-              totalCount={filteredRows.length}
-              pageSize={PAGE_SIZE}
-              onChange={setPage}
-            />
-          )}
         </>
       )}
 

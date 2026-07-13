@@ -477,6 +477,8 @@ export const getTestResult = async (attemptId, studentId) => {
 
   return {
     test: {
+
+      _id: test._id,
       title: test.title,
       description: test.description,
       totalMarks: test.totalMarks,
