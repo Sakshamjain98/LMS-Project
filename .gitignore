@@ -44,3 +44,4 @@ coverage/
 # Logs
 logs/
 config.bat
+backend/.env.docker
