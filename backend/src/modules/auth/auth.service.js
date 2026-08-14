@@ -165,6 +165,9 @@ export const forgotPasswordService = async ({ email }) => {
 export const resetPasswordService = async ({ token, password, newPassword }) => {
   const nextPassword = password || newPassword;
 
+  if (!token) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Reset token is required");
+  }
   if (!nextPassword) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Password is required");
   }

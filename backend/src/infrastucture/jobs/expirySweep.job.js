@@ -3,12 +3,41 @@ import CourseAccess from "../../models/courseAccess.model.js";
 import TopicAccess from "../../models/topicAccess.model.js";
 import Subscription from "../../models/subscription.model.js";
 import logger from "../logger/logger.js";
+import { sendAccessExpiredEmail } from "../../shared/utils/email.util.js";
+
+// Sends the "access expired, renew" notice for a batch of lapsed docs, then
+// flips their status. The status filter (only ACTIVE rows match) is what
+// keeps this idempotent — a row already flipped to EXPIRED never matches
+// again, so the email only ever fires once per expiry.
+const notifyAndExpire = async (Model, lapsedFilter, titleField, populatePath) => {
+  const lapsedDocs = await Model.find(lapsedFilter)
+    .populate("userId", "name email")
+    .populate(populatePath, titleField)
+    .select(`userId ${populatePath}`)
+    .lean();
+
+  await Promise.allSettled(
+    lapsedDocs
+      .filter((doc) => doc.userId?.email)
+      .map((doc) =>
+        sendAccessExpiredEmail(
+          doc.userId.email,
+          doc.userId.name,
+          doc[populatePath]?.[titleField] || "your item"
+        )
+      )
+  );
+
+  return Model.updateMany(lapsedFilter, { $set: { status: "EXPIRED" } });
+};
 
 /**
  * Sweep all access records and flip stored status ACTIVE → EXPIRED where the
  * access window has lapsed. Real-time access checks already treat a passed
  * `expiresAt` as expired, so this job only keeps the *stored* status accurate
  * for admin reporting/filtering — correctness never depends on it running.
+ * It also fires the one-time "access expired, renew now" email per lapsed
+ * grant, so runs frequently (see startExpirySweepJob) rather than daily.
  *
  * Also a safety-net: COURSE_UNLOCK test-series rows whose source course access
  * is gone/expired are marked EXPIRED + disabled so they can't linger active.
@@ -20,8 +49,8 @@ export const runExpirySweep = async () => {
   const lapsed = { expiresAt: { $ne: null, $lte: now }, status: "ACTIVE" };
 
   const [courseRes, topicRes, subRes] = await Promise.all([
-    CourseAccess.updateMany(lapsed, { $set: { status: "EXPIRED" } }),
-    TopicAccess.updateMany(lapsed, { $set: { status: "EXPIRED" } }),
+    notifyAndExpire(CourseAccess, lapsed, "title", "courseId"),
+    notifyAndExpire(TopicAccess, lapsed, "title", "topicId"),
     Subscription.updateMany(
       { plan: { $ne: "FREE" }, endDate: { $ne: null, $lte: now }, status: "ACTIVE" },
       { $set: { status: "EXPIRED" } }
@@ -70,15 +99,22 @@ export const runExpirySweep = async () => {
 };
 
 /**
- * Schedule the daily sweep (02:00 server time). Call once on server boot.
+ * Schedule the sweep every 5 minutes, IST. Runs frequently (not daily) because
+ * it now also fires the expiry-notice email — a daily cron meant a lapsed
+ * grant could sit up to 24h before the student got a "renew now" email.
+ * Call once on server boot.
  */
 export const startExpirySweepJob = () => {
-  cron.schedule("0 2 * * *", () => {
-    runExpirySweep().catch((err) =>
-      logger.error("Expiry sweep failed", { error: err.message })
-    );
-  });
-  logger.info("Expiry sweep cron scheduled (daily 02:00)");
+  cron.schedule(
+    "*/5 * * * *",
+    () => {
+      runExpirySweep().catch((err) =>
+        logger.error("Expiry sweep failed", { error: err.message })
+      );
+    },
+    { timezone: "Asia/Kolkata" }
+  );
+  logger.info("Expiry sweep cron scheduled (every 5 min, Asia/Kolkata)");
 };
 
 export default startExpirySweepJob;

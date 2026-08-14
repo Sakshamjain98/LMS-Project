@@ -61,4 +61,14 @@ describe("resetPasswordService", () => {
     expect(user.passwordChangedAt).toBeInstanceOf(Date);
     expect(save).toHaveBeenCalledTimes(1);
   });
+
+  it("rejects a missing token with a clean 400 instead of crashing", async () => {
+    // Regression: crypto.createHash().update(undefined) used to throw a raw
+    // TypeError here, which the error middleware reported as a 500.
+    await expect(
+      resetPasswordService({ token: undefined, newPassword: "NewPassword@123" })
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(findOne).not.toHaveBeenCalled();
+  });
 });

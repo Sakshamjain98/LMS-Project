@@ -120,6 +120,35 @@ export const sendResetPasswordEmail = async (email, name, resetToken) => {
   }
 };
 
+export const sendAccessExpiredEmail = async (email, name, itemTitle) => {
+  const html = createEmailShell({
+    title: "Your access has expired",
+    intro: `Hello ${name}, access to "${itemTitle}" has expired.`,
+    content: `
+      <p style="margin:0 0 14px;">Renew now to continue where you left off — your progress is saved.</p>
+    `,
+    ctaText: "Renew now",
+    ctaUrl: getBrandUrl(),
+  });
+  const text = [
+    "Access Expired",
+    `Hello ${name},`,
+    `Your access to "${itemTitle}" has expired.`,
+    "Renew now to continue: " + getBrandUrl(),
+  ].join("\n\n");
+
+  try {
+    await sendResendEmail({
+      to: email,
+      subject: `Access expired: ${itemTitle}`,
+      text,
+      html,
+    });
+  } catch (error) {
+    console.error("[mail] failed to send access-expired email", { to: email, error: error.message });
+  }
+};
+
 export const sendWelcomeEmail = async (email, name) => {
   const html = createEmailShell({
     title: "Welcome to PS Classes",

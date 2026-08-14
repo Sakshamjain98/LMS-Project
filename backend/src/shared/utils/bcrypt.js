@@ -6,5 +6,6 @@ export const hashPassword = async (plainPassword) => {
 };
 
 export const comparePassword = async (plainPassword, hashedPassword) => {
+  if (!hashedPassword) return false;
   return bcrypt.compare(plainPassword, hashedPassword);
 };
